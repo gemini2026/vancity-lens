@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vancity-lens-ingress
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+  annotations:
+    # For GKE with Google-managed SSL certificate
+    networking.gke.io/managed-certificates: "vancity-lens-cert"
+    # kubernetes.io/ingress.class: "gce"
+    # To enable backendConfig for additional GCP features:
+    # cloud.google.com/backendConfig: "{{.Values.backendConfig}}"
+spec:
+  rules:
+  - host: "vancity-lens.example.com"  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vancity-lens-api
+            port:
+              number: 80
+
+# Note: Set up a domain in Google Cloud DNS or your domain provider
+# and update the host field above. Create a ManagedCertificate resource:
+#
+# apiVersion: networking.gke.io/v1
+# kind: ManagedCertificate
+# metadata:
+#   name: vancity-lens-cert
+#   namespace: vancity-lens
+# spec:
+#   domains:
+#   - vancity-lens.example.com

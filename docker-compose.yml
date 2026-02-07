@@ -1,0 +1,42 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    container_name: vancity_postgis
+    environment:
+      POSTGRES_DB: vancity_lens
+      POSTGRES_USER: vancity
+      POSTGRES_PASSWORD: vancity_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d  # auto-runs 001-007 SQL files
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U vancity -d vancity_lens -c 'SELECT 1 FROM intelligence_signals LIMIT 1' 2>/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  api:
+    build: .
+    container_name: vancity_api
+    environment:
+      DATABASE_URL: postgresql://vancity:vancity_dev@db:5432/vancity_lens
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app/api   # live-reload Python changes
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata:

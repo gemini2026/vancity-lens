@@ -1,0 +1,304 @@
+VanCity Lens - Terraform Infrastructure
+Directory Structure and File Overview
+=====================================
+
+/sessions/zen-relaxed-lamport/mnt/bill47/terraform/
+│
+├── README.md
+│   └── Comprehensive infrastructure documentation
+│
+├── providers.tf
+│   ├── Terraform version requirement (>= 1.0)
+│   ├── Google provider configuration (v5.0+)
+│   ├── Google-beta provider configuration
+│   └── Backend GCS configuration (commented - ready for production)
+│
+├── variables.tf
+│   ├── project_id                  [Required: GCP Project ID]
+│   ├── region                      [Default: us-west1]
+│   ├── network_name                [Default: vancity-lens-vpc]
+│   ├── cluster_name                [Default: vancity-lens-gke]
+│   ├── db_password                 [Sensitive: Database password]
+│   ├── anthropic_api_key           [Sensitive: Claude API key]
+│   └── cohere_api_key              [Sensitive: Embeddings API key]
+│
+├── main.tf
+│   ├── google_project_service (8 APIs)
+│   │   ├── compute.googleapis.com
+│   │   ├── container.googleapis.com
+│   │   ├── sqladmin.googleapis.com
+│   │   ├── artifactregistry.googleapis.com
+│   │   ├── secretmanager.googleapis.com
+│   │   ├── servicenetworking.googleapis.com
+│   │   ├── cloudlogging.googleapis.com
+│   │   └── monitoring.googleapis.com
+│   ├── Network Module
+│   ├── Cloud SQL Module
+│   ├── GKE Module
+│   ├── Service Account Creation
+│   ├── Service Account IAM Roles
+│   ├── Artifact Registry Module
+│   └── Secrets Module
+│
+├── outputs.tf
+│   ├── VPC outputs (vpc_id, vpc_name, subnet details)
+│   ├── GKE outputs (cluster name, endpoint, CA cert, workload identity)
+│   ├── Cloud SQL outputs (connection name, IP, database info)
+│   ├── Registry outputs (repository URL)
+│   ├── Service account outputs
+│   └── Secrets outputs (secret IDs)
+│
+├── terraform.tfvars.example
+│   └── Template for sensitive configuration
+│
+└── modules/
+    │
+    ├── network/
+    │   │
+    │   ├── main.tf
+    │   │   ├── google_compute_network
+    │   │   │   └── VPC Network (auto_create_subnetworks = false)
+    │   │   ├── google_compute_subnetwork
+    │   │   │   ├── Primary: 10.0.1.0/24
+    │   │   │   ├── Pods: 10.1.0.0/16 (secondary)
+    │   │   │   └── Services: 10.2.0.0/16 (secondary)
+    │   │   ├── google_compute_router
+    │   │   │   └── NAT Router
+    │   │   └── google_compute_router_nat
+    │   │       └── Cloud NAT (AUTO_ONLY IP allocation)
+    │   │
+    │   ├── variables.tf
+    │   │   ├── project_id
+    │   │   ├── region
+    │   │   └── network_name
+    │   │
+    │   └── outputs.tf
+    │       ├── vpc_id
+    │       ├── vpc_name
+    │       ├── subnet_id
+    │       ├── subnet_name
+    │       ├── pods_secondary_range
+    │       └── services_secondary_range
+    │
+    ├── cloudsql/
+    │   │
+    │   ├── main.tf
+    │   │   ├── google_sql_database_instance
+    │   │   │   ├── PostgreSQL 16
+    │   │   │   ├── db-f1-micro (POC)
+    │   │   │   ├── 10GB SSD
+    │   │   │   ├── Database flags:
+    │   │   │   │   ├── pgvector
+    │   │   │   │   └── postgis
+    │   │   │   ├── Backup config (daily, 7-day retention)
+    │   │   │   └── Query Insights enabled
+    │   │   ├── google_compute_global_address
+    │   │   │   └── Reserved IP range for service connection
+    │   │   ├── google_service_networking_connection
+    │   │   │   └── Private VPC service connection
+    │   │   ├── google_sql_database
+    │   │   │   └── Database: vancity_lens
+    │   │   └── google_sql_user
+    │   │       └── User: vancity
+    │   │
+    │   ├── variables.tf
+    │   │   ├── project_id
+    │   │   ├── region
+    │   │   ├── network_id
+    │   │   └── db_password
+    │   │
+    │   └── outputs.tf
+    │       ├── connection_name
+    │       ├── private_ip_address
+    │       ├── database_name
+    │       ├── database_user
+    │       └── instance_name
+    │
+    ├── gke/
+    │   │
+    │   ├── main.tf
+    │   │   ├── google_container_cluster
+    │   │   │   ├── Type: Autopilot (fully managed)
+    │   │   │   ├── Private cluster: true
+    │   │   │   ├── Master CIDR: 172.16.0.0/28
+    │   │   │   ├── Workload Identity: enabled
+    │   │   │   ├── Network Policy: enabled
+    │   │   │   ├── Shielded nodes: enabled
+    │   │   │   └── IP allocation with secondary ranges
+    │   │   ├── google_container_node_pool (primary-node-pool)
+    │   │   │   ├── 1-3 e2-medium nodes (auto-scaling)
+    │   │   │   ├── Auto repair/upgrade: enabled
+    │   │   │   └── Shielded instance config
+    │   │   └── google_container_node_pool (backend)
+    │   │       ├── 1-5 e2-medium nodes (auto-scaling)
+    │   │       ├── Workload taint: backend
+    │   │       └── Shielded instance config
+    │   │
+    │   ├── variables.tf
+    │   │   ├── project_id
+    │   │   ├── region
+    │   │   ├── network_id
+    │   │   ├── subnet_id
+    │   │   └── cluster_name
+    │   │
+    │   └── outputs.tf
+    │       ├── cluster_name
+    │       ├── cluster_endpoint
+    │       ├── cluster_ca_certificate
+    │       ├── location
+    │       └── workload_identity_pool
+    │
+    ├── registry/
+    │   │
+    │   ├── main.tf
+    │   │   ├── google_artifact_registry_repository
+    │   │   │   ├── Format: Docker
+    │   │   │   ├── Location: us-west1
+    │   │   │   └── Repository: vancity-lens-docker
+    │   │   └── google_artifact_registry_repository_iam_member
+    │   │       └── GKE service account pull access
+    │   │
+    │   ├── variables.tf
+    │   │   ├── project_id
+    │   │   ├── region
+    │   │   └── gke_service_account
+    │   │
+    │   └── outputs.tf
+    │       ├── repository_url
+    │       ├── repository_name
+    │       └── repository_id
+    │
+    └── secrets/
+        │
+        ├── main.tf
+        │   ├── google_secret_manager_secret (anthropic-api-key)
+        │   │   ├── Replication: automatic
+        │   │   └── Label: service=llm
+        │   ├── google_secret_manager_secret_version (anthropic)
+        │   ├── google_secret_manager_secret (cohere-api-key)
+        │   │   ├── Replication: automatic
+        │   │   └── Label: service=embeddings
+        │   ├── google_secret_manager_secret_version (cohere)
+        │   ├── google_secret_manager_secret (database-password)
+        │   │   ├── Replication: automatic
+        │   │   └── Label: service=database
+        │   ├── google_secret_manager_secret_version (db_password)
+        │   ├── google_secret_manager_secret_iam_member (anthropic)
+        │   │   └── GKE SA: secretAccessor
+        │   ├── google_secret_manager_secret_iam_member (cohere)
+        │   │   └── GKE SA: secretAccessor
+        │   └── google_secret_manager_secret_iam_member (db_password)
+        │       └── GKE SA: secretAccessor
+        │
+        ├── variables.tf
+        │   ├── project_id
+        │   ├── anthropic_api_key
+        │   ├── cohere_api_key
+        │   ├── db_password
+        │   └── gke_service_account
+        │
+        └── outputs.tf
+            ├── anthropic_api_key_secret_id
+            ├── cohere_api_key_secret_id
+            └── db_password_secret_id
+
+
+RESOURCE DEPENDENCY CHAIN
+=========================
+
+APIs Enabled
+    ↓
+    ├─→ Network Module
+    │    ├─→ VPC Created
+    │    ├─→ Subnet Created
+    │    ├─→ Router Created
+    │    └─→ NAT Created
+    │         ↓
+    ├─────→ Cloud SQL Module
+    │        ├─→ Global Address Created
+    │        ├─→ Service Connection Created
+    │        ├─→ Database Instance Created
+    │        ├─→ Database Created
+    │        └─→ User Created
+    │         ↓
+    ├─────→ GKE Module
+    │        ├─→ Cluster Created
+    │        ├─→ Primary Node Pool Created
+    │        └─→ Backend Node Pool Created
+    │         ↓
+    ├─────→ Service Account Created
+    │        ├─→ Logging Writer Role
+    │        ├─→ Metric Writer Role
+    │        └─→ Monitoring Viewer Role
+    │         ↓
+    ├─────→ Registry Module
+    │        ├─→ Repository Created
+    │        └─→ IAM Binding (Pull Access)
+    │         ↓
+    └─────→ Secrets Module
+            ├─→ Secrets Created
+            └─→ IAM Bindings (Read Access)
+
+
+NETWORK TOPOLOGY
+================
+
+                    Internet
+                       ↓
+                    Cloud NAT
+                       ↓
+        ┌──────────────VPC (10.0.1.0/24)──────────────┐
+        │                                              │
+        │  Private Subnet (10.0.1.0/24)                │
+        │  ├─ GKE Nodes (Pods: 10.1.0.0/16)           │
+        │  │  └─ Services (10.2.0.0/16)               │
+        │  │     ├─ FastAPI Backend                    │
+        │  │     └─ Cloud SQL Auth Proxy               │
+        │  │                                            │
+        │  └─ Cloud SQL                                │
+        │     ├─ Private IP (10.0.1.x)                │
+        │     ├─ PostgreSQL 16                         │
+        │     └─ pgvector + PostGIS                    │
+        │                                              │
+        └──────────────────────────────────────────────┘
+
+
+DATA FLOW EXAMPLES
+==================
+
+1. Pod → Cloud SQL:
+   Pod (10.1.x.x) → Cloud SQL Auth Proxy → Private SQL (10.0.1.x)
+
+2. Pod → Secret Manager:
+   Pod (Workload Identity) → Service Account → Secret Manager
+
+3. Pod → Artifact Registry:
+   Pod (GKE SA) → Artifact Registry (Pull image)
+
+4. External → GKE:
+   Internet → Load Balancer (TBD) → Ingress → Pod
+
+
+FILE SIZES & COUNTS
+===================
+
+Total Terraform Files: 20
+Total Lines of Code: ~2500+
+Documentation Files: 3
+
+Module Distribution:
+├── Network Module: 150 lines
+├── Cloud SQL Module: 180 lines
+├── GKE Module: 200 lines
+├── Registry Module: 60 lines
+├── Secrets Module: 120 lines
+├── Root Module: 200 lines
+└── Documentation: 1000+ lines
+
+
+This structure is designed for:
+✓ Modularity - each component can be maintained independently
+✓ Reusability - modules can be deployed in other projects
+✓ Clarity - clear separation of concerns
+✓ Scale - easily add more modules or resources
+✓ Security - IAM and network isolation built-in

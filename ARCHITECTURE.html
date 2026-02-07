@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VanCity Lens — Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; padding: 40px; min-height: 100vh; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #f1f5f9; }
+  .subtitle { text-align: center; color: #94a3b8; margin-bottom: 40px; font-size: 14px; }
+  .diagram { max-width: 1000px; margin: 0 auto; }
+
+  /* Layers */
+  .layer { margin-bottom: 24px; border-radius: 12px; padding: 20px; position: relative; }
+  .layer-label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8; margin-bottom: 12px; font-weight: 600; }
+
+  .layer-user { background: linear-gradient(135deg, #1e293b, #334155); border: 1px solid #475569; }
+  .layer-edge { background: linear-gradient(135deg, #1a1f2e, #1e293b); border: 1px solid #f97316; }
+  .layer-api { background: linear-gradient(135deg, #1a1f2e, #172033); border: 1px solid #3b82f6; }
+  .layer-data { background: linear-gradient(135deg, #1a1f2e, #17201a); border: 1px solid #22c55e; }
+  .layer-ai { background: linear-gradient(135deg, #1a1f2e, #201724); border: 1px solid #a855f7; }
+  .layer-ingest { background: linear-gradient(135deg, #1a1f2e, #201a17); border: 1px solid #eab308; }
+
+  /* Boxes */
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .box { flex: 1; min-width: 140px; background: #1e293b; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid #334155; }
+  .box-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .box-detail { font-size: 11px; color: #94a3b8; line-height: 1.4; }
+  .box-icon { font-size: 24px; margin-bottom: 6px; }
+
+  .box-orange { border-color: #f97316; }
+  .box-blue { border-color: #3b82f6; }
+  .box-green { border-color: #22c55e; }
+  .box-purple { border-color: #a855f7; }
+  .box-yellow { border-color: #eab308; }
+
+  /* Arrows */
+  .arrow { text-align: center; padding: 8px 0; color: #64748b; font-size: 18px; }
+  .arrow-label { font-size: 11px; color: #94a3b8; }
+
+  /* Cost badge */
+  .cost { display: inline-block; background: #1e293b; border: 1px solid #475569; border-radius: 20px; padding: 3px 10px; font-size: 11px; color: #94a3b8; margin-top: 6px; }
+  .cost-free { border-color: #22c55e; color: #22c55e; }
+  .cost-low { border-color: #eab308; color: #eab308; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #334155; font-size: 13px; }
+  th { color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+  td { color: #e2e8f0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .tag-green { background: #064e3b; color: #6ee7b7; }
+  .tag-blue { background: #1e3a5f; color: #93c5fd; }
+  .tag-orange { background: #431407; color: #fdba74; }
+  .tag-purple { background: #3b0764; color: #d8b4fe; }
+  .tag-gray { background: #1e293b; color: #94a3b8; }
+
+  /* Notes */
+  .notes { max-width: 1000px; margin: 30px auto 0; }
+  .note { background: #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 3px solid #3b82f6; }
+  .note h3 { font-size: 14px; margin-bottom: 6px; color: #f1f5f9; }
+  .note p { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+  .note-warn { border-left-color: #eab308; }
+</style>
+</head>
+<body>
+  <h1>VanCity Lens — Production Architecture</h1>
+  <p class="subtitle">Demo-Ready POC &middot; Google Cloud + Cloudflare &middot; ~$15-30/mo at idle</p>
+
+  <div class="diagram">
+
+    <!-- User Layer -->
+    <div class="layer layer-user">
+      <div class="layer-label">Colin (User)</div>
+      <div class="row">
+        <div class="box">
+          <div class="box-icon">🏠</div>
+          <div class="box-title">Browser</div>
+          <div class="box-detail">Desktop / Mobile<br>Vancouver, BC</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">▼ <span class="arrow-label">HTTPS (Cloudflare CDN edge)</span></div>
+
+    <!-- Edge / Frontend Layer -->
+    <div class="layer layer-edge">
+      <div class="layer-label">Edge — Cloudflare Pages</div>
+      <div class="row">
+        <div class="box box-orange">
+          <div class="box-icon">⚡</div>
+          <div class="box-title">Next.js 15 Frontend</div>
+          <div class="box-detail">React 19 + Mapbox GL 3.9<br>Static export, edge-cached<br>Two tabs: Map + Intelligence</div>
+          <div class="cost cost-free">FREE tier</div>
+        </div>
+        <div class="box box-orange">
+          <div class="box-icon">🗺️</div>
+          <div class="box-title">Mapbox GL</div>
+          <div class="box-detail">Map tiles + geocoding<br>TOA zones overlay<br>Signal markers layer</div>
+          <div class="cost cost-free">FREE to 50K loads</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">▼ <span class="arrow-label">REST API (HTTPS, CORS-protected)</span></div>
+
+    <!-- API Layer -->
+    <div class="layer layer-api">
+      <div class="layer-label">Backend — GCP Cloud Run (us-west1)</div>
+      <div class="row">
+        <div class="box box-blue">
+          <div class="box-icon">🚀</div>
+          <div class="box-title">FastAPI Application</div>
+          <div class="box-detail">
+            12 REST endpoints<br>
+            Scales 0→5 instances<br>
+            1 vCPU, 1 GB RAM
+          </div>
+          <div class="cost cost-low">~$5/mo (scale-to-zero)</div>
+        </div>
+        <div class="box box-blue">
+          <div class="box-icon">💬</div>
+          <div class="box-title">Chat (RAG)</div>
+          <div class="box-detail">Hybrid search → Cohere rerank → Claude synthesis → cited answer</div>
+        </div>
+        <div class="box box-blue">
+          <div class="box-icon">📡</div>
+          <div class="box-title">Signal Feed</div>
+          <div class="box-detail">Filtered feed + GeoJSON<br>Parcel bridge + stats<br>Neighborhood list</div>
+        </div>
+        <div class="box box-blue">
+          <div class="box-icon">⚙️</div>
+          <div class="box-title">Admin API</div>
+          <div class="box-detail">Trigger scraping<br>Process documents<br>Pipeline status</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">▼ <span class="arrow-label">asyncpg (Cloud SQL Auth Proxy)</span></div>
+
+    <!-- Data Layer -->
+    <div class="layer layer-data">
+      <div class="layer-label">Data — GCP Cloud SQL (PostgreSQL 16)</div>
+      <div class="row">
+        <div class="box box-green">
+          <div class="box-icon">🗄️</div>
+          <div class="box-title">PostGIS</div>
+          <div class="box-detail">Parcels, TOA buffers<br>Transit stations<br>Spatial indexes (GIST)</div>
+        </div>
+        <div class="box box-green">
+          <div class="box-icon">🧠</div>
+          <div class="box-title">pgvector</div>
+          <div class="box-detail">1024-dim embeddings<br>IVFFlat cosine index<br>Hybrid: dense + BM25</div>
+        </div>
+        <div class="box box-green">
+          <div class="box-icon">📊</div>
+          <div class="box-title">Intelligence DB</div>
+          <div class="box-detail">Documents, Chunks<br>Signals (geocoded)<br>Chat sessions</div>
+        </div>
+        <div class="box box-green">
+          <div class="box-icon">🔍</div>
+          <div class="box-title">tsvector (BM25)</div>
+          <div class="box-detail">Full-text search<br>GIN index<br>Auto-trigger on insert</div>
+        </div>
+      </div>
+      <div class="cost cost-low" style="margin-top: 12px;">~$10-20/mo (db-f1-micro, 10GB SSD)</div>
+    </div>
+
+    <div class="arrow">▲▼ <span class="arrow-label">External AI APIs (pay-per-use)</span></div>
+
+    <!-- AI Layer -->
+    <div class="layer layer-ai">
+      <div class="layer-label">AI Services — External APIs</div>
+      <div class="row">
+        <div class="box box-purple">
+          <div class="box-icon">🔮</div>
+          <div class="box-title">Anthropic Claude</div>
+          <div class="box-detail">Signal extraction<br>Chat synthesis<br>claude-sonnet-4-5</div>
+          <div class="cost cost-low">~$0.003/query</div>
+        </div>
+        <div class="box box-purple">
+          <div class="box-icon">🎯</div>
+          <div class="box-title">Cohere</div>
+          <div class="box-detail">embed-english-v3.0<br>rerank-v3.5<br>1024-dim vectors</div>
+          <div class="cost cost-low">~$0.0001/embed</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">▲ <span class="arrow-label">Scraped documents (aiohttp, rate-limited)</span></div>
+
+    <!-- Ingestion Layer -->
+    <div class="layer layer-ingest">
+      <div class="layer-label">Data Sources — Vancouver Government + News</div>
+      <div class="row">
+        <div class="box box-yellow">
+          <div class="box-icon">🏛️</div>
+          <div class="box-title">Council Minutes</div>
+          <div class="box-detail">council.vancouver.ca<br>PDF + HTML<br>~600/year</div>
+        </div>
+        <div class="box box-yellow">
+          <div class="box-icon">🏗️</div>
+          <div class="box-title">Rezoning Apps</div>
+          <div class="box-detail">rezoning.vancouver.ca<br>Applications + PDFs<br>~50 active</div>
+        </div>
+        <div class="box box-yellow">
+          <div class="box-icon">📋</div>
+          <div class="box-title">DPB Minutes</div>
+          <div class="box-detail">Dev Permit Board<br>PDF minutes<br>~15/year</div>
+        </div>
+        <div class="box box-yellow">
+          <div class="box-icon">📰</div>
+          <div class="box-title">News Feeds</div>
+          <div class="box-detail">6 RSS sources<br>Van Sun, BIV, etc.<br>Keyword filtered</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Summary Table -->
+  <div class="notes">
+    <table>
+      <tr><th>Component</th><th>Service</th><th>Cost (POC)</th><th>Scaling</th></tr>
+      <tr>
+        <td>Frontend</td>
+        <td><span class="tag tag-orange">Cloudflare Pages</span></td>
+        <td>Free</td>
+        <td>Global CDN, unlimited bandwidth on free tier</td>
+      </tr>
+      <tr>
+        <td>Backend API</td>
+        <td><span class="tag tag-blue">Cloud Run</span></td>
+        <td>~$5/mo</td>
+        <td>0→5 instances, scale-to-zero when idle</td>
+      </tr>
+      <tr>
+        <td>Database</td>
+        <td><span class="tag tag-green">Cloud SQL PostgreSQL 16</span></td>
+        <td>~$10-20/mo</td>
+        <td>db-f1-micro (0.6GB RAM), 10GB SSD</td>
+      </tr>
+      <tr>
+        <td>LLM (chat + extraction)</td>
+        <td><span class="tag tag-purple">Anthropic Claude</span></td>
+        <td>Pay-per-use</td>
+        <td>~$0.003 per chat query, ~$0.01 per doc extraction</td>
+      </tr>
+      <tr>
+        <td>Embeddings + Rerank</td>
+        <td><span class="tag tag-purple">Cohere</span></td>
+        <td>Pay-per-use</td>
+        <td>~$0.0001 per embedding, ~$0.001 per rerank</td>
+      </tr>
+      <tr>
+        <td>Secrets</td>
+        <td><span class="tag tag-gray">GCP Secret Manager</span></td>
+        <td>Free</td>
+        <td>6 free secret versions</td>
+      </tr>
+      <tr>
+        <td>Container Registry</td>
+        <td><span class="tag tag-gray">Artifact Registry</span></td>
+        <td>~$0.10/mo</td>
+        <td>Per-GB storage</td>
+      </tr>
+    </table>
+
+    <div class="note" style="margin-top: 24px;">
+      <h3>💰 Estimated Monthly Cost: $15-30</h3>
+      <p>Cloud SQL is the main cost (~$10-20). Cloud Run scales to zero when Colin isn't using it. AI API costs are pay-per-use — seeding 100 docs costs ~$2-5 total, then chat queries are ~$0.003 each.</p>
+    </div>
+
+    <div class="note note-warn">
+      <h3>⚡ Data Flow: Scraping → Signals</h3>
+      <p><strong>Scrape:</strong> aiohttp fetches PDFs/HTML from Vancouver gov sites → stored in <code>documents</code> table.<br>
+      <strong>Chunk:</strong> semchunk splits into ~800 token pieces → stored in <code>document_chunks</code>.<br>
+      <strong>Embed:</strong> Cohere embed-english-v3.0 (1024 dims) → stored as <code>vector(1024)</code> in pgvector + tsvector for BM25.<br>
+      <strong>Extract:</strong> Claude reads each chunk → extracts structured signals (address, zoning changes, vote counts, severity) → stored in <code>intelligence_signals</code>.<br>
+      <strong>Query:</strong> User asks a question → hybrid search (dense + BM25 + RRF) → Cohere rerank → Claude synthesis → cited answer.</p>
+    </div>
+
+    <div class="note">
+      <h3>🔒 Security</h3>
+      <p>API keys in GCP Secret Manager (not env vars). Cloud SQL uses private IP + Auth Proxy. Cloud Run is public but CORS-restricted. No user auth for POC (Colin is the only user). Frontend is static — no secrets embedded.</p>
+    </div>
+  </div>
+</body>
+</html>

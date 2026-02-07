@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vancity-lens-api
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+    version: v1
+spec:
+  replicas: 1  # POC deployment, scale up in production
+  selector:
+    matchLabels:
+      app: vancity-lens-api
+  template:
+    metadata:
+      labels:
+        app: vancity-lens-api
+        version: v1
+    spec:
+      containers:
+      - name: api
+        image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens/vancity-lens-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        
+        # Resource requests and limits
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Liveness probe - restart container if unhealthy
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe - remove from service if not ready
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Environment variables from ConfigMap and Secrets
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: database-url
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: anthropic-api-key
+        - name: COHERE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: cohere-api-key
+        - name: CORS_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: cors-origins

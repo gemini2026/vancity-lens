@@ -1,0 +1,23 @@
+# Copy this file to terraform.tfvars and fill in the actual values
+
+# GCP Project ID
+project_id = "openclaw-antonmishel-03460"
+
+# GCP Region (us-west1 is closest to Vancouver)
+region = "us-west1"
+
+# VPC Network name
+network_name = "vancity-lens-vpc"
+
+# GKE Cluster name
+cluster_name = "vancity-lens-gke"
+
+# Cloud SQL database password
+# Generate a secure password: openssl rand -base64 32
+db_password = "your-secure-database-password"
+
+# Anthropic API Key (for Claude integration)
+anthropic_api_key = "your-anthropic-api-key"
+
+# Cohere API Key (for embeddings)
+cohere_api_key = "your-cohere-api-key"

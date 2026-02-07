@@ -1,0 +1,40 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+*.egg-info
+dist/
+build/
+.venv
+venv
+
+# Node / Frontend (built separately)
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Tests (not needed in production image)
+tests/
+
+# Misc
+*.md
+*.log
+.env
+.env.*
+k2-lite-main.zip

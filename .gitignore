@@ -1,0 +1,56 @@
+# ── Python ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ── Node / Frontend ──────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+
+# ── Terraform ────────────────────────────────────────
+terraform/.terraform/
+terraform/**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+terraform/environments/**/terraform.tfvars
+.terraform.lock.hcl
+
+# ── Secrets / Environment ────────────────────────────
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# ── IDE ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ── Docker ───────────────────────────────────────────
+pgdata/
+
+# ── Data (too large for git, download separately) ────
+data/
+
+# ── Misc ─────────────────────────────────────────────
+*.log
+*.zip

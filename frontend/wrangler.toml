@@ -1,0 +1,15 @@
+# Cloudflare Pages configuration for VanCity Lens frontend
+# Deploy: npx wrangler pages deploy .next/static --project-name=vancity-lens
+# Or connect GitHub repo in Cloudflare Dashboard → Pages
+
+name = "vancity-lens"
+compatibility_date = "2024-12-01"
+
+# Build configuration (used by Cloudflare Pages)
+# Framework: Next.js (auto-detected)
+# Build command: npm run build
+# Output directory: .next
+
+# Environment variables (set in Cloudflare Dashboard → Pages → Settings)
+# NEXT_PUBLIC_MAPBOX_TOKEN = pk.xxx
+# NEXT_PUBLIC_API_URL = https://vancity-lens-api-xxx.run.app
