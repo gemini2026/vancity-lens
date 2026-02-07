@@ -71,6 +71,50 @@ export interface IntelStats {
   recent_30d: number;
 }
 
+/** Neighborhood scorecard types */
+
+export type MetricCategory =
+  | "safety"
+  | "schools"
+  | "transit"
+  | "parks"
+  | "development"
+  | "air_quality"
+  | "affordability"
+  | "walkability";
+
+export type TrendDirection = "improving" | "stable" | "declining";
+
+export interface CategoryScore {
+  category: MetricCategory;
+  score: number;
+  trend: TrendDirection;
+  trend_delta: number;
+}
+
+export interface NeighborhoodSummary {
+  name: string;
+  slug: string;
+  overall_score: number;
+  rank: number;
+  top_category: string;
+  bottom_category: string;
+}
+
+export interface NeighborhoodScorecard {
+  neighborhood: { name: string; slug: string };
+  overall_score: number;
+  rank: number;
+  category_scores: CategoryScore[];
+  active_rezonings: number;
+  recent_permits: number;
+}
+
+export interface NeighborhoodComparison {
+  neighborhoods: NeighborhoodScorecard[];
+  categories: MetricCategory[];
+}
+
 /** GeoJSON types for map overlay */
 export namespace GeoJSON {
   export interface Point {

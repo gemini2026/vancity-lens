@@ -6,6 +6,9 @@ import type {
   SignalType,
   Severity,
   GeoJSON,
+  NeighborhoodSummary,
+  NeighborhoodScorecard,
+  NeighborhoodComparison,
 } from "./intel-types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -85,6 +88,27 @@ export async function getIntelStats(): Promise<IntelStats> {
 export async function getNeighborhoods(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/v1/intel/neighborhoods`);
   if (!res.ok) return [];
+  return res.json();
+}
+
+// ── Neighborhood Scorecard API ─────────────────────
+
+export async function getNeighborhoodScorecards(): Promise<NeighborhoodSummary[]> {
+  const res = await fetch(`${API_BASE}/api/v1/intel/neighborhoods/scorecards`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getNeighborhoodScorecard(slug: string): Promise<NeighborhoodScorecard | null> {
+  const res = await fetch(`${API_BASE}/api/v1/intel/neighborhoods/${encodeURIComponent(slug)}/scorecard`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function compareNeighborhoods(slugs: string[]): Promise<NeighborhoodComparison | null> {
+  const params = new URLSearchParams({ slugs: slugs.join(",") });
+  const res = await fetch(`${API_BASE}/api/v1/intel/neighborhoods/compare?${params}`);
+  if (!res.ok) return null;
   return res.json();
 }
 
