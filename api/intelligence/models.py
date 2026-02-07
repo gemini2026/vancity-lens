@@ -197,8 +197,6 @@ class TrendDirection(str, Enum):
 class NeighborhoodBase(BaseModel):
     name: str
     slug: str
-    population: Optional[int] = None
-    area_km2: Optional[float] = None
 
 
 class CategoryScore(BaseModel):
@@ -208,7 +206,7 @@ class CategoryScore(BaseModel):
     raw_value: Optional[float] = None
     percentile: Optional[float] = None
     trend: TrendDirection = TrendDirection.STABLE
-    trend_change: Optional[float] = None
+    trend_delta: Optional[float] = None
 
 
 class NeighborhoodScorecard(BaseModel):
@@ -216,15 +214,10 @@ class NeighborhoodScorecard(BaseModel):
     neighborhood: NeighborhoodBase
     overall_score: float = Field(ge=0.0, le=10.0)
     rank: Optional[int] = None
-    total_neighborhoods: int = 22
     category_scores: list[CategoryScore] = Field(default_factory=list)
     # Contextual stats from intelligence layer
     active_rezonings: int = 0
     recent_permits: int = 0
-    recent_signals: int = 0
-    avg_price_sqft: Optional[float] = None
-    price_change_yoy: Optional[float] = None
-    computed_at: Optional[datetime] = None
 
 
 class NeighborhoodSummary(BaseModel):
@@ -235,7 +228,6 @@ class NeighborhoodSummary(BaseModel):
     rank: Optional[int] = None
     top_category: Optional[str] = None
     bottom_category: Optional[str] = None
-    signal_count: int = 0
 
 
 class NeighborhoodComparison(BaseModel):

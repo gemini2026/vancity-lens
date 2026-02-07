@@ -136,11 +136,12 @@ class TestNeighborhoodModels:
             raw_value=28.1,
             percentile=75.0,
             trend=TrendDirection.IMPROVING,
-            trend_change=0.3,
+            trend_delta=0.3,
         )
         assert score.score == 7.5
         assert score.category == "safety"
         assert score.trend == "improving"
+        assert score.trend_delta == 0.3
 
     def test_category_score_bounds(self):
         from api.intelligence.models import CategoryScore, MetricCategory
@@ -164,13 +165,12 @@ class TestNeighborhoodModels:
             ],
             active_rezonings=7,
             recent_permits=23,
-            recent_signals=15,
         )
         assert scorecard.overall_score == 7.2
         assert scorecard.rank == 5
         assert len(scorecard.category_scores) == 2
         assert scorecard.active_rezonings == 7
-        assert scorecard.total_neighborhoods == 22
+        assert scorecard.recent_permits == 23
 
     def test_neighborhood_summary_model(self):
         from api.intelligence.models import NeighborhoodSummary
@@ -181,10 +181,10 @@ class TestNeighborhoodModels:
             rank=2,
             top_category="parks",
             bottom_category="affordability",
-            signal_count=12,
         )
         assert summary.overall_score == 8.1
         assert summary.top_category == "parks"
+        assert summary.bottom_category == "affordability"
 
     def test_neighborhood_comparison_model(self):
         from api.intelligence.models import (

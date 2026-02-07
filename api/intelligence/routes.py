@@ -25,6 +25,9 @@ from .models import (
     SignalResponse,
     SignalFeedResponse,
     Severity,
+    NeighborhoodSummary,
+    NeighborhoodScorecard,
+    NeighborhoodComparison,
 )
 from .signals import (
     get_signal_feed,
@@ -668,6 +671,50 @@ async def admin_get_status(request: Request):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get status: {str(e)}",
+        )
+
+
+@router.post(
+    "/admin/scrape-opendata",
+    summary="Admin: trigger open data scraping for neighborhood metrics",
+    description=(
+        "Start a background task to scrape open data sources (crime, parks, transit, "
+        "permits, property tax), persist metrics, and compute neighborhood scores."
+    ),
+)
+async def admin_trigger_opendata_scrape(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Trigger open data scraping pipeline in the background.
+
+    Scrapes: VPD crime, CoV parks, TransLink transit, CoV permits, CoV property tax.
+    Then persists metrics and computes normalized scores + composite rankings.
+    """
+    try:
+        db_pool = get_db_pool(request)
+
+        async def _run_opendata_scrapers(pool):
+            import aiohttp
+            from .scraper_opendata import run_all_scrapers
+            async with aiohttp.ClientSession() as session:
+                results = await run_all_scrapers(session, pool)
+                logger.info("Open data scraping results: %s", results)
+
+        background_tasks.add_task(_run_opendata_scrapers, db_pool)
+
+        return {
+            "status": "open data scraping started",
+            "sources": ["vpd_crime", "cov_parks", "translink_transit", "development", "cov_permits", "cov_property_tax"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error initiating open data scrape: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initiate open data scraping: {str(e)}",
         )
 
 

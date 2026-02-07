@@ -10,7 +10,10 @@ Handles:
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ── Configuration ─────────────────────────────────────────────
@@ -105,14 +108,11 @@ def compute_composite_score(
     if total_weight == 0:
         return 0.0
 
-    # Normalize in case not all categories are present
-    score = weighted_sum / total_weight * total_weight
-    # If all weights are present, this simplifies to just weighted_sum
-    # But if some are missing, we renormalize
-    if abs(total_weight - 1.0) > 0.01:
-        score = weighted_sum / total_weight
+    # Renormalize: if only a subset of categories are present,
+    # divide by the sum of present weights so the score stays on a 0-10 scale.
+    score = weighted_sum / total_weight
 
-    return round(max(0.0, min(10.0, weighted_sum)), 1)
+    return round(max(0.0, min(10.0, score)), 1)
 
 
 def rank_neighborhoods(
@@ -201,6 +201,7 @@ async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
     Returns a list of NeighborhoodSummary-compatible dicts.
     """
     async with db_pool.acquire() as conn:
+        # FIX: Use per-neighborhood MAX(period_start) instead of global MAX
         rows = await conn.fetch("""
             SELECT
                 n.name,
@@ -211,13 +212,18 @@ async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
             FROM neighborhoods n
             LEFT JOIN neighborhood_composite_scores c ON c.neighborhood_id = n.id
                 AND c.period_start = (
-                    SELECT MAX(period_start) FROM neighborhood_composite_scores
+                    SELECT MAX(c2.period_start)
+                    FROM neighborhood_composite_scores c2
+                    WHERE c2.neighborhood_id = n.id
                 )
             ORDER BY c.rank NULLS LAST, n.name
         """)
 
+        # Get actual count instead of hardcoding
+        total = await conn.fetchval("SELECT COUNT(*) FROM neighborhoods")
+
         summaries = []
-        for row in rows:
+        for i, row in enumerate(rows):
             cat_scores = row.get("category_scores") or {}
             top, bottom = get_top_and_bottom(cat_scores) if cat_scores else ("", "")
 
@@ -225,10 +231,9 @@ async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
                 "name": row["name"],
                 "slug": row["slug"],
                 "overall_score": float(row["overall_score"]),
-                "rank": row.get("rank"),
+                "rank": row.get("rank") or (i + 1),  # Fallback rank if no scores yet
                 "top_category": top or None,
                 "bottom_category": bottom or None,
-                "signal_count": 0,  # Enriched separately
             })
 
         return summaries
@@ -252,56 +257,56 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
 
         # Get latest composite score
         composite = await conn.fetchrow("""
-            SELECT overall_score, rank, category_scores, weights_used, period_start, period_end, computed_at
+            SELECT overall_score, rank, category_scores, weights_used,
+                   period_start, period_end, computed_at
             FROM neighborhood_composite_scores
             WHERE neighborhood_id = $1
             ORDER BY period_start DESC LIMIT 1
         """, hood_id)
 
-        # Get category scores with trends
+        # FIX: Get category scores for LATEST PERIOD ONLY using DISTINCT ON
         cat_scores = await conn.fetch("""
-            SELECT category, score, raw_value, percentile, trend, trend_change
+            SELECT DISTINCT ON (category)
+                category, score, raw_value, percentile, trend, trend_change
             FROM neighborhood_scores
             WHERE neighborhood_id = $1
-            ORDER BY period_start DESC
+            ORDER BY category, period_start DESC
         """, hood_id)
 
-        # Get signal stats from intelligence_signals
-        signal_stats = await conn.fetchrow("""
-            SELECT
-                COUNT(*) FILTER (WHERE signal_type = 'rezoning_decision') as active_rezonings,
-                COUNT(*) FILTER (WHERE signal_type = 'permit_approval') as recent_permits,
-                COUNT(*) as recent_signals
-            FROM intelligence_signals
-            WHERE neighborhood = $1
-              AND extracted_at > NOW() - INTERVAL '90 days'
-        """, hood["name"])
+        # Get signal stats from intelligence_signals (graceful if table empty)
+        try:
+            signal_stats = await conn.fetchrow("""
+                SELECT
+                    COUNT(*) FILTER (WHERE signal_type = 'rezoning_decision') as active_rezonings,
+                    COUNT(*) FILTER (WHERE signal_type = 'permit_approval') as recent_permits,
+                    COUNT(*) as recent_signals
+                FROM intelligence_signals
+                WHERE neighborhood = $1
+                  AND extracted_at > NOW() - INTERVAL '90 days'
+            """, hood["name"])
+        except Exception:
+            logger.warning("intelligence_signals query failed for %s", hood["name"])
+            signal_stats = None
 
         return {
             "neighborhood": {
                 "name": hood["name"],
                 "slug": hood["slug"],
-                "population": hood.get("population"),
-                "area_km2": float(hood["area_km2"]) if hood.get("area_km2") else None,
             },
             "overall_score": float(composite["overall_score"]) if composite else 0.0,
             "rank": composite["rank"] if composite else None,
-            "total_neighborhoods": 22,
             "category_scores": [
                 {
                     "category": row["category"],
                     "score": float(row["score"]),
-                    "raw_value": float(row["raw_value"]) if row.get("raw_value") else None,
-                    "percentile": float(row["percentile"]) if row.get("percentile") else None,
                     "trend": row.get("trend", "stable"),
-                    "trend_change": float(row["trend_change"]) if row.get("trend_change") else None,
+                    # FIX: Use trend_delta consistently (matches frontend TypeScript)
+                    "trend_delta": float(row["trend_change"]) if row.get("trend_change") else 0.0,
                 }
                 for row in cat_scores
             ],
             "active_rezonings": signal_stats["active_rezonings"] if signal_stats else 0,
             "recent_permits": signal_stats["recent_permits"] if signal_stats else 0,
-            "recent_signals": signal_stats["recent_signals"] if signal_stats else 0,
-            "computed_at": composite["computed_at"].isoformat() if composite and composite.get("computed_at") else None,
         }
 
 
@@ -310,13 +315,16 @@ async def compare_neighborhoods(db_pool, slugs: list[str]) -> Optional[dict]:
 
     Returns a NeighborhoodComparison-compatible dict.
     """
+    if not (2 <= len(slugs) <= 4):
+        return None
+
     scorecards = []
     for slug in slugs:
         card = await get_neighborhood_scorecard(db_pool, slug)
         if card:
             scorecards.append(card)
 
-    if not scorecards:
+    if len(scorecards) < 2:
         return None
 
     return {
