@@ -1,4 +1,7 @@
+version: "3.9"
+
 services:
+  # ─── PostgreSQL 16 + PostGIS + pgvector ────────────────────────
   db:
     build:
       context: .
@@ -12,31 +15,66 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db:/docker-entrypoint-initdb.d  # auto-runs 001-007 SQL files
+      - ./db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "psql -U vancity -d vancity_lens -c 'SELECT 1 FROM intelligence_signals LIMIT 1' 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U vancity -d vancity_lens"]
       interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
+      timeout: 3s
+      retries: 10
 
+  # ─── FastAPI Backend ───────────────────────────────────────────
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: vancity_api
-    environment:
-      DATABASE_URL: postgresql://vancity:vancity_dev@db:5432/vancity_lens
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      COHERE_API_KEY: ${COHERE_API_KEY:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql://vancity:vancity_dev@db:5432/vancity_lens"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-sk-placeholder}"
+      COHERE_API_KEY: "${COHERE_API_KEY:-placeholder}"
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
     volumes:
-      - ./api:/app/api   # live-reload Python changes
+      - ./api:/app/api
+      - ./scripts:/app/scripts
+      - ./db:/app/db
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ─── Next.js Frontend ──────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: vancity_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
+      NEXT_PUBLIC_MAPBOX_TOKEN: "${MAPBOX_TOKEN:-}"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - api
+
+  # ─── E2E Test Runner (on-demand) ───────────────────────────────
+  e2e:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.e2e
+    container_name: vancity_e2e
+    environment:
+      PLAYWRIGHT_BASE_URL: "http://frontend:3000"
+      API_BASE_URL: "http://api:8000"
+    depends_on:
+      - frontend
+      - api
+    profiles:
+      - test
 
 volumes:
   pgdata:

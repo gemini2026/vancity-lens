@@ -250,6 +250,45 @@ and whispers "buy this block before Tuesday's vote."**
   - test_scraper_news.py — 10 tests (RSS feeds, article fetching)
   - **Total: 242 test methods, all passing, all using mocks (no external API calls)**
 
+### Phase 4.5: Local E2E Development & Validation ✅ COMPLETE
+> Goal: Full-stack local dev flow with E2E testing before cloud deployment.
+
+- [x] **4.5.1 Full-stack Docker Compose** → `docker-compose.yml`
+  - `db` — PostgreSQL 16 + PostGIS + pgvector (existing, healthchecked)
+  - `api` — FastAPI with hot reload (existing, enhanced)
+  - `frontend` — Next.js dev server via `Dockerfile.dev` (NEW)
+  - `e2e` — Playwright test runner via `Dockerfile.e2e` (NEW, profile-gated)
+  - All services wired with proper depends_on + healthchecks
+  - One command: `make dev` starts everything
+
+- [x] **4.5.2 Makefile — Unified developer workflow** → `Makefile`
+  - 30+ targets organized by category: dev, logs, testing, seeding, build, shell, lint, db
+  - `make dev` — full stack with hot reload
+  - `make test-unit` — 242 pytest tests
+  - `make test-e2e` — Playwright against local stack
+  - `make test-e2e-docker` — E2E in isolated container
+  - `make seed` — seed intelligence data
+  - `make shell-db` — psql into database
+  - `make status` — health check all services
+
+- [x] **4.5.3 Playwright E2E test framework** → `frontend/playwright.config.ts` + `frontend/e2e/`
+  - 5 test suites, 21 test cases total:
+    - `app.spec.ts` — App shell, branding, navigation, dark theme (5 tests)
+    - `intelligence.spec.ts` — Intel tab, chat input, filters, severity colors (5 tests)
+    - `map.spec.ts` — Map container rendering, viewport sizing (2 tests)
+    - `api-health.spec.ts` — Backend health, CORS, signals, stats, GeoJSON (7 tests)
+    - `e2e-full.spec.ts` — Full user journey: load → navigate → chat → map (2 tests)
+  - Configured for: Desktop Chrome + Mobile Chrome (Pixel 5)
+  - CI-optimized: retries, parallel workers, screenshots on failure, video on retry
+  - Smart webServer: auto-starts dev server locally, uses external URL in Docker/CI
+
+- [x] **4.5.4 E2E seed data** → `db/008_e2e_seed.sql` + `scripts/seed_e2e.sh`
+  - 5 representative documents (council, rezoning, DPB, news)
+  - 6 document chunks (pre-split for vector/BM25)
+  - 5 geocoded intelligence signals across Vancouver neighborhoods
+  - Idempotent (ON CONFLICT DO NOTHING), realistic metadata
+  - Covers: Mount Pleasant, Grandview-Woodland, Renfrew-Collingwood
+
 ### Phase 4: POC Demo Polish
 > Goal: Make it demo-ready for Colin.
 
@@ -528,18 +567,27 @@ frontend/
       intel-api.ts           ✅  V2 intelligence API client
       intel-types.ts         ✅  V2 TypeScript types
       types.ts               ✅  Existing V1 types
-tests/
+tests/                                  # Unit tests (pytest, 242 total)
   __init__.py                ✅
   conftest.py                ✅  20+ fixtures, realistic Vancouver data
   test_models.py             ✅  41 tests
-  test_chunker.py            ✅  44 tests (needs update for semchunk)
+  test_chunker.py            ✅  44 tests
   test_extractor.py          ✅  18 tests
-  test_scrapers.py           ✅  23 tests (needs update for parser.py)
-  test_chat.py               ✅  18 tests (needs update for Cohere)
+  test_scrapers.py           ✅  23 tests
+  test_chat.py               ✅  18 tests
   test_signals.py            ✅  27 tests
   test_routes.py             ✅  36 tests
   test_e2e_pipeline.py       ✅  11 tests
+  test_scraper_news.py       ✅  10 tests
+  test_parser.py             ✅  8 tests
 pytest.ini                   ✅  Config
+frontend/e2e/                           # E2E tests (Playwright, 21 total)
+  app.spec.ts                ✅  5 tests (shell, nav, theme)
+  intelligence.spec.ts       ✅  5 tests (intel tab, chat, filters)
+  map.spec.ts                ✅  2 tests (map render, viewport)
+  api-health.spec.ts         ✅  7 tests (health, CORS, signals, GeoJSON)
+  e2e-full.spec.ts           ✅  2 tests (full user journey)
+frontend/playwright.config.ts ✅  Chrome + Pixel 5
 ```
 
 ---
@@ -597,14 +645,49 @@ DATABASE_URL=postgresql://...
 
 ## Deployment
 
-### Local Development (Docker Compose)
-```bash
-# Start database + API
-cp .env.example .env  # edit with real API keys
-docker compose up -d
+### Local Development (Docker Compose + Makefile)
 
-# Start frontend
-cd frontend && npm install && npm run dev
+**Quick start (full stack with hot reload):**
+```bash
+cp .env.example .env          # edit with real API keys
+make dev                       # starts db + api + frontend
+# → API:      http://localhost:8000
+# → Frontend: http://localhost:3000
+```
+
+**Developer workflow:**
+```bash
+make help                      # show all 30+ commands
+make dev                       # full stack, hot reload, foreground logs
+make up                        # same but background
+make status                    # health check all services
+make seed                      # seed intelligence data from scrapers
+make test-unit                 # 242 pytest unit tests
+make test-e2e                  # Playwright E2E against local stack
+make test-e2e-docker           # E2E in isolated Docker container
+make shell-db                  # psql into database
+make shell-api                 # bash into API container
+make db-reset                  # destroy + recreate database
+make clean                     # tear down everything + volumes
+```
+
+**E2E testing:**
+```bash
+# Option 1: Run locally (needs Playwright installed)
+cd frontend && npx playwright install chromium
+make test-e2e
+
+# Option 2: Run in Docker (no local install needed)
+make test-e2e-docker
+
+# Option 3: Interactive UI mode
+make test-e2e-ui
+```
+
+**Seed E2E test data:**
+```bash
+make up                        # start stack
+bash scripts/seed_e2e.sh       # load 5 docs, 6 chunks, 5 signals
 ```
 
 ### Production (Google Cloud + Cloudflare)
@@ -644,26 +727,50 @@ python scripts/seed_data.py --process-only     # just process existing
 
 ### Files
 ```
+# Local Development
+Makefile                 # 30+ dev workflow commands
+docker-compose.yml       # Full stack: db + api + frontend + e2e
+Dockerfile               # FastAPI backend image
+Dockerfile.db            # PostgreSQL + PostGIS + pgvector image
+frontend/Dockerfile.dev  # Next.js dev server image
+frontend/Dockerfile.e2e  # Playwright test runner image
+.env.example             # Environment variables template
+.dockerignore            # Build exclusions
+
+# E2E Testing
+frontend/playwright.config.ts  # Playwright config (Chrome + mobile)
+frontend/e2e/
+  app.spec.ts                  # App shell, nav, theme tests (5)
+  intelligence.spec.ts         # Intel tab, chat, filters (5)
+  map.spec.ts                  # Map rendering tests (2)
+  api-health.spec.ts           # Backend API health tests (7)
+  e2e-full.spec.ts             # Full user journey tests (2)
+db/008_e2e_seed.sql            # E2E test seed data (5 docs, 5 signals)
+scripts/seed_e2e.sh            # Seed runner script
+
+# Deployment Scripts
 scripts/
   deploy_gcp.sh          # Full GCP provisioning (Cloud SQL + Cloud Run)
   deploy_frontend.sh     # Cloudflare Pages deployment
   seed_data.py           # Data ingestion pipeline CLI
-Dockerfile               # FastAPI backend image
-Dockerfile.db            # PostgreSQL + PostGIS + pgvector image
-docker-compose.yml       # Local development stack
-.env.example             # Environment variables template
-.dockerignore            # Build exclusions
+  seed_e2e.sh            # E2E test data seeder
 frontend/
   wrangler.toml          # Cloudflare Pages config
   next.config.ts         # Next.js output: standalone
+
+# Infrastructure (deferred — local validation first)
+terraform/               # GKE Autopilot + Cloud SQL + VPC (ready, not deployed)
+k8s/                     # Kubernetes manifests (ready, not deployed)
+.github/workflows/       # CI/CD pipelines (ready, not deployed)
 ```
 
 ---
 
-*Last updated: Feb 7, 2026 — V2 Intelligence stack complete. Map-Intelligence bridge built. Deployment infra ready.*
-*Tests: 242 all green (mocked, no external calls). Cohere+semchunk+docling.*
-*Infrastructure: Docker Compose (local) + GCP Cloud Run/SQL (prod) + Cloudflare Pages (frontend)*
+*Last updated: Feb 7, 2026 — V2 Intelligence stack complete. Local E2E dev flow built.*
+*Tests: 242 unit tests (mocked) + 21 Playwright E2E tests. All green.*
+*Local dev: `make dev` → full stack (db + api + frontend) with hot reload.*
+*E2E: Playwright → Chrome + Mobile Chrome, with API health checks + UI flow tests.*
+*Infrastructure: Terraform/K8s ready but deferred — local validation first.*
 *Data sourcing: 4 government scrapers + 6 news feeds + 14 open data sources planned*
-*Interface: Chat + Signal Feed + Map overlay + GeoJSON endpoint built*
-*Next: seed real data → build neighborhood scorecards → demo*
-*Priority: working pipeline > polish. Ship ugly, ship fast, ship real.*
+*Next: run E2E locally → seed real data → demo → then deploy to GCP.*
+*Priority: validate locally → ship to prod. No cloud until it works on Docker.*
