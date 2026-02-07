@@ -669,3 +669,63 @@ async def admin_get_status(request: Request):
             status_code=500,
             detail=f"Failed to get status: {str(e)}",
         )
+
+
+# ── Neighborhood Scorecard Endpoints ─────────────────────────
+
+
+@router.get("/neighborhoods/scorecards")
+async def list_neighborhood_scorecards(request: Request):
+    """Get all neighborhoods with their latest overall scores.
+
+    Returns a ranked list of all 22 Vancouver neighborhoods
+    with summary scores and top/bottom categories.
+    """
+    from api.intelligence.neighborhoods import get_all_neighborhood_summaries
+    db_pool = get_db_pool(request)
+    summaries = await get_all_neighborhood_summaries(db_pool)
+    return summaries
+
+
+@router.get("/neighborhoods/compare")
+async def compare_neighborhood_scorecards(request: Request, slugs: str):
+    """Compare 2-4 neighborhoods side by side.
+
+    Query params:
+        slugs: Comma-separated neighborhood slugs (e.g., "kitsilano,downtown")
+
+    Returns category-by-category comparison for selected neighborhoods.
+    """
+    from api.intelligence.neighborhoods import compare_neighborhoods
+
+    slug_list = [s.strip() for s in slugs.split(",") if s.strip()]
+    if len(slug_list) < 2 or len(slug_list) > 4:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide 2-4 neighborhood slugs separated by commas",
+        )
+
+    db_pool = get_db_pool(request)
+
+    result = await compare_neighborhoods(db_pool, slug_list)
+    if not result:
+        raise HTTPException(status_code=404, detail="No neighborhoods found")
+    return result
+
+
+@router.get("/neighborhoods/{slug}/scorecard")
+async def get_single_neighborhood_scorecard(slug: str, request: Request):
+    """Get full Madlan-style scorecard for a single neighborhood.
+
+    Includes:
+    - Overall score (0-10) and rank (1-22)
+    - Category scores with trends (safety, schools, transit, etc.)
+    - Contextual intelligence stats (active rezonings, permits, signals)
+    """
+    from api.intelligence.neighborhoods import get_neighborhood_scorecard
+    
+    db_pool = get_db_pool(request)
+    result = await get_neighborhood_scorecard(db_pool, slug)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Neighborhood '{slug}' not found")
+    return result
