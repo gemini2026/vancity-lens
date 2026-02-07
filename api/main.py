@@ -22,6 +22,8 @@ from .intelligence.routes import router as intelligence_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()
+    # Expose the pool on app.state so intelligence routes can access it
+    app.state.pool = db.pool
     yield
     await db.disconnect()
 
