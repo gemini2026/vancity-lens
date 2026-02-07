@@ -1,5 +1,5 @@
 google-genai==1.14.0
-openai==1.82.0
+openai==2.17.0
 asyncpg==0.30.0
 shapely==2.0.7
 pyproj==3.7.1
