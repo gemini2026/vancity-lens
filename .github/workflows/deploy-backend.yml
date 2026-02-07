@@ -1,0 +1,63 @@
+name: Deploy Backend to GKE
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'k8s/**'
+      - '.github/workflows/deploy-backend.yml'
+
+env:
+  REGISTRY: us-docker.pkg.dev
+  IMAGE_NAME: vancity-lens-api
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGISTRY }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens/${{ env.IMAGE_NAME }}"
+          docker build -t ${IMAGE_URL}:${{ github.sha }} -t ${IMAGE_URL}:latest .
+          docker push ${IMAGE_URL}:${{ github.sha }}
+          docker push ${IMAGE_URL}:latest
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ secrets.GKE_CLUSTER }}
+          location: ${{ secrets.GKE_ZONE }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Update deployment image tag
+        run: |
+          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens/${{ env.IMAGE_NAME }}"
+          sed -i "s|IMAGE_PLACEHOLDER|${IMAGE_URL}:${{ github.sha }}|g" k8s/deployment.yaml
+
+      - name: Deploy to GKE
+        run: |
+          kubectl apply -k k8s/
+          kubectl rollout status deployment/vancity-lens-api -n default --timeout=5m
