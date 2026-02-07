@@ -2,7 +2,7 @@ google-genai==1.14.0
 openai==1.82.0
 asyncpg==0.30.0
 shapely==2.0.7
-pyproj==3.7.1
+pyproj==3.7.2
 pdf2image==1.17.0
 Pillow==11.2.1
 pydantic==2.10.4
