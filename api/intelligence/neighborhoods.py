@@ -243,28 +243,35 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
     """Get full scorecard for a single neighborhood.
 
     Returns a NeighborhoodScorecard-compatible dict, or None if not found.
+    Uses a single CTE query for neighborhood info + composite + category scores
+    (2 queries total: 1 main CTE + 1 signal stats).
     """
     async with db_pool.acquire() as conn:
-        # Get neighborhood info
-        hood = await conn.fetchrow(
-            "SELECT id, name, slug, population, area_km2 FROM neighborhoods WHERE slug = $1",
-            slug,
-        )
-        if not hood:
+        # Single CTE query: neighborhood + composite + category scores
+        row = await conn.fetchrow("""
+            WITH hood AS (
+                SELECT id, name, slug FROM neighborhoods WHERE slug = $1
+            ),
+            latest_composite AS (
+                SELECT overall_score, rank
+                FROM neighborhood_composite_scores
+                WHERE neighborhood_id = (SELECT id FROM hood)
+                ORDER BY period_start DESC LIMIT 1
+            )
+            SELECT
+                h.id, h.name, h.slug,
+                lc.overall_score, lc.rank
+            FROM hood h
+            LEFT JOIN latest_composite lc ON TRUE
+        """, slug)
+
+        if not row:
             return None
 
-        hood_id = hood["id"]
+        hood_id = row["id"]
+        hood_name = row["name"]
 
-        # Get latest composite score
-        composite = await conn.fetchrow("""
-            SELECT overall_score, rank, category_scores, weights_used,
-                   period_start, period_end, computed_at
-            FROM neighborhood_composite_scores
-            WHERE neighborhood_id = $1
-            ORDER BY period_start DESC LIMIT 1
-        """, hood_id)
-
-        # FIX: Get category scores for LATEST PERIOD ONLY using DISTINCT ON
+        # Category scores — still need a second query for the DISTINCT ON
         cat_scores = await conn.fetch("""
             SELECT DISTINCT ON (category)
                 category, score, raw_value, percentile, trend, trend_change
@@ -273,7 +280,7 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
             ORDER BY category, period_start DESC
         """, hood_id)
 
-        # Get signal stats from intelligence_signals (graceful if table empty)
+        # Signal stats (graceful if table empty)
         try:
             signal_stats = await conn.fetchrow("""
                 SELECT
@@ -283,49 +290,108 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
                 FROM intelligence_signals
                 WHERE neighborhood = $1
                   AND extracted_at > NOW() - INTERVAL '90 days'
-            """, hood["name"])
+            """, hood_name)
         except Exception:
-            logger.warning("intelligence_signals query failed for %s", hood["name"])
+            logger.warning("intelligence_signals query failed for %s", hood_name)
             signal_stats = None
 
-        return {
-            "neighborhood": {
-                "name": hood["name"],
-                "slug": hood["slug"],
-            },
-            "overall_score": float(composite["overall_score"]) if composite else 0.0,
-            "rank": composite["rank"] if composite else None,
-            "category_scores": [
-                {
-                    "category": row["category"],
-                    "score": float(row["score"]),
-                    "trend": row.get("trend", "stable"),
-                    # FIX: Use trend_delta consistently (matches frontend TypeScript)
-                    "trend_delta": float(row["trend_change"]) if row.get("trend_change") else 0.0,
-                }
-                for row in cat_scores
-            ],
-            "active_rezonings": signal_stats["active_rezonings"] if signal_stats else 0,
-            "recent_permits": signal_stats["recent_permits"] if signal_stats else 0,
-        }
+        return _format_scorecard(row, cat_scores, signal_stats)
+
+
+def _format_scorecard(hood_row, cat_scores, signal_stats) -> dict:
+    """Format raw DB rows into a scorecard response dict."""
+    return {
+        "neighborhood": {
+            "name": hood_row["name"],
+            "slug": hood_row["slug"],
+        },
+        "overall_score": float(hood_row["overall_score"]) if hood_row.get("overall_score") else 0.0,
+        "rank": hood_row["rank"] if hood_row.get("rank") else None,
+        "category_scores": [
+            {
+                "category": row["category"],
+                "score": float(row["score"]),
+                "trend": row.get("trend", "stable"),
+                "trend_delta": float(row["trend_change"]) if row.get("trend_change") else 0.0,
+            }
+            for row in cat_scores
+        ],
+        "active_rezonings": signal_stats["active_rezonings"] if signal_stats else 0,
+        "recent_permits": signal_stats["recent_permits"] if signal_stats else 0,
+    }
 
 
 async def compare_neighborhoods(db_pool, slugs: list[str]) -> Optional[dict]:
     """Compare 2-4 neighborhoods side by side.
 
-    Returns a NeighborhoodComparison-compatible dict.
+    Batched: 3 queries total regardless of neighborhood count
+    (was: 4 queries × N neighborhoods = up to 16 queries for 4 slugs).
     """
     if not (2 <= len(slugs) <= 4):
         return None
 
-    scorecards = []
-    for slug in slugs:
-        card = await get_neighborhood_scorecard(db_pool, slug)
-        if card:
-            scorecards.append(card)
+    async with db_pool.acquire() as conn:
+        # Query 1: All neighborhoods + composite scores in one shot
+        hoods = await conn.fetch("""
+            SELECT
+                n.id, n.name, n.slug,
+                c.overall_score, c.rank
+            FROM neighborhoods n
+            LEFT JOIN LATERAL (
+                SELECT overall_score, rank
+                FROM neighborhood_composite_scores
+                WHERE neighborhood_id = n.id
+                ORDER BY period_start DESC LIMIT 1
+            ) c ON TRUE
+            WHERE n.slug = ANY($1)
+        """, slugs)
 
-    if len(scorecards) < 2:
-        return None
+        if len(hoods) < 2:
+            return None
+
+        hood_ids = [h["id"] for h in hoods]
+        hood_names = [h["name"] for h in hoods]
+
+        # Query 2: All category scores for all requested neighborhoods
+        all_cat_scores = await conn.fetch("""
+            SELECT DISTINCT ON (neighborhood_id, category)
+                neighborhood_id, category, score, raw_value,
+                percentile, trend, trend_change
+            FROM neighborhood_scores
+            WHERE neighborhood_id = ANY($1)
+            ORDER BY neighborhood_id, category, period_start DESC
+        """, hood_ids)
+
+        # Query 3: Signal stats for all requested neighborhoods
+        try:
+            all_signal_stats = await conn.fetch("""
+                SELECT
+                    neighborhood,
+                    COUNT(*) FILTER (WHERE signal_type = 'rezoning_decision') as active_rezonings,
+                    COUNT(*) FILTER (WHERE signal_type = 'permit_approval') as recent_permits,
+                    COUNT(*) as recent_signals
+                FROM intelligence_signals
+                WHERE neighborhood = ANY($1)
+                  AND extracted_at > NOW() - INTERVAL '90 days'
+                GROUP BY neighborhood
+            """, hood_names)
+        except Exception:
+            logger.warning("intelligence_signals batch query failed")
+            all_signal_stats = []
+
+    # Index results for fast lookup
+    cat_by_hood = {}
+    for row in all_cat_scores:
+        cat_by_hood.setdefault(row["neighborhood_id"], []).append(row)
+
+    sig_by_name = {row["neighborhood"]: row for row in all_signal_stats}
+
+    # Assemble scorecards
+    scorecards = []
+    for hood in hoods:
+        cats = cat_by_hood.get(hood["id"], [])
+        sigs = sig_by_name.get(hood["name"])
+        scorecards.append(_format_scorecard(hood, cats, sigs))
 
     return {
         "neighborhoods": scorecards,

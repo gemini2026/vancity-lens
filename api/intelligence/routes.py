@@ -16,7 +16,9 @@ from datetime import date
 from typing import Optional
 
 import asyncpg
-from fastapi import APIRouter, HTTPException, Query, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
+
+from ..auth import require_admin
 
 from .chat import handle_chat
 from .models import (
@@ -473,6 +475,7 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
 @router.post(
     "/admin/scrape",
     summary="Admin: trigger document scraping",
+    dependencies=[Depends(require_admin)],
     description=(
         "Start a background scraping task to fetch documents from City of Vancouver sources. "
         "This is an admin-only operation. Runs asynchronously."
@@ -531,6 +534,7 @@ async def admin_trigger_scrape(
 @router.post(
     "/admin/process",
     summary="Admin: trigger AI extraction and embedding",
+    dependencies=[Depends(require_admin)],
     description=(
         "Start a background task to process unprocessed documents: chunk with semchunk, "
         "embed with Cohere, and extract intelligence signals using Claude. "
@@ -584,6 +588,7 @@ async def admin_trigger_process(
 @router.get(
     "/admin/feeds",
     summary="Admin: list configured news feeds",
+    dependencies=[Depends(require_admin)],
     description="Get the list of all configured RSS/news feeds and their settings.",
 )
 async def admin_get_feeds():
@@ -605,6 +610,7 @@ async def admin_get_feeds():
 @router.get(
     "/admin/status",
     summary="Admin: get ingestion status",
+    dependencies=[Depends(require_admin)],
     description=(
         "Get statistics on the document ingestion pipeline: "
         "how many documents are scraped, processed, chunked, etc."
@@ -677,6 +683,7 @@ async def admin_get_status(request: Request):
 @router.post(
     "/admin/scrape-opendata",
     summary="Admin: trigger open data scraping for neighborhood metrics",
+    dependencies=[Depends(require_admin)],
     description=(
         "Start a background task to scrape open data sources (crime, parks, transit, "
         "permits, property tax), persist metrics, and compute neighborhood scores."

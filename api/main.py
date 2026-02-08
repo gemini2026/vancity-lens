@@ -3,18 +3,40 @@ VanCity Lens — FastAPI Application
 Bill 47 Entitlement Engine API
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from decimal import Decimal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .db import db
 from .entitlement import ParcelNotFoundError, compute_entitlement
 from .models import EntitlementRequest, ParcelEntitlementResponse
 from .admin import router as admin_router
 from .intelligence.routes import router as intelligence_router
+
+logger = logging.getLogger(__name__)
+
+
+# ── Security Headers Middleware ───────────────────────────────
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if os.getenv("VANCITY_ENV") == "production":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+        return response
 
 
 # ── Lifespan ─────────────────────────────────────────────────
@@ -24,8 +46,10 @@ async def lifespan(app: FastAPI):
     await db.connect()
     # Expose the pool on app.state so intelligence routes can access it
     app.state.pool = db.pool
+    logger.info("VanCity Lens API started")
     yield
     await db.disconnect()
+    logger.info("VanCity Lens API shutdown")
 
 
 # ── App ──────────────────────────────────────────────────────
@@ -40,15 +64,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS: configurable origins, restricted methods and headers
 _default_origins = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003"
 _cors_origins = os.environ.get("CORS_ORIGINS", _default_origins).split(",")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _cors_origins],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Admin-Key"],
 )
+
+# Security headers on all responses
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.include_router(admin_router)
 app.include_router(intelligence_router)
@@ -58,8 +86,23 @@ app.include_router(intelligence_router)
 
 @app.get("/health")
 async def health():
-    """Liveness check."""
-    return {"status": "ok", "engine": "bill47"}
+    """Deep liveness check — verifies database connectivity."""
+    checks = {"engine": "bill47"}
+    try:
+        async with db.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT 1 AS ok, count(*) AS tables "
+                "FROM information_schema.tables "
+                "WHERE table_schema = 'public'"
+            )
+            checks["db"] = "connected"
+            checks["tables"] = row["tables"]
+    except Exception as e:
+        checks["db"] = f"error: {str(e)[:100]}"
+        return {"status": "degraded", **checks}
+
+    checks["status"] = "ok"
+    return checks
 
 
 @app.get(

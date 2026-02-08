@@ -14,11 +14,16 @@ import urllib.parse
 import urllib.request
 from decimal import Decimal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from .auth import require_admin
 from .db import db
 
-router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/api/v1/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
 
 HEADERS = {
     "User-Agent": (

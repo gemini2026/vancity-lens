@@ -2,16 +2,45 @@
 VanCity Lens — Database connection pool (asyncpg).
 """
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import asyncpg
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://vancity:vancity_dev@localhost:5432/vancity_lens"
-)
+logger = logging.getLogger(__name__)
+
+# In production, DATABASE_URL MUST be set as an environment variable.
+# The dev default is only used when VANCITY_ENV != "production".
+_DEFAULT_DEV_URL = "postgresql://vancity:vancity_dev@localhost:5432/vancity_lens"
+
+
+def _get_database_url() -> str:
+    """Resolve DATABASE_URL, failing loudly in production if not set."""
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return url
+
+    env = os.getenv("VANCITY_ENV", "development")
+    if env == "production":
+        raise RuntimeError(
+            "DATABASE_URL environment variable is REQUIRED in production. "
+            "Refusing to start with default credentials."
+        )
+
+    logger.warning(
+        "DATABASE_URL not set — using development default. "
+        "Set DATABASE_URL for production deployments."
+    )
+    return _DEFAULT_DEV_URL
+
+
+DATABASE_URL = _get_database_url()
+
+# Pool sizing: configurable via env vars
+_POOL_MIN = int(os.getenv("DB_POOL_MIN", "2"))
+_POOL_MAX = int(os.getenv("DB_POOL_MAX", "25"))
 
 
 class Database:
@@ -23,10 +52,11 @@ class Database:
     async def connect(self):
         self.pool = await asyncpg.create_pool(
             DATABASE_URL,
-            min_size=2,
-            max_size=10,
+            min_size=_POOL_MIN,
+            max_size=_POOL_MAX,
             command_timeout=30,
         )
+        logger.info(f"Database pool created (min={_POOL_MIN}, max={_POOL_MAX})")
 
     async def disconnect(self):
         if self.pool:
