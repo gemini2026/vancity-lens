@@ -53,6 +53,32 @@ services:
           memory: 256M
           cpus: "0.25"
 
+  # ─── PgBouncer Connection Pooling Proxy (VCL-91 / PERF-014) ────────
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.0
+    container_name: vancity_pgbouncer
+    ports:
+      - "6432:6432"
+    volumes:
+      - ./config/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./config/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U vancity"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+
   # ─── FastAPI Backend ───────────────────────────────────────────
   api:
     build:
@@ -63,7 +89,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: "postgresql://vancity:vancity_dev@db:5432/vancity_lens"
+      DATABASE_URL: "postgresql://vancity:vancity_dev@pgbouncer:6432/vancity_lens"
       REDIS_URL: "redis://redis:6379/0"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-sk-placeholder}"
       COHERE_API_KEY: "${COHERE_API_KEY:-placeholder}"
@@ -73,7 +99,7 @@ services:
       - ./scripts:/app/scripts
       - ./db:/app/db
     depends_on:
-      db:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy

@@ -1,0 +1,86 @@
+# Alert rules for VanCity Lens (VCL-49 / INFRA-007)
+# Monitors API performance, errors, and infrastructure health
+
+groups:
+  - name: vancity_lens_alerts
+    interval: 30s
+    rules:
+      # P95 latency alert: fires when p95 exceeds 5 seconds for 5 minutes
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, rate(request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High P95 latency detected"
+          description: "P95 request latency is {{ $value | humanizeDuration }} (threshold: 5s) for instance {{ $labels.instance }}"
+
+      # P99 latency alert: fires when p99 exceeds 10 seconds for 3 minutes
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, rate(request_duration_seconds_bucket[5m])) > 10
+        for: 3m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Critical P99 latency detected"
+          description: "P99 request latency is {{ $value | humanizeDuration }} (threshold: 10s) for instance {{ $labels.instance }}"
+
+      # Error rate alert: fires when error rate exceeds 5% for 2 minutes
+      - alert: HighErrorRate
+        expr: |
+          (sum(rate(api_calls_total{status=~"5.."}[5m])) / sum(rate(api_calls_total[5m]))) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanize }}% (threshold: 5%) for instance {{ $labels.instance }}"
+
+      # Critical error rate: fires when error rate exceeds 10% for 1 minute
+      - alert: CriticalErrorRate
+        expr: |
+          (sum(rate(api_calls_total{status=~"5.."}[5m])) / sum(rate(api_calls_total[5m]))) * 100 > 10
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is {{ $value | humanize }}% (threshold: 10%) for instance {{ $labels.instance }}"
+
+      # DB pool exhaustion: fires when pool utilization exceeds 90%
+      - alert: DBPoolExhaustion
+        expr: |
+          (db_pool_size{state="active"} / db_pool_size{state="total"}) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Pool {{ $labels.pool_name }} utilization is {{ $value | humanize }}% (threshold: 90%)"
+
+      # Low cache hit ratio: fires when cache hit ratio drops below 50%
+      - alert: LowCacheHitRatio
+        expr: cache_hit_ratio < 0.5
+        for: 10m
+        labels:
+          severity: info
+          component: cache
+        annotations:
+          summary: "Low cache hit ratio detected"
+          description: "Cache hit ratio is {{ $value | humanizePercentage }} (threshold: 50%) for instance {{ $labels.instance }}"
+
+      # High active requests: fires when more than 100 concurrent requests
+      - alert: HighConcurrentRequests
+        expr: active_requests > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High number of concurrent requests"
+          description: "{{ $value | humanize }} active requests (threshold: 100) for instance {{ $labels.instance }}"

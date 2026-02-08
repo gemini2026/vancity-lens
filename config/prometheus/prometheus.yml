@@ -1,0 +1,36 @@
+# Prometheus configuration for VanCity Lens (VCL-49 / INFRA-007)
+# Scrapes metrics from the FastAPI /metrics endpoint
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'vancity-lens'
+    environment: 'production'
+
+# Alert rules configuration
+rule_files:
+  - '/etc/prometheus/alert_rules.yml'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - localhost:9093
+
+scrape_configs:
+  # VanCity Lens API Prometheus metrics
+  - job_name: 'vancity-lens-api'
+    static_configs:
+      - targets: ['localhost:8000']
+        labels:
+          instance: 'api-main'
+          service: 'vancity-lens'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
