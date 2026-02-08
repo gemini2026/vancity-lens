@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "@/lib/theme-context";
+import "@/styles/dark-mode.css";
 
 export const metadata: Metadata = {
   title: "VanCity Lens — Bill 47 Engine",
@@ -7,9 +9,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body style={{ margin: 0, padding: 0, background: "#0a0a0a" }}>
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body style={{ margin: 0, padding: 0 }}>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

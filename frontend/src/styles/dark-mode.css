@@ -1,0 +1,160 @@
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9f9f9;
+  --bg-tertiary: #f0f0f0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #505050;
+  --text-tertiary: #808080;
+  --accent: #0066cc;
+  --border: #e0e0e0;
+  --transition-speed: 0.3s;
+}
+
+.dark {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #2a2a2a;
+  --text-primary: #f5f5f5;
+  --text-secondary: #d0d0d0;
+  --text-tertiary: #808080;
+  --accent: #3b82f6;
+  --border: #404040;
+}
+
+html,
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed);
+}
+
+html {
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed);
+}
+
+body {
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed);
+}
+
+/* Map and popup dark mode support */
+.mapboxgl-popup-content {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed);
+}
+
+.mapboxgl-popup-close-button {
+  color: var(--text-primary);
+}
+
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+  border-bottom-color: var(--bg-secondary);
+}
+
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+  border-top-color: var(--bg-secondary);
+}
+
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: var(--bg-secondary);
+}
+
+.mapboxgl-popup-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: var(--bg-secondary);
+}
+
+/* Panel and card dark mode support */
+.panel,
+.card {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed), border-color var(--transition-speed);
+}
+
+/* Button dark mode support */
+button {
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed);
+}
+
+/* Input dark mode support */
+input,
+textarea,
+select {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border);
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed), border-color var(--transition-speed);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Link dark mode support */
+a {
+  color: var(--accent);
+  transition: color var(--transition-speed);
+}
+
+a:visited {
+  color: var(--accent);
+}
+
+/* Border and separator dark mode support */
+hr,
+.border {
+  border-color: var(--border);
+  transition: border-color var(--transition-speed);
+}
+
+/* Scrollbar dark mode support */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-tertiary);
+}
+
+/* Selection dark mode support */
+::selection {
+  background-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* Focus styles dark mode support */
+*:focus-visible {
+  outline-color: var(--accent);
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color var(--transition-speed),
+    color var(--transition-speed), border-color var(--transition-speed),
+    box-shadow var(--transition-speed);
+}
+
+/* Reduce transitions for performance on some elements */
+.mapboxgl-canvas,
+.mapboxgl-canvas-container {
+  transition: none;
+}

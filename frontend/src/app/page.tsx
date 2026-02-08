@@ -4,6 +4,7 @@ import { useState } from "react";
 import MapView from "@/components/MapView";
 import IntelPage from "@/components/IntelPage";
 import NeighborhoodPage from "@/components/NeighborhoodPage";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"map" | "intel" | "hoods">("map");
@@ -101,6 +102,11 @@ export default function Home() {
           >
             Neighborhoods
           </button>
+        </div>
+
+        {/* Theme Toggle */}
+        <div style={{ marginLeft: "auto", paddingRight: "16px" }}>
+          <ThemeToggle />
         </div>
       </nav>
 
