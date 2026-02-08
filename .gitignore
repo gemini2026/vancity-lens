@@ -43,6 +43,7 @@ terraform/environments/**/terraform.tfvars
 *.swp
 *.swo
 *~
+~$*.docx
 .DS_Store
 
 # ── Docker ───────────────────────────────────────────

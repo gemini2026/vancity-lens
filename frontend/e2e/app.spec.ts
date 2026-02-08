@@ -5,8 +5,9 @@ const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
 test.describe('VanCity Lens — App Shell', () => {
   test('homepage loads with VanCity Lens branding', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('text=VanCity Lens')).toBeVisible();
-    await expect(page.locator('text=V2')).toBeVisible();
+    const nav = page.getByRole('navigation');
+    await expect(nav.getByText('VanCity Lens', { exact: true })).toBeVisible();
+    await expect(nav.getByText('V2', { exact: true })).toBeVisible();
   });
 
   test('nav bar shows Map and Intelligence tabs', async ({ page }) => {

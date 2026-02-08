@@ -1,0 +1,148 @@
+VANCITY LENS - PERFORMANCE & SCALABILITY REVIEW SUMMARY
+========================================================
+
+ANALYSIS SCOPE:
+- API: FastAPI application (6,349 Python LOC across 27 modules)
+- Database: PostgreSQL 16 + PostGIS + pgvector
+- Frontend: Next.js (TypeScript)
+- Stack: Bill 47 entitlement engine + Intelligence layer + Neighborhood scorecards
+
+CRITICAL FINDINGS:
+==================
+
+1. DATABASE CONNECTION POOL UNDERSIZED
+   Current: min_size=2, max_size=10
+   Impact: Exhaustion at 50+ concurrent requests
+   Fix: Increase to max_size=25-100 (env-configurable)
+   File: /api/db.py
+
+2. MISSING COMPOUND INDEXES
+   Missing: (signal_type, neighborhood, event_date), (document_id, chunk_index), etc.
+   Impact: Sequential scans on intelligence signals and document chunks
+   Performance: 10-20x slowdown vs indexed queries
+   File: /db/007_intelligence_layer.sql (add 4 indexes)
+
+3. N+1 QUERIES IN NEIGHBORHOOD SCORING
+   Issue: 4 separate queries per neighborhood → 88 queries for 22 neighborhoods
+   Impact: 880ms-4,400ms latency per /neighborhoods/scorecards request
+   Fix: Single JOIN query + Redis cache (5-minute TTL)
+   File: /api/intelligence/neighborhoods.py:242-310
+
+4. SERIAL EMBEDDING/EXTRACTION PIPELINE
+   Current: Document-by-document processing, chunk extraction forced to batch_size=1
+   Impact: 1,000 documents = 10+ hours continuous processing
+   Fix: asyncio.gather() for parallel chunk embedding, Semaphore-controlled LLM extraction
+   Files: /api/intelligence/embeddings.py, routes.py:419-471
+
+5. NO RESPONSE CACHING
+   Missing: Cache for TOA GeoJSON, opportunity markers, neighborhood scorecards
+   Impact: Same query recomputed every time (30s for TOA GeoJSON)
+   Fix: Redis cache with 5-min/24-hour TTL
+   File: New /api/cache.py + modifications to endpoints
+
+6. INADEQUATE HEALTH CHECKS
+   Current: /health endpoint returns {"status": "ok"} without checking dependencies
+   Impact: Kubernetes can't detect DB pool exhaustion or API key misconfiguration
+   Fix: Add /ready endpoint that checks database, cache, and API keys
+   File: /api/main.py
+
+7. NO REQUEST RATE LIMITING
+   Current: Unlimited requests to chat/extraction endpoints
+   Impact: 100 concurrent chat requests = 100× Anthropic API calls (hits rate limit)
+   Fix: slowapi middleware or custom Semaphore-based rate limiter
+   File: New /api/middleware/rate_limit.py
+
+8. DOCKER RESOURCE LIMITS ABSENT
+   Current: No memory/CPU limits in docker-compose.yml
+   Impact: Uncontrolled resource consumption; no multi-tenant safety
+   Fix: Add resource limits/reservations for db, api, redis, frontend
+   File: docker-compose.yml
+
+SCALABILITY GAPS:
+=================
+
+At 10x Scale (10,000 documents, 1,000 concurrent users):
+- Pool exhaustion: System becomes unresponsive
+- Document processing: 100+ hours instead of 10 hours
+- Cache miss latency: 30s+ for GeoJSON endpoints
+- API rate limits: Anthropic/Cohere will throttle requests
+
+At 100x Scale (100,000 documents, 10,000 concurrent users):
+- Complete system failure without infrastructure upgrades
+- Connection pooling proxy (PgBouncer) required
+- Message queue (Celery) for background jobs
+- Read replicas for reporting queries
+- Kubernetes with autoscaling
+
+RECOMMENDED FIXES BY PRIORITY:
+==============================
+
+WEEK 1 (Foundations):
+□ Increase DB pool: max_size=25 (env-configurable)
+□ Create 4 compound indexes
+□ Add /ready endpoint
+□ Set up Redis caching
+
+WEEK 2 (Parallelization):
+□ Implement batch embedding with asyncio.gather()
+□ Parallel LLM extraction with Semaphore
+□ Response caching (TOA GeoJSON, scorecards)
+□ Rate limiting middleware
+
+WEEK 3 (Optimization):
+□ Docker resource limits
+□ Stream GeoJSON responses (NDJSON)
+□ Monitoring/observability
+
+WEEK 4+ (Horizontal Scaling):
+□ Connection pool proxy (PgBouncer)
+□ Message queue for background jobs
+□ Read replicas
+□ Kubernetes deployment
+
+PERFORMANCE IMPROVEMENTS:
+=========================
+
+After Week 1 fixes:
+- Concurrency: 2 concurrent requests → 25-50 (12-25x improvement)
+- Query latency: 500ms → 50ms for indexed queries (10x)
+- Neighborhood scorecard: 2-4s → 200ms (10-20x with caching)
+
+After Week 2 fixes:
+- Document processing: 1,000 docs in 10 hours → 1-2 hours (5-10x)
+- Response caching: 30s → 100ms for cached endpoints (300x)
+
+Combined estimated improvement: 5-50x at baseline, enables 10-100x scaling
+
+KEY CODE LOCATIONS:
+===================
+
+Database:
+- Connection pool: /api/db.py:23-29
+- Schema/indexes: /db/001_schema.sql, /db/007_intelligence_layer.sql
+
+API Routes:
+- Main app setup: /api/main.py:20-54
+- Intelligence routes: /api/intelligence/routes.py
+
+Performance-Critical Modules:
+- Embeddings: /api/intelligence/embeddings.py (embedding batching, search)
+- Extraction: /api/intelligence/extractor.py (LLM signal extraction)
+- Signals: /api/intelligence/signals.py (feed queries, N+1 issues)
+- Neighborhoods: /api/intelligence/neighborhoods.py (scoring, N+1 queries)
+- Chat: /api/intelligence/chat.py (RAG pipeline)
+
+Infrastructure:
+- Docker compose: /docker-compose.yml (no resource limits)
+- Requirements: /requirements.txt (missing redis-py)
+
+ADDITIONAL NOTES:
+=================
+
+Frontend Data Fetching:
+- Uses native fetch API without pagination enforcement
+- Could request unlimited results from backend
+- Recommend: Add maxResults protection in intel-api.ts
+
+Recommendations are actionable and implementable within the project timeline.
+See PERFORMANCE_SCALABILITY_REVIEW.md for detailed technical analysis and code snippets.

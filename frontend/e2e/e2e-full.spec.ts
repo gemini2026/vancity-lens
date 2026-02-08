@@ -6,7 +6,9 @@ test.describe('VanCity Lens — Full E2E Flow', () => {
   test('complete user journey: load → navigate → view intel → chat', async ({ page }) => {
     // Step 1: Load the app
     await page.goto('/');
-    await expect(page.locator('text=VanCity Lens')).toBeVisible();
+    await expect(
+      page.getByRole('navigation').getByText('VanCity Lens', { exact: true })
+    ).toBeVisible();
 
     // Step 2: Verify Map tab is showing
     const mapTab = page.locator('button', { hasText: 'Map' });

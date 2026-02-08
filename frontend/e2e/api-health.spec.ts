@@ -25,7 +25,8 @@ test.describe('VanCity Lens — API Health', () => {
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(body).toHaveProperty('signals');
-    expect(body).toHaveProperty('total');
+    expect(body).toHaveProperty('total_count');
+    expect(body).toHaveProperty('has_more');
   });
 
   test('neighborhoods endpoint responds', async ({ request }) => {
@@ -39,8 +40,10 @@ test.describe('VanCity Lens — API Health', () => {
     const response = await request.get(`${API_BASE}/api/v1/intel/stats`);
     expect(response.status()).toBe(200);
     const body = await response.json();
-    expect(body).toHaveProperty('total_documents');
     expect(body).toHaveProperty('total_signals');
+    expect(body).toHaveProperty('by_type');
+    expect(body).toHaveProperty('by_neighborhood');
+    expect(body).toHaveProperty('by_severity');
   });
 
   test('signals GeoJSON endpoint responds with FeatureCollection', async ({ request }) => {
