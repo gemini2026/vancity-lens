@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional, Tuple
 from difflib import SequenceMatcher
 
@@ -17,6 +17,7 @@ import aiohttp
 import anthropic
 import asyncpg
 
+from .external_clients import ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
 from .models import ExtractedSignal, SignalType, Decision, Sentiment, Severity
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,8 @@ async def extract_signals_from_chunk(
     chunk_text: str,
     document_context: dict,
     api_key: str,
+    *,
+    client: Optional[anthropic.AsyncAnthropic] = None,
 ) -> list[ExtractedSignal]:
     """Extract intelligence signals from a document chunk using Claude.
 
@@ -132,8 +135,6 @@ async def extract_signals_from_chunk(
         logger.debug("Empty chunk text, returning empty list")
         return []
 
-    client = anthropic.Anthropic(api_key=api_key)
-
     user_message = f"""Document Context:
 - Source Type: {document_context.get('source_type', 'Unknown')}
 - Title: {document_context.get('title', 'Unknown')}
@@ -148,82 +149,95 @@ Extract all real estate intelligence signals from this chunk. Return valid JSON 
     max_retries = 3
     backoff_factor = 2  # exponential backoff: 2, 4, 8 seconds
 
-    for attempt in range(max_retries):
-        try:
-            logger.debug(
-                f"Calling Claude API (attempt {attempt + 1}/{max_retries}) for chunk extraction"
-            )
+    created_client = False
+    if client is None:
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        created_client = True
 
-            response = client.messages.create(
-                model="claude-sonnet-4-5-20250514",
-                max_tokens=2000,
-                system=EXTRACTION_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_message}],
-            )
+    try:
+        for attempt in range(max_retries):
+            try:
+                logger.debug(
+                    f"Calling Claude API (attempt {attempt + 1}/{max_retries}) for chunk extraction"
+                )
 
-            response_text = response.content[0].text.strip()
-            logger.debug(f"Claude API response: {response_text[:200]}...")
-
-            # Parse the JSON response
-            signals_data = json.loads(response_text)
-
-            # Handle case where model returns an empty array
-            if not signals_data:
-                logger.debug("Claude returned empty signal list for chunk")
-                return []
-
-            # Ensure it's a list
-            if not isinstance(signals_data, list):
-                signals_data = [signals_data]
-
-            # Convert to ExtractedSignal objects with validation
-            signals = []
-            for signal_dict in signals_data:
-                try:
-                    signal = ExtractedSignal(**signal_dict)
-                    signals.append(signal)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to parse signal object: {e}. Data: {signal_dict}"
+                async with ANTHROPIC_SEMAPHORE:
+                    response = await asyncio.wait_for(
+                        client.messages.create(
+                            model="claude-sonnet-4-5-20250514",
+                            max_tokens=2000,
+                            system=EXTRACTION_SYSTEM_PROMPT,
+                            messages=[{"role": "user", "content": user_message}],
+                        ),
+                        timeout=ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS,
                     )
-                    # Skip invalid signals but continue processing
-                    continue
 
-            logger.info(f"Extracted {len(signals)} signals from chunk")
-            return signals
+                response_text = response.content[0].text.strip()
+                logger.debug(f"Claude API response: {response_text[:200]}...")
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Claude JSON response (attempt {attempt + 1}): {e}")
-            logger.debug(f"Response text: {response_text}")
-            if attempt < max_retries - 1:
-                wait_time = backoff_factor ** attempt
-                logger.info(f"Retrying in {wait_time} seconds...")
-                await asyncio.sleep(wait_time)
-            else:
-                logger.error("Max retries exceeded for JSON parsing")
-                return []
+                # Parse the JSON response
+                signals_data = json.loads(response_text)
 
-        except anthropic.APIError as e:
-            logger.error(f"Anthropic API error on attempt {attempt + 1}: {e}")
-            if attempt < max_retries - 1:
-                wait_time = backoff_factor ** attempt
-                logger.info(f"Retrying in {wait_time} seconds...")
-                await asyncio.sleep(wait_time)
-            else:
-                logger.error("Max retries exceeded for API calls")
-                return []
+                # Handle case where model returns an empty array
+                if not signals_data:
+                    logger.debug("Claude returned empty signal list for chunk")
+                    return []
 
-        except Exception as e:
-            logger.error(f"Unexpected error during extraction (attempt {attempt + 1}): {e}")
-            if attempt < max_retries - 1:
-                wait_time = backoff_factor ** attempt
-                logger.info(f"Retrying in {wait_time} seconds...")
-                await asyncio.sleep(wait_time)
-            else:
-                logger.error("Max retries exceeded")
-                return []
+                # Ensure it's a list
+                if not isinstance(signals_data, list):
+                    signals_data = [signals_data]
 
-    return []
+                # Convert to ExtractedSignal objects with validation
+                signals = []
+                for signal_dict in signals_data:
+                    try:
+                        signal = ExtractedSignal(**signal_dict)
+                        signals.append(signal)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to parse signal object: {e}. Data: {signal_dict}"
+                        )
+                        # Skip invalid signals but continue processing
+                        continue
+
+                logger.info(f"Extracted {len(signals)} signals from chunk")
+                return signals
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Claude JSON response (attempt {attempt + 1}): {e}")
+                logger.debug(f"Response text: {response_text}")
+                if attempt < max_retries - 1:
+                    wait_time = backoff_factor ** attempt
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error("Max retries exceeded for JSON parsing")
+                    return []
+
+            except anthropic.APIError as e:
+                logger.error(f"Anthropic API error on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    wait_time = backoff_factor ** attempt
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error("Max retries exceeded for API calls")
+                    return []
+
+            except Exception as e:
+                logger.error(f"Unexpected error during extraction (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    wait_time = backoff_factor ** attempt
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error("Max retries exceeded")
+                    return []
+
+        return []
+    finally:
+        if created_client:
+            await client.close()
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -387,7 +401,7 @@ async def process_document(
                 logger.warning(f"Document {document_id} has no chunks")
                 await conn.execute(
                     "UPDATE documents SET processed_at = $1 WHERE id = $2",
-                    datetime.utcnow(),
+                    datetime.now(timezone.utc),
                     document_id,
                 )
                 return 0
@@ -405,15 +419,30 @@ async def process_document(
         # Extract signals from each chunk
         total_signals = 0
         extracted_signals_by_chunk = {}
+        llm_client = anthropic.AsyncAnthropic(api_key=api_key)
+        try:
+            async def _extract_for_chunk(chunk_row):
+                chunk_id = chunk_row["id"]
+                chunk_text = chunk_row["chunk_text"]
+                logger.debug(f"Extracting signals from chunk {chunk_id}")
+                try:
+                    return await extract_signals_from_chunk(
+                        chunk_text,
+                        doc_context,
+                        api_key,
+                        client=llm_client,
+                    )
+                except Exception as e:
+                    logger.error(f"Chunk {chunk_id} extraction failed: {e}")
+                    return []
 
-        for chunk in chunks:
-            chunk_id = chunk["id"]
-            chunk_text = chunk["chunk_text"]
+            tasks = [_extract_for_chunk(chunk) for chunk in chunks]
+            results = await asyncio.gather(*tasks)
+        finally:
+            await llm_client.close()
 
-            logger.debug(f"Extracting signals from chunk {chunk_id}")
-
-            signals = await extract_signals_from_chunk(chunk_text, doc_context, api_key)
-
+        for chunk_row, signals in zip(chunks, results):
+            chunk_id = chunk_row["id"]
             extracted_signals_by_chunk[chunk_id] = signals
             total_signals += len(signals)
 
@@ -481,7 +510,7 @@ async def process_document(
                             signal.event_date,
                             geom if geom else "SRID=4326;POINT(0 0)",  # default point if geocoding failed
                             "claude-sonnet-4-5-20250514",
-                            datetime.utcnow(),
+                            datetime.now(timezone.utc),
                         )
 
                         logger.debug(f"Stored signal: {signal.signal_type} at {signal.addresses}")
@@ -493,7 +522,7 @@ async def process_document(
             # Update document processed_at timestamp
             await conn.execute(
                 "UPDATE documents SET processed_at = $1 WHERE id = $2",
-                datetime.utcnow(),
+                datetime.now(timezone.utc),
                 document_id,
             )
 

@@ -41,7 +41,7 @@ class TestExtractSignalsFromChunk:
     @pytest.mark.asyncio
     async def test_extract_empty_chunk(self):
         """Test extraction from empty chunk."""
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client:
             signals = await extract_signals_from_chunk("", {}, "test-key")
             assert signals == []
 
@@ -56,7 +56,7 @@ class TestExtractSignalsFromChunk:
             "source_url": "https://example.com"
         }
 
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
 
@@ -80,7 +80,8 @@ class TestExtractSignalsFromChunk:
                 "event_date": "2024-01-15"
             }]"""
 
-            mock_client_instance.messages.create.return_value = mock_response
+            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
+            mock_client_instance.close = AsyncMock()
 
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
@@ -95,7 +96,7 @@ class TestExtractSignalsFromChunk:
         chunk_text = "This is just regular meeting notes with no actionable signals."
         doc_context = {"source_type": "council_minutes"}
 
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
 
@@ -103,7 +104,8 @@ class TestExtractSignalsFromChunk:
             mock_response.content = [MagicMock()]
             mock_response.content[0].text = "[]"
 
-            mock_client_instance.messages.create.return_value = mock_response
+            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
+            mock_client_instance.close = AsyncMock()
 
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
@@ -115,7 +117,7 @@ class TestExtractSignalsFromChunk:
         chunk_text = "Some text"
         doc_context = {}
 
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
 
@@ -123,7 +125,8 @@ class TestExtractSignalsFromChunk:
             mock_response.content = [MagicMock()]
             mock_response.content[0].text = "This is not valid JSON"
 
-            mock_client_instance.messages.create.return_value = mock_response
+            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
+            mock_client_instance.close = AsyncMock()
 
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
@@ -136,7 +139,7 @@ class TestExtractSignalsFromChunk:
         chunk_text = "Test chunk"
         doc_context = {}
 
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
 
@@ -145,10 +148,11 @@ class TestExtractSignalsFromChunk:
             mock_response.content = [MagicMock()]
             mock_response.content[0].text = "[]"
 
-            mock_client_instance.messages.create.side_effect = [
+            mock_client_instance.messages.create = AsyncMock(side_effect=[
                 Exception("API Error"),
                 mock_response
-            ]
+            ])
+            mock_client_instance.close = AsyncMock()
 
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
@@ -316,8 +320,15 @@ class TestProcessAllUnprocessed:
     @pytest.mark.asyncio
     async def test_process_batch_counts(self):
         """Test batch processing returns correct counts."""
+        mock_pool = AsyncMock()
+        mock_pool.acquire = MagicMock()
+        conn = AsyncMock()
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+        conn.fetch.return_value = []
+
         result = await process_all_unprocessed(
-            AsyncMock(),
+            mock_pool,
             "test-key",
             batch_size=5
         )
@@ -348,7 +359,7 @@ Project value estimated at $150 million."""
             "source_url": "https://council.vancouver.ca/20240115/regulagenda20240115.htm"
         }
 
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client_instance = MagicMock()
             mock_client_class.return_value = mock_client_instance
 
@@ -378,7 +389,8 @@ Project value estimated at $150 million."""
                 "event_date": "2024-01-15"
             }]"""
 
-            mock_client_instance.messages.create.return_value = mock_response
+            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
+            mock_client_instance.close = AsyncMock()
 
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 

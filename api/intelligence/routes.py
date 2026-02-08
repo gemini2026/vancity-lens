@@ -19,8 +19,16 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
 
 from ..auth import require_admin
+from ..rate_limit import rate_limit_llm
 
 from .chat import handle_chat
+from .chat_sessions import (
+    create_session,
+    get_session,
+    list_sessions,
+    get_session_history,
+    delete_session,
+)
 from .models import (
     ChatRequest,
     ChatResponse,
@@ -30,6 +38,9 @@ from .models import (
     NeighborhoodSummary,
     NeighborhoodScorecard,
     NeighborhoodComparison,
+    ChatSession,
+    ChatSessionList,
+    ChatMessageHistory,
 )
 from .signals import (
     get_signal_feed,
@@ -39,10 +50,18 @@ from .signals import (
     get_neighborhoods,
     get_signals_geojson,
 )
+from . import alert_routes
+from . import opportunity_routes
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/intel", tags=["intelligence"])
+
+# Include alert routes
+router.include_router(alert_routes.router)
+
+# Include opportunity routes
+router.include_router(opportunity_routes.router)
 
 
 # ── Utility: Get API keys from environment ────────────────────────────
@@ -96,6 +115,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
         "relevant document chunks via hybrid search (Cohere + BM25), and returns "
         "an AI-generated answer with citations and related signals."
     ),
+    dependencies=[Depends(rate_limit_llm)],
 )
 async def post_chat(request: Request, chat_request: ChatRequest) -> ChatResponse:
     """
@@ -433,7 +453,7 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
         from .embeddings import process_document_chunks
-        from .extractor import process_all_unprocessed
+        from .extractor import process_document
 
         # Get unprocessed documents
         async with db_pool.acquire() as conn:
@@ -453,19 +473,19 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
 
         logger.info(f"Processing {len(doc_ids)} documents")
 
-        for row in doc_ids:
-            doc_id = row['id']
+        # Process documents concurrently; vendor calls are concurrency-limited globally
+        async def _process_one(doc_id: int):
             try:
-                # Chunk + embed
                 chunks_stored = await process_document_chunks(db_pool, doc_id, cohere_key)
                 logger.info(f"Doc {doc_id}: {chunks_stored} chunks embedded")
 
-                # Extract signals
-                await process_all_unprocessed(db_pool, anthropic_key, batch_size=1)
-
+                signals_stored = await process_document(db_pool, doc_id, anthropic_key)
+                logger.info(f"Doc {doc_id}: {signals_stored} signals extracted")
             except Exception as e:
                 logger.error(f"Failed to process document {doc_id}: {e}")
-                continue
+
+        tasks = [_process_one(row["id"]) for row in doc_ids]
+        await asyncio.gather(*tasks)
 
         logger.info("Processing complete")
     except Exception as e:
@@ -534,7 +554,7 @@ async def admin_trigger_scrape(
 @router.post(
     "/admin/process",
     summary="Admin: trigger AI extraction and embedding",
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_admin), Depends(rate_limit_llm)],
     description=(
         "Start a background task to process unprocessed documents: chunk with semchunk, "
         "embed with Cohere, and extract intelligence signals using Claude. "
@@ -777,9 +797,571 @@ async def get_single_neighborhood_scorecard(slug: str, request: Request):
     - Contextual intelligence stats (active rezonings, permits, signals)
     """
     from api.intelligence.neighborhoods import get_neighborhood_scorecard
-    
+
     db_pool = get_db_pool(request)
     result = await get_neighborhood_scorecard(db_pool, slug)
     if not result:
         raise HTTPException(status_code=404, detail=f"Neighborhood '{slug}' not found")
     return result
+
+
+# ── Chat Session Management Endpoints ────────────────────────────
+
+
+@router.post(
+    "/chat/sessions",
+    response_model=ChatSession,
+    summary="Create a new chat session",
+    description="Create a new chat session for starting a conversation.",
+)
+async def post_create_session(
+    request: Request,
+    user_label: str = Query("default", description="User label for analytics")
+) -> ChatSession:
+    """
+    Create a new chat session.
+
+    Sessions are used to group related chat messages for multi-turn
+    conversations and history tracking.
+    """
+    try:
+        db_pool = get_db_pool(request)
+        session = await create_session(db_pool, user_label=user_label)
+        logger.info(f"Created new chat session: {session.session_id}")
+        return session
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating session: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create chat session",
+        )
+
+
+@router.get(
+    "/chat/sessions",
+    response_model=ChatSessionList,
+    summary="List user's chat sessions",
+    description="Get a paginated list of chat sessions for a user.",
+)
+async def get_list_sessions(
+    request: Request,
+    user_label: str = Query("default", description="User label to filter by"),
+    limit: int = Query(20, ge=1, le=100, description="Results per page"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+) -> ChatSessionList:
+    """
+    Get a paginated list of chat sessions for a user.
+
+    Results are ordered by creation date (most recent first).
+    """
+    try:
+        db_pool = get_db_pool(request)
+        session_list = await list_sessions(
+            db_pool,
+            user_label=user_label,
+            limit=limit,
+            offset=offset
+        )
+        logger.info(
+            f"Listed {len(session_list.sessions)} sessions for user '{user_label}'"
+        )
+        return session_list
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing sessions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to list chat sessions",
+        )
+
+
+@router.get(
+    "/chat/sessions/{session_id}",
+    response_model=ChatSession,
+    summary="Get session details",
+    description="Get metadata and statistics for a specific chat session.",
+)
+async def get_session_details(
+    session_id: str,
+    request: Request,
+) -> ChatSession:
+    """
+    Get details for a specific chat session including message count and last activity.
+    """
+    try:
+        db_pool = get_db_pool(request)
+        session = await get_session(db_pool, session_id)
+
+        if not session:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session '{session_id}' not found"
+            )
+
+        logger.info(f"Retrieved session details: {session_id}")
+        return session
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving session {session_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve session details",
+        )
+
+
+@router.get(
+    "/chat/sessions/{session_id}/messages",
+    response_model=ChatMessageHistory,
+    summary="Get session message history",
+    description="Get the full conversation history for a session.",
+)
+async def get_session_messages(
+    session_id: str,
+    request: Request,
+    limit: int = Query(50, ge=1, le=500, description="Max messages to retrieve"),
+) -> ChatMessageHistory:
+    """
+    Get the full message history for a session.
+
+    Messages are ordered chronologically (oldest first).
+    """
+    try:
+        db_pool = get_db_pool(request)
+        history = await get_session_history(db_pool, session_id, limit=limit)
+
+        if history is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session '{session_id}' not found"
+            )
+
+        logger.info(f"Retrieved {len(history.messages)} messages for session {session_id}")
+        return history
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving session history {session_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve session history",
+        )
+
+
+@router.delete(
+    "/chat/sessions/{session_id}",
+    summary="Delete a chat session",
+    description="Delete a session and all its messages.",
+)
+async def delete_chat_session(
+    session_id: str,
+    request: Request,
+) -> dict:
+    """
+    Delete a chat session and all its messages.
+
+    WARNING: This operation is not reversible.
+    """
+    try:
+        db_pool = get_db_pool(request)
+        success = await delete_session(db_pool, session_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Session '{session_id}' not found or already deleted"
+            )
+
+        logger.info(f"Deleted session: {session_id}")
+        return {
+            "status": "deleted",
+            "session_id": session_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting session {session_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete session",
+        )
+
+
+# ── Materialized View Endpoints (VCL-79 / PERF-011) ─────────────────
+
+@router.get(
+    "/neighborhoods/rankings",
+    response_model=list[NeighborhoodSummary],
+    summary="Get neighborhood rankings from materialized view",
+    description=(
+        "Get all Vancouver neighborhoods ranked by overall composite score. "
+        "Served from materialized view for maximum performance. "
+        "Includes top/bottom categories for quick scanning."
+    ),
+)
+async def get_neighborhood_rankings(
+    request: Request,
+    limit: int = Query(50, ge=1, le=100, description="Max neighborhoods to return"),
+) -> list[NeighborhoodSummary]:
+    """
+    Get ranked neighborhoods from materialized view (fast).
+
+    Returns all neighborhoods sorted by overall score and rank.
+    """
+    try:
+        from .materialized_views import get_neighborhood_rankings as mv_rankings
+
+        db_pool = get_db_pool(request)
+        rankings = await mv_rankings(db_pool, limit=limit)
+
+        logger.info(f"Retrieved {len(rankings)} neighborhood rankings")
+        return rankings
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving neighborhood rankings: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve neighborhood rankings",
+        )
+
+
+@router.get(
+    "/neighborhoods/{slug}/scorecard",
+    response_model=NeighborhoodScorecard,
+    summary="Get detailed neighborhood scorecard",
+    description=(
+        "Get full Madlan-style scorecard for a single neighborhood from materialized view. "
+        "Includes overall score, category breakdown, rank, and intelligence stats. "
+        "Cached for performance."
+    ),
+)
+async def get_neighborhood_scorecard(
+    slug: str,
+    request: Request,
+) -> NeighborhoodScorecard:
+    """
+    Get full scorecard for a neighborhood from materialized view.
+
+    Returns category scores, rank, active rezonings, and recent permits.
+    """
+    try:
+        from .materialized_views import get_neighborhood_detail
+
+        db_pool = get_db_pool(request)
+        scorecard = await get_neighborhood_detail(db_pool, slug)
+
+        if not scorecard:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Neighborhood '{slug}' not found",
+            )
+
+        logger.info(f"Retrieved scorecard for neighborhood: {slug}")
+        return scorecard
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving scorecard for {slug}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve neighborhood scorecard",
+        )
+
+
+@router.post(
+    "/neighborhoods/compare",
+    response_model=NeighborhoodComparison,
+    summary="Compare neighborhoods side-by-side",
+    description=(
+        "Compare 2-4 neighborhoods with category-by-category breakdown. "
+        "Served from materialized view for fast comparisons."
+    ),
+)
+async def post_compare_neighborhoods(
+    request: Request,
+    body: dict = None,
+) -> NeighborhoodComparison:
+    """
+    Compare 2-4 neighborhoods side-by-side.
+
+    Request body should contain:
+        {
+            "slugs": ["kitsilano", "downtown", "west-point-grey"]
+        }
+
+    Returns category-by-category comparison with all neighborhoods.
+    """
+    try:
+        from .materialized_views import compare_neighborhoods
+
+        db_pool = get_db_pool(request)
+
+        # Parse request body
+        if body is None:
+            body = await request.json()
+
+        slugs = body.get("slugs", [])
+
+        if not slugs or len(slugs) < 2 or len(slugs) > 4:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide 2-4 neighborhood slugs in 'slugs' array",
+            )
+
+        comparison = await compare_neighborhoods(db_pool, slugs)
+
+        if not comparison:
+            raise HTTPException(
+                status_code=404,
+                detail="One or more neighborhoods not found",
+            )
+
+        logger.info(f"Compared {len(slugs)} neighborhoods")
+        return comparison
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing neighborhoods: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to compare neighborhoods",
+        )
+
+
+@router.post(
+    "/admin/refresh-views",
+    summary="Admin: refresh materialized views",
+    dependencies=[Depends(require_admin)],
+    description=(
+        "Manually trigger a refresh of all materialized views (neighborhoods scores, signal activity). "
+        "Admin-only operation. Returns refresh timing and statistics."
+    ),
+)
+async def admin_refresh_views(request: Request) -> dict:
+    """
+    Trigger manual refresh of materialized views.
+
+    Refreshes:
+    - mv_neighborhood_scores
+    - mv_neighborhood_signal_activity
+
+    Returns timing information and row counts.
+    """
+    try:
+        from .materialized_views import refresh_all_views
+
+        db_pool = get_db_pool(request)
+
+        logger.info("Admin refresh of materialized views initiated")
+
+        result = await refresh_all_views(db_pool)
+
+        logger.info(
+            f"Materialized views refreshed: "
+            f"success={result.get('all_success')}, "
+            f"duration_ms={result.get('total_duration_ms')}"
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error refreshing materialized views: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to refresh materialized views",
+        )
+
+
+# ── Geocoding Endpoints (VCL-84) ───────────────────────────────────────────
+
+
+@router.post(
+    "/admin/geocode/backfill",
+    summary="Admin: backfill missing signal geocodes",
+    dependencies=[Depends(require_admin)],
+    description=(
+        "Find intelligence signals with addresses but no geom and attempt to geocode them. "
+        "Uses parcels table as primary geocoding source. "
+        "Returns statistics on attempted, succeeded, and failed geocodings."
+    ),
+)
+async def admin_geocode_backfill(
+    request: Request,
+    limit: int = Query(100, ge=1, le=1000, description="Max signals to process"),
+) -> dict:
+    """
+    Trigger backfill of missing geocodes for intelligence signals.
+
+    Finds signals with addresses but no geom and attempts to geocode them
+    using exact match, fuzzy match, and regex-based extraction strategies.
+
+    Returns statistics on the operation.
+    """
+    try:
+        from .geocoder import VancouverGeocoder
+
+        db_pool = get_db_pool(request)
+        geocoder = VancouverGeocoder(db_pool)
+
+        logger.info(f"Starting geocode backfill with limit={limit}")
+
+        stats = await geocoder.backfill_missing_geocodes(limit=limit)
+
+        logger.info(
+            f"Geocode backfill completed: "
+            f"attempted={stats['attempted']}, "
+            f"succeeded={stats['succeeded']}, "
+            f"failed={stats['failed']}"
+        )
+
+        return {
+            "status": "completed",
+            "attempted": stats["attempted"],
+            "succeeded": stats["succeeded"],
+            "failed": stats["failed"],
+        }
+
+    except Exception as e:
+        logger.error(f"Error during geocode backfill: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to perform geocode backfill",
+        )
+
+
+@router.get(
+    "/admin/geocode/stats",
+    summary="Admin: geocoding coverage statistics",
+    dependencies=[Depends(require_admin)],
+    description=(
+        "Get statistics on signal geocoding coverage. "
+        "Returns total signal count, geocoded count, and missing count."
+    ),
+)
+async def admin_geocode_stats(request: Request) -> dict:
+    """
+    Get geocoding coverage statistics.
+
+    Returns counts for:
+    - total_signals: Total signals in database
+    - geocoded_signals: Signals with non-null geom
+    - missing_signals: Signals with null geom
+    - addressable_missing: Signals with addresses but no geom
+    """
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            # Get all signal counts
+            counts = await conn.fetchrow(
+                """
+                SELECT
+                    COUNT(*) as total_signals,
+                    COUNT(geom) as geocoded_signals,
+                    COUNT(*) FILTER (WHERE geom IS NULL) as missing_signals,
+                    COUNT(*) FILTER (WHERE geom IS NULL AND addresses IS NOT NULL AND array_length(addresses, 1) > 0) as addressable_missing
+                FROM intelligence_signals
+                """
+            )
+
+            if not counts:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to query signal statistics",
+                )
+
+            stats = {
+                "total_signals": counts["total_signals"],
+                "geocoded_signals": counts["geocoded_signals"],
+                "missing_signals": counts["missing_signals"],
+                "addressable_missing": counts["addressable_missing"],
+                "geocoding_coverage_pct": (
+                    round(
+                        (counts["geocoded_signals"] / counts["total_signals"] * 100)
+                        if counts["total_signals"] > 0
+                        else 0,
+                        2,
+                    )
+                ),
+            }
+
+            logger.info(f"Geocoding stats retrieved: {stats}")
+            return stats
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving geocoding statistics: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve geocoding statistics",
+        )
+
+
+@router.post(
+    "/admin/geocode/test",
+    summary="Admin: test geocode a single address",
+    dependencies=[Depends(require_admin)],
+    description=(
+        "Test geocoding a single address. "
+        "Returns the geocoded (lng, lat) or null if address cannot be matched."
+    ),
+)
+async def admin_geocode_test(
+    request: Request,
+    address: str = Query(..., description="Address to test geocoding"),
+) -> dict:
+    """
+    Test geocoding for a single address.
+
+    Useful for verifying geocoding quality and debugging address matching issues.
+
+    Returns:
+        {
+            "address": "input address",
+            "result": [lng, lat] or null,
+            "found": true/false
+        }
+    """
+    try:
+        from .geocoder import VancouverGeocoder
+
+        db_pool = get_db_pool(request)
+        geocoder = VancouverGeocoder(db_pool)
+
+        logger.info(f"Testing geocode for address: {address}")
+
+        result = await geocoder.geocode_address(address)
+
+        if result:
+            lng, lat = result
+            return {
+                "address": address,
+                "result": [lng, lat],
+                "found": True,
+            }
+        else:
+            return {
+                "address": address,
+                "result": None,
+                "found": False,
+            }
+
+    except Exception as e:
+        logger.error(f"Error testing geocode for '{address}': {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to test geocode",
+        )

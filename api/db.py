@@ -9,6 +9,8 @@ from typing import AsyncGenerator
 
 import asyncpg
 
+from .pool_monitor import MonitoredDatabase
+
 logger = logging.getLogger(__name__)
 
 # In production, DATABASE_URL MUST be set as an environment variable.
@@ -70,4 +72,16 @@ class Database:
             yield conn
 
 
-db = Database()
+# Use MonitoredDatabase as the default instance (backward compatible)
+db = MonitoredDatabase()
+# Wrapper to maintain backward compatibility with existing code
+_original_connect = db.connect
+
+
+async def _connect_wrapper():
+    """Wrapper to connect without explicit parameters."""
+    await _original_connect(DATABASE_URL, _POOL_MIN, _POOL_MAX)
+
+
+# Replace the connect method for transparent operation
+db.connect = _connect_wrapper

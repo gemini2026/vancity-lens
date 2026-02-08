@@ -62,15 +62,17 @@ def estimate_demolition(
     existing_footprint = lot_sqft * 0.4
     base_rate = 20  # $/sqft
 
-    # Asbestos premium for pre-1980 buildings
+    # Asbestos premium for pre-1980 buildings (VCL-44 / TEST-009: fixed ordering)
+    # IMPORTANT: Check pre-1960 FIRST — pre-1960 is a subset of pre-1980,
+    # so the broader check must come second to avoid shadowing the higher premium.
     asbestos_mult = 1.0
     asbestos_note = ""
-    if year_built and year_built < 1980:
-        asbestos_mult = 1.25
-        asbestos_note = " (includes 25% asbestos abatement premium for pre-1980 structure)"
-    elif year_built and year_built < 1960:
+    if year_built and year_built < 1960:
         asbestos_mult = 1.40
         asbestos_note = " (includes 40% asbestos/hazmat premium for pre-1960 structure)"
+    elif year_built and year_built < 1980:
+        asbestos_mult = 1.25
+        asbestos_note = " (includes 25% asbestos abatement premium for pre-1980 structure)"
 
     # Scale by lot size — bigger lots have more to demolish
     if lot_sqft > 15_000:

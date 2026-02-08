@@ -326,13 +326,15 @@ class TestAdminProcessEndpoint:
         query_params = {"batch_size": 10}
 
         with patch("api.intelligence.routes.get_db_pool") as mock_pool:
-            mock_pool.return_value = AsyncMock()
+            with patch("api.intelligence.routes._background_process_task", new=AsyncMock()) as mock_bg:
+                mock_pool.return_value = MagicMock()
 
-            response = client.post("/api/v1/intel/admin/process", params=query_params)
+                response = client.post("/api/v1/intel/admin/process", params=query_params)
 
-            assert response.status_code == 200
-            data = response.json()
-            assert "status" in data
+                assert response.status_code == 200
+                data = response.json()
+                assert "status" in data
+                assert mock_bg.await_count >= 1
 
 
 class TestAdminStatusEndpoint:

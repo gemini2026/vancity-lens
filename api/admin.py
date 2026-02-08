@@ -9,14 +9,16 @@ Uses only stdlib (urllib) so no Docker rebuild is needed.
 import asyncio
 import json
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from .auth import require_admin
+from .audit import audit_log_dependency
 from .db import db
 
 router = APIRouter(
@@ -1762,3 +1764,190 @@ async def data_status():
         )
         stats["sample_priced"] = [dict(r) for r in priced]
         return stats
+
+
+# ── Pool Monitoring Routes ────────────────────────────────────────
+
+@router.get(
+    "/pool/metrics",
+    summary="Get connection pool metrics",
+    description="Returns real-time connection pool statistics including utilization, "
+                "timing, and error counts. Admin-only endpoint.",
+)
+async def get_pool_metrics():
+    """Get current connection pool metrics (VCL-87 / PERF-013)."""
+    if db.monitor is None:
+        return {"error": "Pool monitor not initialized"}
+
+    metrics = db.monitor.get_metrics()
+    return {
+        "pool": {
+            "size": metrics.size,
+            "min_size": metrics.min_size,
+            "max_size": metrics.max_size,
+            "free_size": metrics.free_size,
+            "used_size": metrics.used_size,
+            "utilization_pct": round(metrics.utilization_pct, 2),
+        },
+        "queries": {
+            "total": metrics.queries_total,
+            "active": metrics.queries_active,
+        },
+        "timing": {
+            "avg_acquire_ms": round(metrics.avg_acquire_time_ms, 2),
+            "max_acquire_ms": round(metrics.max_acquire_time_ms, 2),
+        },
+        "errors": {
+            "connection_errors": metrics.connection_errors,
+            "pool_full_events": metrics.pool_full_events,
+        },
+        "uptime_seconds": round(metrics.uptime_seconds, 1),
+    }
+
+
+@router.get(
+    "/pool/health",
+    summary="Get connection pool health status",
+    description="Returns pool health assessment (healthy/degraded/unhealthy) "
+                "based on utilization and error thresholds.",
+)
+async def get_pool_health():
+    """Get connection pool health status (VCL-87 / PERF-013)."""
+    if db.monitor is None:
+        return {"error": "Pool monitor not initialized"}
+
+    health = db.monitor.get_health_status()
+    metrics = db.monitor.get_metrics()
+
+    return {
+        "status": health["status"],
+        "reason": health["reason"],
+        "utilization_pct": round(health["utilization_pct"], 2),
+        "connection_errors": health["connection_errors"],
+        "pool_full_events": health["pool_full_events"],
+        "pool": {
+            "size": metrics.size,
+            "used": metrics.used_size,
+            "free": metrics.free_size,
+        },
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Scraper Scheduling Routes (VCL-80 / DATA-004)
+# ────────────────────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/scrapers/status",
+    summary="Get scraper schedule status",
+    description="Returns status of all registered scrapers including schedules, "
+                "last run time, and next scheduled run.",
+)
+async def get_scrapers_status(request: Request):
+    """Get status of all registered scrapers."""
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is None:
+        return {"error": "Scheduler not initialized"}
+
+    return scheduler.get_status()
+
+
+@router.post(
+    "/scrapers/{scraper_name}/run",
+    summary="Manually trigger a scraper run",
+    description="Execute a specific scraper immediately, bypassing schedule.",
+)
+async def run_scraper_manual(scraper_name: str, request: Request):
+    """Manually trigger a scraper run."""
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is None:
+        return {"error": "Scheduler not initialized"}
+
+    try:
+        result = await scheduler.run_scraper(scraper_name)
+        return result.to_dict()
+    except ValueError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": f"Failed to run scraper: {str(e)}"}
+
+
+@router.get(
+    "/scrapers/history",
+    summary="Get scraper run history",
+    description="Returns paginated history of all scraper runs with metrics.",
+)
+async def get_scrapers_history(
+    request: Request,
+    scraper_name: str = Query(None, description="Filter by scraper name"),
+    limit: int = Query(50, ge=1, le=500, description="Results per page"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    status: str = Query(None, description="Filter by status (success/partial/failed)"),
+):
+    """Get paginated scraper run history."""
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is None or scheduler.db_pool is None:
+        return {"error": "Scheduler not initialized"}
+
+    try:
+        query = "SELECT * FROM scraper_runs WHERE 1=1"
+        params = []
+
+        if scraper_name:
+            query += " AND scraper_name = $" + str(len(params) + 1)
+            params.append(scraper_name)
+
+        if status:
+            query += " AND status = $" + str(len(params) + 1)
+            params.append(status)
+
+        query += " ORDER BY created_at DESC LIMIT $" + str(len(params) + 1)
+        params.append(limit)
+        query += " OFFSET $" + str(len(params) + 1)
+        params.append(offset)
+
+        async with scheduler.db_pool.acquire() as conn:
+            rows = await conn.fetch(query, *params)
+
+        # Get total count for pagination
+        count_query = "SELECT COUNT(*) as total FROM scraper_runs WHERE 1=1"
+        count_params = []
+
+        if scraper_name:
+            count_query += " AND scraper_name = $" + str(len(count_params) + 1)
+            count_params.append(scraper_name)
+
+        if status:
+            count_query += " AND status = $" + str(len(count_params) + 1)
+            count_params.append(status)
+
+        async with scheduler.db_pool.acquire() as conn:
+            count_result = await conn.fetchval(count_query, *count_params)
+
+        return {
+            "history": [
+                {
+                    "id": row["id"],
+                    "scraper_name": row["scraper_name"],
+                    "started_at": row["started_at"].isoformat(),
+                    "completed_at": row["completed_at"].isoformat(),
+                    "duration_seconds": (
+                        row["completed_at"] - row["started_at"]
+                    ).total_seconds(),
+                    "status": row["status"],
+                    "documents_found": row["documents_found"],
+                    "documents_new": row["documents_new"],
+                    "documents_skipped": row["documents_skipped"],
+                    "errors": row["errors"],
+                }
+                for row in rows
+            ],
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": count_result or 0,
+            },
+        }
+    except Exception as e:
+        return {"error": f"Failed to retrieve history: {str(e)}"}

@@ -176,7 +176,7 @@ class TestFetchRssFeed:
     async def test_rss_feed_timeout(self):
         """Test RSS feed timeout handling."""
         mock_session = AsyncMock()
-        mock_session.get.side_effect = asyncio.TimeoutError()
+        mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
         articles = await fetch_rss_feed(mock_session, "https://example.com/feed")
 
@@ -302,7 +302,7 @@ class TestFetchArticleContent:
     async def test_fetch_timeout(self):
         """Test article fetch timeout."""
         mock_session = AsyncMock()
-        mock_session.get.side_effect = asyncio.TimeoutError()
+        mock_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
         result = await fetch_article_content(mock_session, "https://example.com/slow")
 

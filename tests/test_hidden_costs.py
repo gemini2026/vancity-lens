@@ -38,10 +38,10 @@ class TestEstimateDemolition:
 
     def test_pre1960_building_asbestos_bug(self):
         """
-        Test the asbestos premium logic bug:
-        Pre-1960 check (40%) runs AFTER pre-1980 check (25%),
-        so it never applies — pre-1980 catches year < 1960 first.
-        This test documents the bug behavior.
+        Test the asbestos premium logic (VCL-44 / TEST-009 fix):
+        Pre-1960 buildings get 40% hazmat premium.
+        Pre-1980 (but post-1960) buildings get 25% abatement premium.
+        Previously the ordering was wrong and pre-1960 always got 25%.
         """
         cost1950, exp1950 = estimate_demolition(
             improvement_value=500_000,
@@ -57,12 +57,14 @@ class TestEstimateDemolition:
             entitled_storeys=8
         )
 
-        # BUG: Both should have same multiplier because pre-1960 logic
-        # never executes (pre-1980 check catches year < 1960 first)
-        assert "25% asbestos" in exp1950
+        # FIXED (VCL-44): Pre-1960 now correctly gets the higher 40% premium
+        assert "40% asbestos" in exp1950
+        assert "pre-1960" in exp1950
+        # Pre-1980 (but post-1960) still gets 25%
         assert "25% asbestos" in exp1975
-        # The 40% premium for pre-1960 is never applied due to logic order
-        assert "40% asbestos" not in exp1950
+        assert "pre-1980" in exp1975
+        # Both may hit the $150K floor on small lots, but multipliers differ
+        assert cost1950 >= cost1975
 
     def test_low_improvement_value_minimal_cost(self):
         """Test minimal demolition cost ($50K) for improvement < $200K."""

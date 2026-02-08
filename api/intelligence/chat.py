@@ -11,16 +11,24 @@ Search pipeline uses Cohere embeddings + BM25 hybrid search with RRF fusion.
 """
 
 import json
+import asyncio
 import logging
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional, List
 
 import asyncpg
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 
 from .embeddings import hybrid_search
+from .external_clients import ANTHROPIC_CHAT_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
 from .models import ChatResponse, SourceCitation, SignalResponse
+from .prepared_queries import QueryBuilder
+from .chat_sessions import (
+    create_session,
+    get_session_history,
+    build_context_window,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +94,26 @@ async def handle_chat(
         ChatResponse with answer, citations, and related signals
     """
 
+    # Create or retrieve session
     if not session_id:
-        session_id = str(uuid.uuid4())
+        try:
+            session = await create_session(db_pool)
+            session_id = session.session_id
+            logger.info(f"Created new chat session: {session_id}")
+        except Exception as e:
+            # Non-fatal: fall back to generating a UUID for this chat
+            logger.warning(f"Failed to create session, using generated UUID: {e}")
+            session_id = str(uuid.uuid4())
+    else:
+        # Validate that session exists
+        try:
+            history = await get_session_history(db_pool, session_id, limit=1)
+            if history is None:
+                # Session doesn't exist, but we'll still store messages with this ID
+                logger.warning(f"Session {session_id} not found, will create on first message")
+        except Exception as e:
+            logger.error(f"Error validating session {session_id}: {e}")
+            # Continue anyway - session may be new
 
     try:
         # Step 1: Retrieve relevant document chunks via hybrid search
@@ -149,31 +175,51 @@ async def handle_chat(
             logger.warning("No relevant chunks or signals found for query")
             context = "No relevant information found in the knowledge base."
 
-        # Step 4: Call Claude API with system prompt + context + user query
+        # Step 4: Build multi-turn context from conversation history
+        logger.info("Building multi-turn context...")
+        history_context = ""
+        try:
+            history_context = await build_context_window(db_pool, session_id, max_messages=10)
+        except Exception as e:
+            logger.warning(f"Could not build context window: {e}")
+            # Continue without history
+
+        # Step 5: Call Claude API with system prompt + context + user query
         logger.info("Calling Claude API...")
-        client = Anthropic(api_key=anthropic_api_key)
+        client = AsyncAnthropic(api_key=anthropic_api_key)
+
+        user_content = f"""Context information:
+
+{context}
+
+{history_context}
+
+User query: {query}"""
 
         messages = [
             {
                 "role": "user",
-                "content": f"""Context information:
-
-{context}
-
-User query: {query}"""
+                "content": user_content
             }
         ]
 
-        response = client.messages.create(
-            model="claude-sonnet-4-5-20250514",
-            max_tokens=2000,
-            system=CHAT_SYSTEM_PROMPT,
-            messages=messages
-        )
+        try:
+            async with ANTHROPIC_SEMAPHORE:
+                response = await asyncio.wait_for(
+                    client.messages.create(
+                        model="claude-sonnet-4-5-20250514",
+                        max_tokens=2000,
+                        system=CHAT_SYSTEM_PROMPT,
+                        messages=messages,
+                    ),
+                    timeout=ANTHROPIC_CHAT_TIMEOUT_SECONDS,
+                )
+        finally:
+            await client.close()
 
         answer = response.content[0].text
 
-        # Step 5: Extract citations from used chunks
+        # Step 6: Extract citations from used chunks
         citations: List[SourceCitation] = []
         for chunk in chunks:
             # Include top chunks as citations (reranking already sorted by relevance)
@@ -192,7 +238,7 @@ User query: {query}"""
         # Limit citations to top 5
         citations = citations[:5]
 
-        # Step 6: Store chat message in database
+        # Step 7: Store chat message in database
         try:
             async with db_pool.acquire() as conn:
                 await conn.execute("""
@@ -207,7 +253,7 @@ User query: {query}"""
                     query,
                     [c.get('chunk_id') for c in chunks if c.get('chunk_id')],
                     [s.id for s in signals],
-                    datetime.utcnow()
+                    datetime.now(timezone.utc)
                 )
                 await conn.execute("""
                     INSERT INTO chat_messages (
@@ -218,13 +264,13 @@ User query: {query}"""
                     uuid.UUID(session_id),
                     'assistant',
                     answer,
-                    datetime.utcnow()
+                    datetime.now(timezone.utc)
                 )
         except Exception as e:
             logger.error(f"Failed to store chat message: {e}")
             # Continue anyway - don't fail the response
 
-        # Step 7: Return ChatResponse
+        # Step 8: Return ChatResponse
         logger.info(f"Chat response generated with {len(citations)} citations")
         return ChatResponse(
             answer=answer,
@@ -251,8 +297,25 @@ async def get_relevant_signals(
     """
 
     try:
-        # Build the query using plainto_tsquery for safe full-text search
-        base_query = """
+        # Build parameterized query using QueryBuilder
+        builder = QueryBuilder()
+
+        # Base WHERE condition for full-text search (param 1 is the query)
+        builder.params = [query]
+        builder.conditions = [
+            "to_tsvector('english', isig.summary || ' ' || COALESCE(isig.headline, '')) "
+            "@@ plainto_tsquery('english', $1)"
+        ]
+
+        # Add neighborhood filter if provided
+        if neighborhood:
+            builder.add_filter("isig.neighborhood", "=", neighborhood)
+
+        where_clause, params = builder.build()
+
+        # Build the full query with ordering and limit
+        param_num = len(params) + 1
+        base_query = f"""
             SELECT
                 isig.id,
                 isig.document_id,
@@ -274,22 +337,11 @@ async def get_relevant_signals(
                 d.published_date AS source_date
             FROM intelligence_signals isig
             JOIN documents d ON isig.document_id = d.id
-            WHERE (
-                to_tsvector('english', isig.summary || ' ' || COALESCE(isig.headline, ''))
-                @@ plainto_tsquery('english', $1)
-            )
-        """
-
-        params = [query]
-
-        if neighborhood:
-            base_query += " AND isig.neighborhood = $2"
-            params.append(neighborhood)
-
-        base_query += f"""
+            WHERE {where_clause}
             ORDER BY isig.event_date DESC NULLS LAST, isig.severity DESC
-            LIMIT ${len(params) + 1}
+            LIMIT ${param_num}
         """
+
         params.append(limit)
 
         async with db_pool.acquire() as conn:

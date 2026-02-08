@@ -16,11 +16,14 @@ from typing import Optional, List, Dict, Any
 
 import asyncpg
 
+from ..cache import cached, CACHE_TTL_SHORT, CACHE_TTL_MEDIUM, CACHE_TTL_LONG
 from .models import SignalResponse, SignalFeedResponse, Severity
+from .prepared_queries import build_signal_feed_query, build_signal_count_query
 
 logger = logging.getLogger(__name__)
 
 
+@cached(ttl=CACHE_TTL_SHORT, key_prefix="signal_feed")
 async def get_signal_feed(
     db_pool: asyncpg.Pool,
     neighborhood: Optional[str] = None,
@@ -56,83 +59,30 @@ async def get_signal_feed(
         limit = min(limit, 100)
         offset = max(offset, 0)
 
-        # Build WHERE clause dynamically
-        where_conditions = []
-        params = []
+        # Build parameterized queries using QueryBuilder
+        filters = {
+            "neighborhood": neighborhood,
+            "signal_type": signal_type,
+            "severity_min": severity_min,
+            "date_from": date_from,
+            "date_to": date_to,
+            "limit": limit,
+            "offset": offset,
+        }
 
-        if neighborhood:
-            where_conditions.append("isig.neighborhood = ${}".format(len(params) + 1))
-            params.append(neighborhood)
+        # Build count query
+        count_query, count_params = build_signal_count_query(filters)
 
-        if signal_type:
-            where_conditions.append("isig.signal_type = ${}".format(len(params) + 1))
-            params.append(signal_type)
-
-        if severity_min:
-            # Map severity to numeric for comparison
-            severity_levels = {
-                "info": 0,
-                "low": 1,
-                "medium": 2,
-                "high": 3,
-                "critical": 4
-            }
-            severity_val = severity_levels.get(severity_min.lower(), 0)
-            severity_col = "CASE isig.severity WHEN 'info' THEN 0 WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3 WHEN 'critical' THEN 4 ELSE 0 END"
-            where_conditions.append(f"{severity_col} >= {severity_val}")
-
-        if date_from:
-            where_conditions.append("isig.event_date >= ${}".format(len(params) + 1))
-            params.append(date_from)
-
-        if date_to:
-            where_conditions.append("isig.event_date <= ${}".format(len(params) + 1))
-            params.append(date_to)
-
-        where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
-
-        # Get total count
-        count_query = f"""
-            SELECT COUNT(*) as total
-            FROM intelligence_signals isig
-            WHERE {where_clause}
-        """
-
-        # Get paginated results
-        feed_query = f"""
-            SELECT
-                isig.id,
-                isig.document_id,
-                isig.signal_type,
-                isig.summary,
-                isig.headline,
-                isig.addresses,
-                isig.neighborhood,
-                isig.decision,
-                isig.vote_for,
-                isig.vote_against,
-                isig.sentiment,
-                isig.severity,
-                isig.confidence,
-                isig.event_date,
-                d.title AS source_title,
-                d.source_url,
-                d.source_type,
-                d.published_date AS source_date
-            FROM intelligence_signals isig
-            JOIN documents d ON isig.document_id = d.id
-            WHERE {where_clause}
-            ORDER BY isig.event_date DESC, isig.id DESC
-            LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
-        """
+        # Build feed query
+        feed_query, feed_params, _, _ = build_signal_feed_query(filters)
 
         async with db_pool.acquire() as conn:
             # Get count
-            count_row = await conn.fetchrow(count_query, *params)
+            count_row = await conn.fetchrow(count_query, *count_params)
             total_count = count_row['total'] if count_row else 0
 
             # Get paginated results
-            rows = await conn.fetch(feed_query, *params, limit, offset)
+            rows = await conn.fetch(feed_query, *feed_params)
 
         # Convert rows to SignalResponse objects
         signals = []
@@ -357,6 +307,7 @@ async def get_signals_for_parcel(
         raise
 
 
+@cached(ttl=CACHE_TTL_MEDIUM, key_prefix="signal_stats")
 async def get_signal_stats(
     db_pool: asyncpg.Pool
 ) -> Dict[str, Any]:
@@ -432,6 +383,7 @@ async def get_signal_stats(
         raise
 
 
+@cached(ttl=CACHE_TTL_LONG, key_prefix="neighborhoods")
 async def get_neighborhoods(
     db_pool: asyncpg.Pool
 ) -> List[str]:
@@ -468,6 +420,7 @@ async def get_neighborhoods(
         raise
 
 
+@cached(ttl=CACHE_TTL_MEDIUM, key_prefix="signals_geojson")
 async def get_signals_geojson(
     db_pool: asyncpg.Pool,
     limit: int = 200,

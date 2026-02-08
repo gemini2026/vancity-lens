@@ -57,24 +57,39 @@ class TestHandleChat:
 
         with patch("api.intelligence.chat.hybrid_search", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.Anthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Test answer"
-                    mock_client.messages.create.return_value = mock_response
-
-                    response = await handle_chat(
-                        mock_pool,
-                        "Test query",
-                        "test-key",
-                        "test-cohere-key"
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    # Mock session creation
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session-id",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
                     )
+                    mock_create.return_value = mock_session
 
-                    assert response.session_id is not None
-                    assert len(response.session_id) > 0
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
+
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "Test answer"
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
+
+                            response = await handle_chat(
+                                mock_pool,
+                                "Test query",
+                                "test-key",
+                                "test-cohere-key"
+                            )
+
+                            assert response.session_id is not None
+                            assert len(response.session_id) > 0
 
     @pytest.mark.asyncio
     async def test_handle_chat_uses_provided_session_id(self):
@@ -87,25 +102,28 @@ class TestHandleChat:
 
         with patch("api.intelligence.chat.hybrid_search", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.Anthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
+                with patch("api.intelligence.chat.get_session_history", return_value=None):
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                            with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                                mock_client = MagicMock()
+                                mock_anthropic.return_value = mock_client
 
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Test answer"
-                    mock_client.messages.create.return_value = mock_response
+                                mock_response = MagicMock()
+                                mock_response.content = [MagicMock()]
+                                mock_response.content[0].text = "Test answer"
+                                mock_client.messages.create = AsyncMock(return_value=mock_response)
+                                mock_client.close = AsyncMock()
 
-                    provided_id = "custom-session-123"
-                    response = await handle_chat(
-                        mock_pool,
-                        "Test query",
-                        "test-key",
-                        "test-cohere-key",
-                        session_id=provided_id
-                    )
+                                provided_id = "custom-session-123"
+                                response = await handle_chat(
+                                    mock_pool,
+                                    "Test query",
+                                    "test-key",
+                                    "test-cohere-key",
+                                    session_id=provided_id
+                                )
 
-                    assert response.session_id == provided_id
+                                assert response.session_id == provided_id
 
     @pytest.mark.asyncio
     async def test_handle_chat_builds_citations(self):
@@ -125,30 +143,44 @@ class TestHandleChat:
                 "document_title": "Council Meeting Jan 15",
                 "source_url": "https://example.com/meeting",
                 "section_header": None,
-                "chunk_index": 0
+                "chunk_index": 0,
+                "final_score": 0.92
             }
         ]
 
         with patch("api.intelligence.chat.hybrid_search", return_value=mock_chunks):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.Anthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Council voted to approve"
-                    mock_client.messages.create.return_value = mock_response
-
-                    response = await handle_chat(
-                        mock_pool,
-                        "What rezoning decisions were made?",
-                        "test-key",
-                        "test-cohere-key"
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
                     )
+                    mock_create.return_value = mock_session
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
 
-                    # Should have citations
-                    assert len(response.citations) > 0
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "Council voted to approve"
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
+
+                            response = await handle_chat(
+                                mock_pool,
+                                "What rezoning decisions were made?",
+                                "test-key",
+                                "test-cohere-key"
+                            )
+
+                            # Should have citations
+                            assert len(response.citations) > 0
 
     @pytest.mark.asyncio
     async def test_handle_chat_with_neighborhood_filter(self):
@@ -161,25 +193,38 @@ class TestHandleChat:
 
         with patch("api.intelligence.chat.hybrid_search", return_value=[]) as mock_search:
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.Anthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Test"
-                    mock_client.messages.create.return_value = mock_response
-
-                    response = await handle_chat(
-                        mock_pool,
-                        "Query",
-                        "test-key",
-                        "test-cohere-key",
-                        neighborhood_filter="Downtown"
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
                     )
+                    mock_create.return_value = mock_session
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
 
-                    # Should pass neighborhood filter to semantic search
-                    mock_search.assert_called_once()
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "Test"
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
+
+                            response = await handle_chat(
+                                mock_pool,
+                                "Query",
+                                "test-key",
+                                "test-cohere-key",
+                                neighborhood_filter="Downtown"
+                            )
+
+                            # Should pass neighborhood filter to semantic search
+                            mock_search.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_handle_chat_returns_valid_response(self):
@@ -192,25 +237,38 @@ class TestHandleChat:
 
         with patch("api.intelligence.chat.hybrid_search", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.Anthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Test answer"
-                    mock_client.messages.create.return_value = mock_response
-
-                    response = await handle_chat(
-                        mock_pool,
-                        "Test query",
-                        "test-key",
-                        "test-cohere-key"
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
                     )
+                    mock_create.return_value = mock_session
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
 
-                    assert isinstance(response, ChatResponse)
-                    assert response.answer == "Test answer"
-                    assert response.session_id is not None
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "Test answer"
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
+
+                            response = await handle_chat(
+                                mock_pool,
+                                "Test query",
+                                "test-key",
+                                "test-cohere-key"
+                            )
+
+                            assert isinstance(response, ChatResponse)
+                            assert response.answer == "Test answer"
+                            assert response.session_id is not None
 
 
 class TestGetRelevantSignals:
@@ -302,27 +360,41 @@ class TestChatIntegration:
                 "document_title": "Council Meeting",
                 "source_url": "https://example.com",
                 "section_header": "Rezoning",
-                "chunk_index": 0
+                "chunk_index": 0,
+                "final_score": 0.95
             }
         ]
 
         with patch("api.intelligence.chat.hybrid_search", return_value=mock_chunks):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.Anthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "The city council approved rezoning of 1234 Main Street."
-                    mock_client.messages.create.return_value = mock_response
-
-                    response = await handle_chat(
-                        mock_pool,
-                        "What rezoning decisions were made?",
-                        "test-key",
-                        "test-cohere-key"
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
                     )
+                    mock_create.return_value = mock_session
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
 
-                    assert isinstance(response, ChatResponse)
-                    assert len(response.answer) > 0
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "The city council approved rezoning of 1234 Main Street."
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
+
+                            response = await handle_chat(
+                                mock_pool,
+                                "What rezoning decisions were made?",
+                                "test-key",
+                                "test-cohere-key"
+                            )
+
+                            assert isinstance(response, ChatResponse)
+                            assert len(response.answer) > 0

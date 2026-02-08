@@ -52,17 +52,18 @@ class TestGenerateEmbedding:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = MagicMock()
             mock_response.embeddings.float_ = [mock_embedding]
-            mock_client.embed.return_value = mock_response
+            mock_client.embed = AsyncMock(return_value=mock_response)
 
             result = await generate_embedding("test text", "test-key")
 
             assert len(result) == 1024
             assert result == mock_embedding
-            mock_client.embed.assert_called_once()
+            mock_client.embed.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_embedding_uses_correct_input_type(self):
@@ -71,11 +72,12 @@ class TestGenerateEmbedding:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = MagicMock()
             mock_response.embeddings.float_ = [mock_embedding]
-            mock_client.embed.return_value = mock_response
+            mock_client.embed = AsyncMock(return_value=mock_response)
 
             await generate_embedding("text", "key", input_type="search_document")
 
@@ -91,11 +93,12 @@ class TestGenerateEmbedding:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = MagicMock()
             mock_response.embeddings.float_ = [mock_embedding]
-            mock_client.embed.return_value = mock_response
+            mock_client.embed = AsyncMock(return_value=mock_response)
 
             await generate_embedding(long_text, "key")
 
@@ -110,11 +113,12 @@ class TestGenerateEmbedding:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = MagicMock()
             mock_response.embeddings.float_ = [wrong_embedding]
-            mock_client.embed.return_value = mock_response
+            mock_client.embed = AsyncMock(return_value=mock_response)
 
             with pytest.raises(EmbeddingError):
                 await generate_embedding("text", "key", max_retries=1)
@@ -127,15 +131,16 @@ class TestGenerateEmbedding:
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             with patch("api.intelligence.embeddings.asyncio.sleep") as mock_sleep:
                 mock_client = MagicMock()
-                mock_cohere_mod.Client.return_value = mock_client
+                mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+                mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
                 # Fail first, succeed second
                 mock_response = MagicMock()
                 mock_response.embeddings.float_ = [mock_embedding]
-                mock_client.embed.side_effect = [
+                mock_client.embed = AsyncMock(side_effect=[
                     Exception("Rate limited"),
                     mock_response,
-                ]
+                ])
 
                 result = await generate_embedding("text", "key", max_retries=2)
 
@@ -162,16 +167,17 @@ class TestBatchEmbed:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = MagicMock()
             mock_response.embeddings.float_ = mock_embeddings
-            mock_client.embed.return_value = mock_response
+            mock_client.embed = AsyncMock(return_value=mock_response)
 
             result = await batch_embed(texts, "key")
 
             assert len(result) == 3
-            mock_client.embed.assert_called_once()
+            mock_client.embed.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_batch_size_mismatch_raises(self):
@@ -180,11 +186,12 @@ class TestBatchEmbed:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = MagicMock()
             mock_response.embeddings.float_ = [[0.1] * 1024]  # Only 1, expected 2
-            mock_client.embed.return_value = mock_response
+            mock_client.embed = AsyncMock(return_value=mock_response)
 
             with pytest.raises(EmbeddingError):
                 await batch_embed(texts, "key")
@@ -208,13 +215,14 @@ class TestRerankResults:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_result1 = MagicMock(index=2, relevance_score=0.95)
             mock_result2 = MagicMock(index=0, relevance_score=0.8)
             mock_response = MagicMock()
             mock_response.results = [mock_result1, mock_result2]
-            mock_client.rerank.return_value = mock_response
+            mock_client.rerank = AsyncMock(return_value=mock_response)
 
             result = await rerank_results("query", docs, "key", top_n=2)
 
@@ -230,8 +238,9 @@ class TestRerankResults:
 
         with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
-            mock_cohere_mod.Client.return_value = mock_client
-            mock_client.rerank.side_effect = Exception("API error")
+            mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_client.rerank = AsyncMock(side_effect=Exception("API error"))
 
             result = await rerank_results("query", docs, "key", top_n=3)
 

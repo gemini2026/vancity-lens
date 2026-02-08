@@ -40,7 +40,7 @@ Project: 25-storey mixed-use tower with 300 units."""
             "source_url": "https://example.com"
         }
 
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value = mock_client
 
@@ -65,7 +65,8 @@ Project: 25-storey mixed-use tower with 300 units."""
                 "event_date": "2024-01-15"
             }])
 
-            mock_client.messages.create.return_value = mock_response
+            mock_client.messages.create = AsyncMock(return_value=mock_response)
+            mock_client.close = AsyncMock()
 
             from api.intelligence.extractor import extract_signals_from_chunk
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
@@ -126,7 +127,7 @@ Neighborhood: Downtown."""
         assert len(chunks) > 0
 
         # Stage 2: Extract signals (mocked)
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value = mock_client
 
@@ -151,7 +152,8 @@ Neighborhood: Downtown."""
                 "event_date": "2024-01-15"
             }])
 
-            mock_client.messages.create.return_value = mock_response
+            mock_client.messages.create = AsyncMock(return_value=mock_response)
+            mock_client.close = AsyncMock()
 
             from api.intelligence.extractor import extract_signals_from_chunk
             signals = await extract_signals_from_chunk(
@@ -358,7 +360,7 @@ class TestE2EPipelineWithMocks:
         assert len(chunks) > 0
 
         # Stage 3: Mock LLM extraction
-        with patch("api.intelligence.extractor.anthropic.Anthropic") as mock_client_class:
+        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value = mock_client
 
@@ -383,7 +385,8 @@ class TestE2EPipelineWithMocks:
                 "event_date": "2024-01-15"
             }])
 
-            mock_client.messages.create.return_value = mock_response
+            mock_client.messages.create = AsyncMock(return_value=mock_response)
+            mock_client.close = AsyncMock()
 
             from api.intelligence.extractor import extract_signals_from_chunk
             signals = await extract_signals_from_chunk(

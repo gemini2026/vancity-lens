@@ -134,11 +134,25 @@ class SignalResponse(BaseModel):
 # ── Chat models ──────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    query: str
+    """Chat request with input validation (SEC-007 / VCL-17)."""
+    query: str = Field(
+        ...,
+        min_length=1,
+        max_length=2000,
+        description="Chat query (max 2000 characters)",
+    )
     session_id: Optional[str] = None
     neighborhood_filter: Optional[str] = None
     date_from: Optional[date] = None
     date_to: Optional[date] = None
+
+    @classmethod
+    def __get_validators__(cls):
+        yield from super().__get_validators__()
+
+    def model_post_init(self, __context) -> None:
+        """Strip whitespace from query after validation."""
+        object.__setattr__(self, 'query', self.query.strip())
 
 
 class SourceCitation(BaseModel):
@@ -247,3 +261,38 @@ class MetricIngestion(BaseModel):
     source_name: str
     source_url: Optional[str] = None
     metadata: dict = Field(default_factory=dict)
+
+
+# ── Chat Session Management models ───────────────────────────
+
+class ChatHistoryMessage(BaseModel):
+    """A single message in chat history."""
+    id: int
+    role: str  # 'user' or 'assistant'
+    content: str
+    source_chunks: list[int] = Field(default_factory=list)
+    source_signals: list[int] = Field(default_factory=list)
+    created_at: datetime
+
+
+class ChatMessageHistory(BaseModel):
+    """Full conversation history for a session."""
+    session_id: str
+    messages: list[ChatHistoryMessage] = Field(default_factory=list)
+
+
+class ChatSession(BaseModel):
+    """Chat session metadata."""
+    id: int
+    session_id: str
+    user_label: str
+    created_at: datetime
+    message_count: int = 0
+    last_message_at: Optional[datetime] = None
+
+
+class ChatSessionList(BaseModel):
+    """Paginated list of chat sessions."""
+    sessions: list[ChatSession] = Field(default_factory=list)
+    total_count: int
+    has_more: bool

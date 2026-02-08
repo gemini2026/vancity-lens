@@ -16,10 +16,13 @@ Switched from OpenAI embeddings to Cohere for:
 
 import asyncio
 import logging
+import os
 from typing import List, Dict, Optional, Any
 
 import asyncpg
 import cohere
+
+from .external_clients import COHERE_SEMAPHORE, COHERE_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,7 @@ DEFAULT_BATCH_SIZE = 96  # Cohere allows up to 96 texts per batch
 MAX_RETRIES = 3
 INITIAL_BACKOFF = 1.0
 RRF_K = 60  # Reciprocal Rank Fusion smoothing constant
+DEFAULT_CHUNK_INSERT_CONCURRENCY = 10
 
 
 class EmbeddingError(Exception):
@@ -58,39 +62,48 @@ async def generate_embedding(
     Returns:
         1024-dimensional embedding vector
     """
-    co = cohere.Client(api_key=api_key)
     text = text[:4096]  # Cohere max input is ~512 tokens, but truncates gracefully
 
     backoff = INITIAL_BACKOFF
     last_error = None
 
-    for attempt in range(max_retries):
-        try:
-            response = co.embed(
-                texts=[text],
-                model=EMBEDDING_MODEL,
-                input_type=input_type,
-                embedding_types=["float"],
-            )
+    async with cohere.AsyncClient(api_key=api_key) as co:
+        for attempt in range(max_retries):
+            try:
+                async with COHERE_SEMAPHORE:
+                    response = await asyncio.wait_for(
+                        co.embed(
+                            texts=[text],
+                            model=EMBEDDING_MODEL,
+                            input_type=input_type,
+                            embedding_types=["float"],
+                        ),
+                        timeout=COHERE_TIMEOUT_SECONDS,
+                    )
 
-            embedding = response.embeddings.float_[0]
+                embedding = response.embeddings.float_[0]
 
-            if not embedding or len(embedding) != EMBEDDING_DIMENSION:
-                raise EmbeddingError(
-                    f"Invalid embedding dimension: {len(embedding)} != {EMBEDDING_DIMENSION}"
-                )
+                if not embedding or len(embedding) != EMBEDDING_DIMENSION:
+                    raise EmbeddingError(
+                        f"Invalid embedding dimension: {len(embedding)} != {EMBEDDING_DIMENSION}"
+                    )
 
-            logger.debug(f"Generated embedding ({input_type}) for text of length {len(text)}")
-            return embedding
+                logger.debug(f"Generated embedding ({input_type}) for text of length {len(text)}")
+                return embedding
 
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                logger.warning(f"Embedding attempt {attempt + 1} failed: {e}, backing off {backoff}s")
-                await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, 32.0)
-            else:
-                break
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        "Embedding attempt %s failed: %s, backing off %ss",
+                        attempt + 1,
+                        e,
+                        backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, 32.0)
+                else:
+                    break
 
     raise EmbeddingError(f"Failed after {max_retries} attempts: {last_error}")
 
@@ -116,38 +129,55 @@ async def batch_embed(
     if not texts:
         return []
 
-    co = cohere.Client(api_key=api_key)
     batch_size = min(batch_size, 96)
     all_embeddings = []
 
-    for i in range(0, len(texts), batch_size):
-        batch = [t[:4096] for t in texts[i:i + batch_size]]
+    async with cohere.AsyncClient(api_key=api_key) as co:
+        for i in range(0, len(texts), batch_size):
+            batch = [t[:4096] for t in texts[i:i + batch_size]]
 
-        try:
-            logger.info(f"Embedding batch {i // batch_size + 1} ({len(batch)} texts)")
+            backoff = INITIAL_BACKOFF
+            last_error = None
 
-            response = co.embed(
-                texts=batch,
-                model=EMBEDDING_MODEL,
-                input_type=input_type,
-                embedding_types=["float"],
-            )
+            for attempt in range(MAX_RETRIES):
+                try:
+                    logger.info(f"Embedding batch {i // batch_size + 1} ({len(batch)} texts)")
 
-            batch_embeddings = response.embeddings.float_
-            if len(batch_embeddings) != len(batch):
-                raise EmbeddingError(
-                    f"Batch size mismatch: got {len(batch_embeddings)}, expected {len(batch)}"
-                )
+                    async with COHERE_SEMAPHORE:
+                        response = await asyncio.wait_for(
+                            co.embed(
+                                texts=batch,
+                                model=EMBEDDING_MODEL,
+                                input_type=input_type,
+                                embedding_types=["float"],
+                            ),
+                            timeout=COHERE_TIMEOUT_SECONDS,
+                        )
 
-            all_embeddings.extend(batch_embeddings)
+                    batch_embeddings = response.embeddings.float_
+                    if len(batch_embeddings) != len(batch):
+                        raise EmbeddingError(
+                            f"Batch size mismatch: got {len(batch_embeddings)}, expected {len(batch)}"
+                        )
 
-            # Rate limit between batches
-            if i + batch_size < len(texts):
-                await asyncio.sleep(0.3)
+                    all_embeddings.extend(batch_embeddings)
+                    break
 
-        except Exception as e:
-            logger.error(f"Batch {i // batch_size + 1} failed: {e}")
-            raise EmbeddingError(f"Batch embedding failed: {e}")
+                except Exception as e:
+                    last_error = e
+                    if attempt < MAX_RETRIES - 1:
+                        logger.warning(
+                            "Batch %s attempt %s failed: %s, backing off %ss",
+                            i // batch_size + 1,
+                            attempt + 1,
+                            e,
+                            backoff,
+                        )
+                        await asyncio.sleep(backoff)
+                        backoff = min(backoff * 2, 32.0)
+                    else:
+                        logger.error(f"Batch {i // batch_size + 1} failed: {e}")
+                        raise EmbeddingError(f"Batch embedding failed: {last_error}")
 
     logger.info(f"Embedded {len(all_embeddings)} texts total")
     return all_embeddings
@@ -176,15 +206,18 @@ async def rerank_results(
     if not documents:
         return []
 
-    co = cohere.Client(api_key=api_key)
-
     try:
-        response = co.rerank(
-            model=RERANK_MODEL,
-            query=query,
-            documents=documents,
-            top_n=min(top_n, len(documents)),
-        )
+        async with cohere.AsyncClient(api_key=api_key) as co:
+            async with COHERE_SEMAPHORE:
+                response = await asyncio.wait_for(
+                    co.rerank(
+                        model=RERANK_MODEL,
+                        query=query,
+                        documents=documents,
+                        top_n=min(top_n, len(documents)),
+                    ),
+                    timeout=COHERE_TIMEOUT_SECONDS,
+                )
 
         results = [
             {"index": r.index, "relevance_score": r.relevance_score}
@@ -298,19 +331,29 @@ async def process_document_chunks(
         raise EmbeddingError(f"Count mismatch: {len(embeddings)} embeddings vs {len(chunks)} chunks")
 
     # Store
-    stored = 0
-    for chunk, embedding in zip(chunks, embeddings):
-        try:
-            await store_chunk_with_embedding(
-                db_pool, document_id,
-                chunk['chunk_index'], chunk['chunk_text'],
-                chunk.get('section_header'), chunk.get('approx_token_count', 0),
-                embedding
-            )
-            stored += 1
-        except Exception as e:
-            logger.error(f"Failed to store chunk {chunk['chunk_index']}: {e}")
-            continue
+    insert_concurrency = int(os.getenv("CHUNK_INSERT_MAX_CONCURRENCY", DEFAULT_CHUNK_INSERT_CONCURRENCY))
+    insert_concurrency = max(1, min(insert_concurrency, 50))
+    insert_sem = asyncio.Semaphore(insert_concurrency)
+
+    async def _store_one(chunk: dict, embedding: List[float]) -> int:
+        async with insert_sem:
+            try:
+                await store_chunk_with_embedding(
+                    db_pool,
+                    document_id,
+                    chunk["chunk_index"],
+                    chunk["chunk_text"],
+                    chunk.get("section_header"),
+                    chunk.get("approx_token_count", 0),
+                    embedding,
+                )
+                return 1
+            except Exception as e:
+                logger.error(f"Failed to store chunk {chunk['chunk_index']}: {e}")
+                return 0
+
+    tasks = [_store_one(chunk, embedding) for chunk, embedding in zip(chunks, embeddings)]
+    stored = sum(await asyncio.gather(*tasks))
 
     logger.info(f"Document {document_id}: stored {stored}/{len(chunks)} chunks")
     return stored

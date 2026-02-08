@@ -8,6 +8,28 @@ from fastapi.testclient import TestClient
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Cache Clearing (ensures no cross-test cache pollution from @cached decorator)
+# ────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+async def _clear_cache():
+    """Clear the in-memory cache before each test to avoid cross-test pollution."""
+    try:
+        from api.cache import CacheManager
+        manager = CacheManager()
+        await manager.clear()
+    except Exception:
+        pass
+    yield
+    try:
+        from api.cache import CacheManager
+        manager = CacheManager()
+        await manager.clear()
+    except Exception:
+        pass
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Database Fixtures
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -247,7 +269,8 @@ def mock_anthropic_client():
         "event_date": "2024-01-15"
     }]"""
 
-    client.messages.create.return_value = mock_response
+    client.messages.create = AsyncMock(return_value=mock_response)
+    client.close = AsyncMock()
     return client
 
 
@@ -261,12 +284,12 @@ def mock_cohere_client():
     mock_response = MagicMock()
     mock_response.embeddings = [mock_embedding]
 
-    client.embed.return_value = mock_response
+    client.embed = AsyncMock(return_value=mock_response)
 
     # Mock rerank response
     mock_rerank = MagicMock()
     mock_rerank.results = []
-    client.rerank.return_value = mock_rerank
+    client.rerank = AsyncMock(return_value=mock_rerank)
 
     return client
 

@@ -1,0 +1,369 @@
+"""
+API endpoints for supply pipeline tracking.
+
+Provides REST endpoints for:
+- Querying pipeline entries
+- Managing pipeline entries (add, update, delete)
+- Viewing stage history
+- Getting pipeline statistics and summaries
+- Ingesting from intelligence signals
+"""
+
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..auth import require_admin
+from ..db import db
+from .supply_pipeline import (
+    SupplyPipelineTracker,
+    PipelineEntry,
+    PipelineEntryCreate,
+    PipelineStage,
+    PipelineSummary,
+    NeighborhoodSupply,
+    PipelineStats,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/api/v1/intel",
+    tags=["intelligence", "supply_pipeline"],
+)
+
+admin_router = APIRouter(
+    prefix="/api/v1/admin",
+    tags=["admin", "supply_pipeline"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PUBLIC ENDPOINTS
+# ════════════════════════════════════════════════════════════════════════════
+
+@router.get("/pipeline", response_model=dict)
+async def list_pipeline(
+    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
+    stage: Optional[str] = Query(None, description="Filter by pipeline stage"),
+    limit: int = Query(50, ge=1, le=100, description="Results per page"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+) -> dict:
+    """
+    List pipeline entries with optional filters.
+
+    Query Parameters:
+    - neighborhood: Filter by neighborhood name (optional)
+    - stage: Filter by pipeline stage (optional)
+    - limit: Results per page (1-100, default 50)
+    - offset: Pagination offset (default 0)
+
+    Returns:
+    - entries: List of pipeline entries
+    - total_count: Total number of matching entries
+    - has_more: Whether more results exist
+    """
+    try:
+        entries, total_count = await SupplyPipelineTracker.get_pipeline(
+            db.pool,
+            neighborhood=neighborhood,
+            stage=stage,
+            limit=limit,
+            offset=offset
+        )
+
+        has_more = (offset + limit) < total_count
+
+        return {
+            "entries": [entry.model_dump() for entry in entries],
+            "total_count": total_count,
+            "has_more": has_more,
+            "offset": offset,
+            "limit": limit,
+        }
+
+    except Exception as e:
+        logger.error(f"Error listing pipeline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list pipeline entries")
+
+
+@router.get("/pipeline/{pipeline_id}", response_model=dict)
+async def get_pipeline_entry(pipeline_id: int) -> dict:
+    """
+    Get a single pipeline entry by ID.
+
+    Returns:
+    - entry: PipelineEntry or null if not found
+    """
+    try:
+        entry = await SupplyPipelineTracker.get_entry(db.pool, pipeline_id)
+
+        if not entry:
+            raise HTTPException(status_code=404, detail="Pipeline entry not found")
+
+        return entry.model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving pipeline entry: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline entry")
+
+
+@router.get("/pipeline/{pipeline_id}/history", response_model=dict)
+async def get_stage_history(pipeline_id: int) -> dict:
+    """
+    Get the stage transition history for a pipeline entry.
+
+    Returns:
+    - history: List of PipelineStageChange objects
+    """
+    try:
+        # Verify entry exists
+        entry = await SupplyPipelineTracker.get_entry(db.pool, pipeline_id)
+        if not entry:
+            raise HTTPException(status_code=404, detail="Pipeline entry not found")
+
+        history = await SupplyPipelineTracker.get_stage_history(db.pool, pipeline_id)
+
+        return {
+            "pipeline_id": pipeline_id,
+            "history": [change.model_dump() for change in history],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving stage history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve stage history")
+
+
+@router.get("/pipeline/summary", response_model=dict)
+async def get_summary() -> dict:
+    """
+    Get high-level pipeline summary.
+
+    Returns:
+    - total_entries: Total pipeline entries
+    - total_units: Total residential units in pipeline
+    - total_sqft: Total floor space in pipeline
+    - by_stage: Breakdown by pipeline stage
+    - by_neighborhood: Breakdown by neighborhood
+    """
+    try:
+        summary = await SupplyPipelineTracker.get_pipeline_summary(db.pool)
+
+        return {
+            "total_entries": summary.total_entries,
+            "total_units": summary.total_units,
+            "total_sqft": summary.total_sqft,
+            "by_stage": [stage.model_dump() for stage in summary.by_stage],
+            "by_neighborhood": summary.by_neighborhood,
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving pipeline summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline summary")
+
+
+@router.get("/pipeline/neighborhood/{neighborhood}", response_model=dict)
+async def get_neighborhood_supply(neighborhood: str) -> dict:
+    """
+    Get detailed supply analysis for a neighborhood.
+
+    Returns:
+    - neighborhood: Neighborhood name
+    - total_projects: Count of projects
+    - total_units: Total units in pipeline
+    - total_sqft: Total floor space
+    - by_stage: Breakdown by pipeline stage
+    - estimated_completion_range: Projects grouped by completion quarter
+    """
+    try:
+        supply = await SupplyPipelineTracker.get_neighborhood_supply(
+            db.pool, neighborhood
+        )
+
+        return {
+            "neighborhood": supply.neighborhood,
+            "total_projects": supply.total_projects,
+            "total_units": supply.total_units,
+            "total_sqft": supply.total_sqft,
+            "by_stage": supply.by_stage,
+            "estimated_completion_range": supply.estimated_completion_range,
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving neighborhood supply: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve neighborhood supply")
+
+
+@router.get("/pipeline/stats", response_model=dict)
+async def get_stats(
+    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood")
+) -> dict:
+    """
+    Get detailed pipeline statistics.
+
+    Query Parameters:
+    - neighborhood: Optional filter to specific neighborhood
+
+    Returns:
+    - total_projects: Total count of projects
+    - total_units: Total units in pipeline
+    - total_sqft: Total floor space
+    - average_units_per_project: Mean units per project
+    - average_storeys_per_project: Mean storeys per project
+    - projects_by_stage: Breakdown by pipeline stage
+    - projects_by_neighborhood: Breakdown by neighborhood
+    - near_completion_count: Projects in building_permit or under_construction stages
+    """
+    try:
+        stats = await SupplyPipelineTracker.get_pipeline_stats(
+            db.pool, neighborhood=neighborhood
+        )
+
+        return {
+            "total_projects": stats.total_projects,
+            "total_units": stats.total_units,
+            "total_sqft": stats.total_sqft,
+            "average_units_per_project": stats.average_units_per_project,
+            "average_storeys_per_project": stats.average_storeys_per_project,
+            "projects_by_stage": stats.projects_by_stage,
+            "projects_by_neighborhood": stats.projects_by_neighborhood,
+            "near_completion_count": stats.near_completion_count,
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving pipeline statistics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline statistics")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# ADMIN ENDPOINTS
+# ════════════════════════════════════════════════════════════════════════════
+
+@admin_router.post("/pipeline", response_model=dict)
+async def create_pipeline_entry(entry: PipelineEntryCreate) -> dict:
+    """
+    Create a new pipeline entry (admin only).
+
+    Request body:
+    - parcel_pid: Unique parcel identifier
+    - address: Street address
+    - neighborhood: Vancouver neighborhood (optional)
+    - pipeline_stage: Current stage in pipeline
+    - current_zoning: Current zoning designation
+    - proposed_zoning: Proposed zoning designation
+    - proposed_storeys: Number of storeys (optional)
+    - proposed_units: Number of residential units (optional)
+    - proposed_sqft: Total floor space (optional)
+    - developer: Developer/company name (optional)
+    - estimated_completion: Estimated completion date (optional)
+    - metadata: Additional project data as JSON object
+
+    Returns:
+    - Created PipelineEntry
+    """
+    try:
+        created = await SupplyPipelineTracker.add_entry(db.pool, entry)
+        return created.model_dump()
+
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating pipeline entry: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create pipeline entry")
+
+
+@admin_router.put("/pipeline/{pipeline_id}/stage", response_model=dict)
+async def update_pipeline_stage(
+    pipeline_id: int,
+    new_stage: PipelineStage = Query(..., description="New pipeline stage"),
+    signal_id: Optional[int] = Query(None, description="Triggering signal ID"),
+    notes: Optional[str] = Query(None, description="Transition notes"),
+) -> dict:
+    """
+    Update a pipeline entry's stage (admin only).
+
+    Path Parameters:
+    - pipeline_id: ID of pipeline entry to update
+
+    Query Parameters:
+    - new_stage: New pipeline stage (required)
+    - signal_id: Optional intelligence signal that triggered transition
+    - notes: Optional notes about the transition
+
+    Returns:
+    - Updated PipelineEntry
+    """
+    try:
+        updated = await SupplyPipelineTracker.update_stage(
+            db.pool,
+            pipeline_id,
+            new_stage,
+            signal_id=signal_id,
+            notes=notes
+        )
+        return updated.model_dump()
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating pipeline stage: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update pipeline stage")
+
+
+@admin_router.delete("/pipeline/{pipeline_id}", response_model=dict)
+async def delete_pipeline_entry(pipeline_id: int) -> dict:
+    """
+    Delete a pipeline entry (admin only).
+
+    Returns:
+    - success: Whether deletion was successful
+    """
+    try:
+        deleted = await SupplyPipelineTracker.delete_entry(db.pool, pipeline_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Pipeline entry not found")
+
+        return {"success": True, "pipeline_id": pipeline_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting pipeline entry: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to delete pipeline entry")
+
+
+@admin_router.post("/pipeline/ingest", response_model=dict)
+async def ingest_from_signal(signal: dict) -> dict:
+    """
+    Create/update pipeline entry from intelligence signal (admin only).
+
+    Request body should contain signal data from intelligence_signals table:
+    - id: Signal ID
+    - addresses: List of addresses
+    - neighborhood: Neighborhood name
+    - zoning_from: Current zoning
+    - zoning_to: Proposed zoning
+    - height_after: Proposed storeys
+    - unit_count: Residential units
+    - signal_type: Type of signal
+    - confidence: Extraction confidence
+
+    Returns:
+    - Created or updated PipelineEntry
+    """
+    try:
+        entry = await SupplyPipelineTracker.ingest_from_signal(db.pool, signal)
+        return entry.model_dump()
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error ingesting from signal: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to ingest from signal")

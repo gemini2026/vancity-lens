@@ -21,6 +21,37 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+
+  # ─── Redis Cache ──────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: vancity_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
 
   # ─── FastAPI Backend ───────────────────────────────────────────
   api:
@@ -33,6 +64,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: "postgresql://vancity:vancity_dev@db:5432/vancity_lens"
+      REDIS_URL: "redis://redis:6379/0"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-sk-placeholder}"
       COHERE_API_KEY: "${COHERE_API_KEY:-placeholder}"
       CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
@@ -43,6 +75,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
 
   # ─── Next.js Frontend ──────────────────────────────────────────
   frontend:
@@ -60,6 +102,14 @@ services:
       - ./frontend/public:/app/public
     depends_on:
       - api
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
 
   # ─── E2E Test Runner (on-demand) ───────────────────────────────
   e2e:
@@ -75,6 +125,12 @@ services:
       - api
     profiles:
       - test
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
 
 volumes:
   pgdata:
+  redisdata:
