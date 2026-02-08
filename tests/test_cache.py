@@ -198,7 +198,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_connect_success(self):
         """Test successful Redis connection."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_from_url.return_value = mock_client
@@ -213,7 +213,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_connect_failure(self):
         """Test failed Redis connection falls back gracefully."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_from_url.side_effect = ConnectionError("Connection failed")
 
             cache = RedisCache("redis://localhost:6379/0")
@@ -225,7 +225,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_set_and_get(self):
         """Test basic set and get with mocked Redis."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_client.get = AsyncMock(return_value='"value1"')
@@ -243,7 +243,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_set_with_ttl(self):
         """Test set with TTL uses setex."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_client.setex = AsyncMock()
@@ -261,7 +261,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_delete(self):
         """Test delete operation."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_client.delete = AsyncMock()
@@ -276,7 +276,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_clear(self):
         """Test clear operation."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_client.flushdb = AsyncMock()
@@ -291,7 +291,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_health_check_success(self):
         """Test successful health check."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_from_url.return_value = mock_client
@@ -305,7 +305,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_health_check_failure(self):
         """Test failed health check."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(side_effect=ConnectionError())
             mock_from_url.return_value = mock_client
@@ -319,7 +319,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_invalidate_pattern(self):
         """Test pattern-based invalidation with SCAN."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             # Mock SCAN cursor behavior
@@ -338,7 +338,7 @@ class TestRedisCache:
     @pytest.mark.asyncio
     async def test_reconnect_on_failed_operation(self):
         """Test automatic reconnection when operation fails."""
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
             mock_client = AsyncMock()
             mock_client.ping = AsyncMock(return_value=True)
             mock_client.get = AsyncMock(side_effect=ConnectionError())
@@ -376,7 +376,7 @@ class TestCacheManager:
             pytest.skip("redis package not installed")
 
         with patch.dict("os.environ", {"REDIS_URL": "redis://localhost:6379/0"}):
-            with patch("redis.asyncio.from_url") as mock_from_url:
+            with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
                 mock_client = AsyncMock()
                 mock_client.ping = AsyncMock(return_value=True)
                 mock_from_url.return_value = mock_client
@@ -403,14 +403,20 @@ class TestCacheManager:
         except ImportError:
             pytest.skip("redis package not installed")
 
+        # Reset singleton state
+        CacheManager._instance = None
+
         with patch.dict("os.environ", {"REDIS_URL": "redis://localhost:6379/0"}):
-            with patch("redis.asyncio.from_url") as mock_from_url:
+            with patch("redis.asyncio.from_url", new_callable=AsyncMock) as mock_from_url:
                 mock_from_url.side_effect = ConnectionError("Connection refused")
 
                 manager = CacheManager()
                 await manager.initialize()
 
                 assert isinstance(manager.get_backend(), InMemoryCache)
+
+        # Reset again for subsequent tests
+        CacheManager._instance = None
 
     @pytest.mark.asyncio
     async def test_manager_operations(self):

@@ -409,11 +409,15 @@ class CacheManager:
 
         if redis_url:
             logger.info("Initializing Redis cache backend")
-            self._backend = RedisCache(redis_url)
+            redis_backend = RedisCache(redis_url)
             try:
-                await self._backend.connect()
+                await redis_backend.connect()
             except Exception as e:
                 logger.warning(f"Redis initialization failed, falling back to in-memory: {e}")
+            if redis_backend._connected:
+                self._backend = redis_backend
+            else:
+                logger.warning("Redis not connected, falling back to in-memory cache")
                 self._backend = InMemoryCache()
         else:
             logger.info("Initializing in-memory cache backend (REDIS_URL not set)")
