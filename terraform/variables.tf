@@ -38,3 +38,27 @@ variable "cohere_api_key" {
   type        = string
   sensitive   = true
 }
+
+variable "cloudrun_container_image" {
+  description = "Cloud Run container image URL"
+  type        = string
+  default     = ""
+}
+
+variable "cloudrun_min_instances" {
+  description = "Minimum number of Cloud Run instances"
+  type        = number
+  default     = 0
+}
+
+variable "cloudrun_max_instances" {
+  description = "Maximum number of Cloud Run instances"
+  type        = number
+  default     = 5
+}
+
+variable "environment_name" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+  default     = "dev"
+}

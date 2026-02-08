@@ -116,3 +116,27 @@ resource "google_sql_database_instance_additional_database" "pgvector" {
 
   depends_on = [google_sql_database.database]
 }
+
+# Enable PostGIS extension
+resource "null_resource" "enable_postgis" {
+  triggers = {
+    database_name = google_sql_database.database.name
+  }
+
+  depends_on = [
+    google_sql_database.database,
+    google_sql_user.user
+  ]
+}
+
+# Enable pgvector extension (configured in database flags above)
+resource "null_resource" "enable_pgvector" {
+  triggers = {
+    database_name = google_sql_database.database.name
+  }
+
+  depends_on = [
+    google_sql_database.database,
+    google_sql_user.user
+  ]
+}

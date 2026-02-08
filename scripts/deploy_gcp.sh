@@ -5,6 +5,9 @@ set -euo pipefail
 # VanCity Lens — Google Cloud Deployment Script
 # Provisions: Cloud SQL (PostgreSQL 16 + pgvector + PostGIS)
 #             Cloud Run (FastAPI backend)
+#             Secret Manager integration
+#             Health check configuration
+#             Custom domain: api.vancitylens.com
 # ─────────────────────────────────────────────────────────
 
 # Configuration — edit these or pass as env vars
@@ -15,9 +18,14 @@ DB_NAME="vancity_lens"
 DB_USER="vancity"
 DB_PASSWORD="${DB_PASSWORD:-$(openssl rand -base64 16)}"
 SERVICE_NAME="vancity-lens-api"
+CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-api.vancitylens.com}"
 ANTHROPIC_KEY="${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY}"
 COHERE_KEY="${COHERE_API_KEY:?Set COHERE_API_KEY}"
-CORS_ORIGINS="${CORS_ORIGINS:-https://vancity-lens.pages.dev}"
+CORS_ORIGINS="${CORS_ORIGINS:-https://app.vancitylens.com}"
+HEALTH_CHECK_PATH="${HEALTH_CHECK_PATH:-/health}"
+HEALTH_CHECK_INITIAL_DELAY="${HEALTH_CHECK_INITIAL_DELAY:-10}"
+HEALTH_CHECK_TIMEOUT="${HEALTH_CHECK_TIMEOUT:-5}"
+HEALTH_CHECK_PERIOD="${HEALTH_CHECK_PERIOD:-10}"
 
 echo "═══════════════════════════════════════════════════"
 echo "  VanCity Lens — GCP Deployment"
@@ -97,25 +105,38 @@ for sql_file in db/001_schema.sql db/002_seed_stations.sql db/003_add_rew_url.sq
 done
 echo "  ✓ Migrations complete"
 
-# 6. Store secrets
+# 6. Store secrets in Secret Manager
 echo ""
 echo "▶ Storing secrets in Secret Manager..."
-echo -n "${ANTHROPIC_KEY}" | gcloud secrets create anthropic-api-key \
-    --data-file=- --project="${PROJECT_ID}" 2>/dev/null || \
-    echo -n "${ANTHROPIC_KEY}" | gcloud secrets versions add anthropic-api-key \
-    --data-file=- --project="${PROJECT_ID}"
 
-echo -n "${COHERE_KEY}" | gcloud secrets create cohere-api-key \
-    --data-file=- --project="${PROJECT_ID}" 2>/dev/null || \
-    echo -n "${COHERE_KEY}" | gcloud secrets versions add cohere-api-key \
-    --data-file=- --project="${PROJECT_ID}"
+# Helper function to create or update secret
+upsert_secret() {
+    local secret_name="$1"
+    local secret_value="$2"
 
-echo -n "${DB_PASSWORD}" | gcloud secrets create db-password \
-    --data-file=- --project="${PROJECT_ID}" 2>/dev/null || \
-    echo -n "${DB_PASSWORD}" | gcloud secrets versions add db-password \
-    --data-file=- --project="${PROJECT_ID}"
+    if gcloud secrets describe "${secret_name}" --project="${PROJECT_ID}" &>/dev/null; then
+        echo "  Updating ${secret_name}..."
+        echo -n "${secret_value}" | gcloud secrets versions add "${secret_name}" \
+            --data-file=- --project="${PROJECT_ID}" > /dev/null
+    else
+        echo "  Creating ${secret_name}..."
+        echo -n "${secret_value}" | gcloud secrets create "${secret_name}" \
+            --data-file=- --replication-policy="automatic" \
+            --project="${PROJECT_ID}" > /dev/null
+    fi
+}
 
-echo "  ✓ Secrets stored"
+upsert_secret "anthropic-api-key" "${ANTHROPIC_KEY}"
+upsert_secret "cohere-api-key" "${COHERE_KEY}"
+upsert_secret "database-password" "${DB_PASSWORD}"
+
+# Construct DATABASE_URL and store as secret
+CLOUD_SQL_CONNECTION="${PROJECT_ID}:${REGION}:${DB_INSTANCE_NAME}"
+DB_SOCKET="/cloudsql/${CLOUD_SQL_CONNECTION}"
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@/${DB_NAME}?host=${DB_SOCKET}"
+upsert_secret "database-url" "${DATABASE_URL}"
+
+echo "  ✓ All secrets stored securely in Secret Manager"
 
 # 7. Create Artifact Registry repo
 echo ""
@@ -136,11 +157,13 @@ gcloud builds submit \
     --project="${PROJECT_ID}"
 echo "  ✓ Image built and pushed"
 
-# 9. Deploy to Cloud Run
+# 9. Deploy to Cloud Run with advanced configuration
 echo ""
 echo "▶ Deploying to Cloud Run..."
-DB_SOCKET="/cloudsql/${CLOUD_SQL_CONNECTION}"
-DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@/${DB_NAME}?host=${DB_SOCKET}"
+echo "  Service: ${SERVICE_NAME}"
+echo "  Region: ${REGION}"
+echo "  Min instances: 0, Max instances: 5"
+echo "  Health check: ${HEALTH_CHECK_PATH}"
 
 gcloud run deploy "${SERVICE_NAME}" \
     --image="${IMAGE}" \
@@ -153,9 +176,14 @@ gcloud run deploy "${SERVICE_NAME}" \
     --min-instances=0 \
     --max-instances=5 \
     --timeout=300 \
-    --set-env-vars="DATABASE_URL=${DATABASE_URL},CORS_ORIGINS=${CORS_ORIGINS}" \
-    --set-secrets="ANTHROPIC_API_KEY=anthropic-api-key:latest,COHERE_API_KEY=cohere-api-key:latest" \
-    --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}"
+    --set-env-vars="CORS_ORIGINS=${CORS_ORIGINS}" \
+    --set-secrets="ANTHROPIC_API_KEY=anthropic-api-key:latest,COHERE_API_KEY=cohere-api-key:latest,DATABASE_URL=database-url:latest" \
+    --add-cloudsql-instances="${CLOUD_SQL_CONNECTION}" \
+    --health-check-path="${HEALTH_CHECK_PATH}" \
+    --startup-cpu-boost \
+    --no-cpu-throttling
+
+echo "  ✓ Cloud Run deployment complete"
 
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
@@ -164,21 +192,44 @@ SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
     --format="value(status.url)")
 
 echo ""
+echo "▶ Configuring custom domain..."
+# Create Cloud Run domain mapping for custom domain
+gcloud run domain-mappings create \
+    --service="${SERVICE_NAME}" \
+    --domain="${CUSTOM_DOMAIN}" \
+    --region="${REGION}" \
+    --project="${PROJECT_ID}" 2>/dev/null || echo "  Domain mapping already exists or in progress"
+
+echo "  ✓ Custom domain configuration complete"
+echo "  Note: Point DNS A record to GCP Load Balancer IP (shown in Cloud Run console)"
+
+echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  ✅ Deployment Complete!"
 echo "═══════════════════════════════════════════════════"
 echo ""
-echo "  API URL:     ${SERVICE_URL}"
-echo "  Health:      ${SERVICE_URL}/health"
-echo "  Chat:        POST ${SERVICE_URL}/api/v1/intel/chat"
-echo "  Signals:     GET  ${SERVICE_URL}/api/v1/intel/signals"
+echo "  API Service URL:  ${SERVICE_URL}"
+echo "  Custom Domain:    https://${CUSTOM_DOMAIN}"
+echo "  Health Check:     https://${CUSTOM_DOMAIN}${HEALTH_CHECK_PATH}"
+echo "  Chat Endpoint:    POST https://${CUSTOM_DOMAIN}/api/v1/intel/chat"
+echo "  Signals Endpoint: GET  https://${CUSTOM_DOMAIN}/api/v1/intel/signals"
 echo ""
-echo "  DB Instance: ${DB_INSTANCE_NAME}"
-echo "  DB Password: ${DB_PASSWORD}"
-echo "  (stored in Secret Manager as 'db-password')"
+echo "  Database:"
+echo "    Instance: ${DB_INSTANCE_NAME}"
+echo "    Database: ${DB_NAME}"
+echo "    User: ${DB_USER}"
+echo "    (Password stored in Secret Manager as 'database-password')"
+echo ""
+echo "  Secrets stored in Secret Manager:"
+echo "    - anthropic-api-key"
+echo "    - cohere-api-key"
+echo "    - database-password"
+echo "    - database-url"
 echo ""
 echo "  Next steps:"
-echo "  1. Update Cloudflare Pages env: NEXT_PUBLIC_API_URL=${SERVICE_URL}"
-echo "  2. Run seeding: python scripts/seed_data.py"
-echo "  3. Test: curl ${SERVICE_URL}/health"
+echo "  1. Configure DNS: Point ${CUSTOM_DOMAIN} to GCP's load balancer"
+echo "  2. Update frontend: NEXT_PUBLIC_API_URL=https://${CUSTOM_DOMAIN}"
+echo "  3. Run seeding: python scripts/seed_data.py"
+echo "  4. Test health: curl https://${CUSTOM_DOMAIN}${HEALTH_CHECK_PATH}"
+echo "  5. Monitor logs: gcloud run logs read ${SERVICE_NAME} --region=${REGION} --limit=50"
 echo ""

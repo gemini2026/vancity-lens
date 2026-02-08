@@ -9,6 +9,8 @@ resource "google_project_service" "required_apis" {
     "servicenetworking.googleapis.com",
     "cloudlogging.googleapis.com",
     "monitoring.googleapis.com",
+    "run.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
   ])
 
   project = var.project_id
@@ -118,4 +120,120 @@ module "secrets" {
     google_project_service.required_apis,
     google_service_account.gke_sa
   ]
+}
+
+# Cloud Run Service Account
+resource "google_service_account" "cloudrun_sa" {
+  account_id   = "vancity-lens-cloudrun-sa"
+  display_name = "VanCity Lens Cloud Run Service Account"
+  project      = var.project_id
+  description  = "Service account for VanCity Lens Cloud Run API service"
+
+  depends_on = [google_project_service.required_apis]
+}
+
+# Grant Cloud Run service account access to secrets
+resource "google_secret_manager_secret_iam_member" "cloudrun_access_anthropic" {
+  secret_id = module.secrets.anthropic_api_key_secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+
+  depends_on = [module.secrets]
+}
+
+resource "google_secret_manager_secret_iam_member" "cloudrun_access_cohere" {
+  secret_id = module.secrets.cohere_api_key_secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+
+  depends_on = [module.secrets]
+}
+
+resource "google_secret_manager_secret_iam_member" "cloudrun_access_db_password" {
+  secret_id = module.secrets.db_password_secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+
+  depends_on = [module.secrets]
+}
+
+# Grant Cloud Run service account Cloud SQL client role
+resource "google_project_iam_member" "cloudrun_sql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+}
+
+# Cloud Run Service for VanCity Lens API
+resource "google_cloud_run_service" "api" {
+  name     = "vancity-lens-api"
+  location = var.region
+  project  = var.project_id
+
+  template {
+    spec {
+      service_account_name = google_service_account.cloudrun_sa.email
+
+      containers {
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${module.registry.repository_name}/api:latest"
+
+        env {
+          name  = "DATABASE_URL"
+          value = "postgresql://${module.cloudsql.database_user}@/${module.cloudsql.database_name}?host=/cloudsql/${module.cloudsql.connection_name}"
+        }
+
+        env {
+          name  = "ANTHROPIC_API_KEY"
+          value = "sm://${var.project_id}/anthropic-api-key"
+        }
+
+        env {
+          name  = "COHERE_API_KEY"
+          value = "sm://${var.project_id}/cohere-api-key"
+        }
+
+        resources {
+          limits = {
+            cpu    = "2"
+            memory = "1Gi"
+          }
+        }
+      }
+
+      timeout_seconds = 300
+    }
+
+    metadata {
+      annotations = {
+        "autoscaling.knative.dev/maxScale" = "5"
+        "autoscaling.knative.dev/minScale" = "0"
+      }
+    }
+  }
+
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+
+  depends_on = [
+    google_project_service.required_apis,
+    module.secrets,
+    module.registry,
+    module.cloudsql,
+    google_service_account.cloudrun_sa,
+    google_secret_manager_secret_iam_member.cloudrun_access_anthropic,
+    google_secret_manager_secret_iam_member.cloudrun_access_cohere,
+    google_secret_manager_secret_iam_member.cloudrun_access_db_password
+  ]
+}
+
+# Cloud Run IAM - allow public access to the service
+resource "google_cloud_run_service_iam_member" "cloudrun_invoker" {
+  service       = google_cloud_run_service.api.name
+  location      = google_cloud_run_service.api.location
+  role          = "roles/run.invoker"
+  member        = "allUsers"
+
+  depends_on = [google_cloud_run_service.api]
 }

@@ -99,3 +99,19 @@ output "db_password_secret_id" {
   description = "Secret Manager ID for database password"
   value       = module.secrets.db_password_secret_id
 }
+
+output "cloudrun_service_name" {
+  description = "Cloud Run service name"
+  value       = google_cloud_run_service.api.name
+}
+
+output "cloudrun_service_url" {
+  description = "Cloud Run service URL"
+  value       = google_cloud_run_service.api.status[0].url
+  sensitive   = true
+}
+
+output "cloudrun_service_account_email" {
+  description = "Cloud Run service account email"
+  value       = google_service_account.cloudrun_sa.email
+}

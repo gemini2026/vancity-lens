@@ -12,11 +12,15 @@ terraform {
     }
   }
 
-  # Backend configuration - uncomment and configure for remote state
-  # backend "gcs" {
-  #   bucket = "YOUR_TERRAFORM_STATE_BUCKET"
-  #   prefix = "vancity-lens/terraform"
-  # }
+  # GCS Backend for remote state storage
+  # Configure via environment variables or -backend-config flag:
+  # terraform init -backend-config="bucket=YOUR_BUCKET" \
+  #   -backend-config="prefix=vancity-lens/terraform"
+  backend "gcs" {
+    # bucket - GCS bucket for state (pass via init flags or env var TF_BACKEND_BUCKET)
+    # prefix - state file path (default: vancity-lens/terraform)
+    # encryption_key - (optional) customer-managed encryption key for at-rest encryption
+  }
 }
 
 provider "google" {
