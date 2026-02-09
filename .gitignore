@@ -55,3 +55,35 @@ data/
 # ── Misc ─────────────────────────────────────────────
 *.log
 *.zip
+
+# ── Cowork Session Artifacts ────────────────────────
+# Documentation generated during Cowork sessions
+*_IMPLEMENTATION*.md
+*_IMPLEMENTATION*.txt
+*_GUIDE*.md
+*_SUMMARY*.md
+*_SUMMARY*.txt
+*_DELIVERABLES.md
+*_CHECKLIST*.md
+*_COMPLETION_REPORT*.md
+*_QUICK_START.md
+*_QUICK_REFERENCE*.md
+*_INDEX.md
+*_API_REFERENCE.md
+FILES_CREATED.md
+IMPLEMENTATION_INDEX.md
+ALERT_SYSTEM_IMPLEMENTATION.md
+AUDIT_LOGGING.md
+DIGEST_*.md
+PAGINATION_*.md
+PROMETHEUS_*.md
+METRICS_*.md
+REVIEW_SUMMARY.txt
+VCL-*_IMPLEMENTATION.md
+VCL-*_INDEX.md
+VCL-*_DELIVERABLES.md
+VCL-*_CHECKLIST.md
+VCL-*_STRIPE*.md
+VCL-*_COMPLETION_REPORT.md
+VCL*_IMPLEMENTATION_SUMMARY.txt
+VCL*_FILES.txt
