@@ -230,9 +230,24 @@ export default function MapView() {
             ${v ? `<span style="background:${gradeColor};color:#000;font-size:14px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:1px">Grade ${v.deal_grade}</span>` : ""}
           </div>
         </div>
-        ${v ? `<div style="padding:6px 12px;background:#0f172a;font-size:11px;color:#d1d5db;border-bottom:1px solid #1e293b">
-          ${v.one_liner}
-          <span style="float:right;font-size:10px;color:#6b7280">${v.neighborhood ? v.neighborhood + ' · ' : ''}Score: ${v.deal_score}/100</span>
+        ${v ? `<div style="padding:6px 12px;background:#0f172a;border-bottom:1px solid #1e293b">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:10px;color:#9ca3af">Economics:</span>
+              <span style="font-size:12px;font-weight:700;color:${gradeColor}">${v.deal_grade}</span>
+              <span style="font-size:9px;color:#6b7280">(${v.deal_score}/100)</span>
+              <span style="color:#374151">|</span>
+              <span style="font-size:10px;color:#9ca3af">Friction:</span>
+              <span style="font-size:10px;font-weight:600;color:${v.friction_level === 'high' ? '#f87171' : v.friction_level === 'medium' ? '#fbbf24' : '#86efac'}">${(v.friction_level || 'low').charAt(0).toUpperCase() + (v.friction_level || 'low').slice(1)}</span>
+              <span style="color:#374151">|</span>
+              <span style="font-size:10px;color:#9ca3af">Confidence:</span>
+              <span style="font-size:11px;color:#fbbf24">${"★".repeat(v.confidence_stars || 1)}${"☆".repeat(3 - (v.confidence_stars || 1))}</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#d1d5db">
+            ${v.one_liner}
+            <span style="float:right;font-size:10px;color:#6b7280">${v.neighborhood ? v.neighborhood : ''}</span>
+          </div>
         </div>` : ""}
         <div style="padding:12px;background:#111827;color:#f3f4f6;max-height:500px;overflow-y:auto">
           <div style="font-size:13px;font-weight:600;margin-bottom:2px">${data.civic_address || data.pid} ${srcRow("civic_address")}</div>
@@ -533,7 +548,7 @@ export default function MapView() {
   }, [showSignals]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100vh" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
       {/* Title */}
       <div style={{ position:"absolute",top:16,left:16,zIndex:10,background:"rgba(17,24,39,0.92)",borderRadius:8,padding:"12px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)" }}>

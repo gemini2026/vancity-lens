@@ -6,8 +6,6 @@ Database-backed with hardcoded fallback for resilience.
 
 from __future__ import annotations
 
-from decimal import Decimal
-from typing import Optional
 
 import asyncpg
 from pydantic import BaseModel, Field

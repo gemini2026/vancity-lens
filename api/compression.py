@@ -17,7 +17,6 @@ Environment variables:
 import gzip
 import io
 import os
-from typing import Callable
 
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send, Message

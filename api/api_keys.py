@@ -4,13 +4,11 @@ VanCity Lens — API Key Management (VCL-108 / BIZ-010)
 Third-party integration API keys with secure hashing, scopes, and rate limiting.
 """
 
-import os
 import logging
 import secrets
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, NamedTuple
-from dataclasses import dataclass
 
 import asyncpg
 

@@ -6,23 +6,29 @@ Stripe service layer: checkout sessions, webhook handling, subscription manageme
 
 import logging
 import os
-import hmac
-import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
-from decimal import Decimal
+from typing import Dict, Any
 
 import asyncpg
 import stripe
 
 logger = logging.getLogger(__name__)
 
-# Initialize Stripe with API key
-STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+# Stripe keys are read lazily to avoid import-time env var issues in tests
+STRIPE_API_KEY = None
+STRIPE_WEBHOOK_SECRET = None
+_stripe_initialized = False
 
-if STRIPE_API_KEY:
-    stripe.api_key = STRIPE_API_KEY
+
+def _ensure_stripe_initialized():
+    """Lazily initialize Stripe API key from environment."""
+    global STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET, _stripe_initialized
+    if not _stripe_initialized:
+        STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
+        STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+        if STRIPE_API_KEY:
+            stripe.api_key = STRIPE_API_KEY
+        _stripe_initialized = True
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -71,6 +77,7 @@ class StripeService:
         Raises:
             ValueError: If tier not found or Stripe API fails
         """
+        _ensure_stripe_initialized()
         if not STRIPE_API_KEY:
             raise ValueError("STRIPE_API_KEY not configured")
 
@@ -156,6 +163,7 @@ class StripeService:
         Raises:
             ValueError: If signature verification fails
         """
+        _ensure_stripe_initialized()
         if not STRIPE_WEBHOOK_SECRET:
             raise ValueError("STRIPE_WEBHOOK_SECRET not configured")
 
@@ -227,7 +235,7 @@ class StripeService:
 
             if not user_id or not tier_name:
                 raise ValueError(
-                    f"Missing user_id or tier_name in subscription metadata"
+                    "Missing user_id or tier_name in subscription metadata"
                 )
 
             async with pool.acquire() as conn:
@@ -347,7 +355,7 @@ class StripeService:
                 )
 
                 # Update subscription: clear grace period, set to active
-                result = await conn.execute(
+                await conn.execute(
                     """
                     UPDATE user_subscriptions
                     SET status = 'active',
@@ -565,6 +573,7 @@ class StripeService:
         Raises:
             ValueError: If user has no Stripe customer ID or API fails
         """
+        _ensure_stripe_initialized()
         if not STRIPE_API_KEY:
             raise ValueError("STRIPE_API_KEY not configured")
 
@@ -615,6 +624,7 @@ class StripeService:
         Raises:
             ValueError: If user has no active subscription or API fails
         """
+        _ensure_stripe_initialized()
         if not STRIPE_API_KEY:
             raise ValueError("STRIPE_API_KEY not configured")
 

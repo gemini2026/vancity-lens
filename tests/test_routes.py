@@ -10,8 +10,9 @@ from api.intelligence.models import SignalResponse
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
     """Create test FastAPI app with intelligence routes."""
+    monkeypatch.setenv("ADMIN_API_KEY", "test-admin-key")
     app = FastAPI()
     app.include_router(router)
     return app
@@ -20,7 +21,7 @@ def app():
 @pytest.fixture
 def client(app):
     """Create test client."""
-    return TestClient(app)
+    return TestClient(app, headers={"X-Admin-Key": "test-admin-key"})
 
 
 class TestChatEndpoint:

@@ -8,7 +8,6 @@ Implements exact match, fuzzy match, and regex-based address extraction.
 import logging
 import re
 from typing import Optional
-from decimal import Decimal
 
 import asyncpg
 

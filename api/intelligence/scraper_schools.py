@@ -12,11 +12,9 @@ Key components:
 - Neighborhood mapping via school coordinates to Vancouver neighborhoods
 """
 
-import asyncio
 import logging
 from datetime import datetime, date
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
+from typing import List, Dict, Optional
 
 from pydantic import BaseModel, Field
 import aiohttp
@@ -216,7 +214,7 @@ class VSBSchoolScraper:
                     name = record.get("name") or record.get("school_name") or ""
 
                     if not name or not address:
-                        logger.warning(f"Skipping school with missing name or address")
+                        logger.warning("Skipping school with missing name or address")
                         continue
 
                     # Map to neighborhood

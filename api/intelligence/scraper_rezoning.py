@@ -14,10 +14,8 @@ Key functions:
 
 import asyncio
 import logging
-import re
 from typing import List, Tuple, Dict, Optional
-from urllib.parse import urljoin, urlparse
-import io
+from urllib.parse import urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup

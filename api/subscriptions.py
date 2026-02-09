@@ -7,10 +7,10 @@ Subscription tier management, user subscriptions, usage tracking, and rate limit
 import logging
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Optional, Dict, List
+from typing import Any, Optional, Dict, List
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, model_validator
 import asyncpg
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,15 @@ class TierInfo(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_features_json(cls, data: Any) -> Any:
+        """Parse features from JSON string if needed (DB stores as TEXT)."""
+        if isinstance(data, dict) and isinstance(data.get("features"), str):
+            import json
+            data["features"] = json.loads(data["features"])
+        return data
 
 
 class UserSubscription(BaseModel):
@@ -249,12 +258,12 @@ class SubscriptionManager:
                     current_period_start, current_period_end, created_at, updated_at
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                RETURNING us.id, us.user_id, us.tier_id,
-                          (SELECT name FROM subscription_tiers WHERE id = us.tier_id) as tier_name,
-                          (SELECT display_name FROM subscription_tiers WHERE id = us.tier_id) as tier_display_name,
-                          us.status, us.trial_ends_at, us.current_period_start,
-                          us.current_period_end, us.cancel_at_period_end,
-                          us.created_at, us.updated_at
+                RETURNING id, user_id, tier_id,
+                          (SELECT name FROM subscription_tiers WHERE id = user_subscriptions.tier_id) as tier_name,
+                          (SELECT display_name FROM subscription_tiers WHERE id = user_subscriptions.tier_id) as tier_display_name,
+                          status, trial_ends_at, current_period_start,
+                          current_period_end, cancel_at_period_end,
+                          created_at, updated_at
                 """,
                 user_id,
                 tier["id"],

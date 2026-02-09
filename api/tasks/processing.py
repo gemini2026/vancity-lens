@@ -12,10 +12,8 @@ Provides Celery task definitions for:
 
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
 
 from .worker import celery_app, DatabaseTask
-from .job_tracker import JobTracker, JobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +221,7 @@ def generate_embeddings_task(
         }
 
         logger.info(
-            f"Embeddings generation completed",
+            "Embeddings generation completed",
             extra={"task_id": job_id, "result": result}
         )
         return result
@@ -354,7 +352,7 @@ def scan_opportunities_task(
         }
 
         logger.info(
-            f"Opportunity scan completed",
+            "Opportunity scan completed",
             extra={"task_id": job_id, "result": result}
         )
         return result
@@ -421,7 +419,7 @@ def refresh_materialized_views_task(
         }
 
         logger.info(
-            f"Materialized views refresh completed",
+            "Materialized views refresh completed",
             extra={"task_id": job_id, "result": result}
         )
         return result

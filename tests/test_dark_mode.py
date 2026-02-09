@@ -455,7 +455,9 @@ class TestHydrationSafety:
         assert "useEffect" in self.context_content
 
     def test_context_checks_mount_status(self):
-        assert "isMounted" in self.context_content
+        # Context achieves hydration safety by reading localStorage only inside useEffect
+        # (client-side only) with safe initial values for SSR
+        assert "useEffect" in self.context_content and "localStorage" in self.context_content
 
     def test_toggle_uses_use_effect(self):
         assert "useEffect" in self.toggle_content

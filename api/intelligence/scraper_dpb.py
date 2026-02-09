@@ -17,7 +17,6 @@ import asyncio
 import logging
 from typing import List, Dict, Optional
 from urllib.parse import urljoin
-import io
 
 import aiohttp
 from bs4 import BeautifulSoup

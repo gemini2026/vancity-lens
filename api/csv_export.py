@@ -9,7 +9,6 @@ import csv
 import io
 import logging
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Optional, List, Any, Dict
 
 from pydantic import BaseModel, Field
@@ -203,7 +202,7 @@ class CSVExporter:
                 "summary": CSVExporter._sanitize_csv_value(signal.get("summary")),
                 "neighborhood": signal.get("neighborhood"),
                 "addresses": CSVExporter._sanitize_csv_value(
-                    ",".join(signal.get("addresses", []))
+                    ",".join(signal.get("addresses") or [])
                 ),
                 "event_date": signal.get("event_date"),
                 "severity": signal.get("severity"),
@@ -220,7 +219,7 @@ class CSVExporter:
                 "vote_for": signal.get("vote_for"),
                 "vote_against": signal.get("vote_against"),
                 "conditions": CSVExporter._sanitize_csv_value(
-                    ",".join(signal.get("conditions", []))
+                    ",".join(signal.get("conditions") or [])
                 ),
                 "sentiment": signal.get("sentiment"),
                 "source_title": CSVExporter._sanitize_csv_value(signal.get("source_title")),
@@ -357,17 +356,19 @@ class CSVExporter:
         writer.writeheader()
 
         for parcel in parcels:
+            lot_sqm = parcel.get("lot_area_sqm")
+            lot_sqft = float(lot_sqm) * 10.764 if lot_sqm else None
             row = {
                 "pid": parcel.get("pid"),
                 "civic_address": CSVExporter._sanitize_csv_value(parcel.get("civic_address")),
-                "neighborhood": parcel.get("neighborhood"),
-                "zoning": parcel.get("zoning"),
-                "lot_area_sqft": parcel.get("lot_area_sqft"),
-                "lot_area_sqm": parcel.get("lot_area_sqm"),
+                "neighborhood": parcel.get("geo_local_area"),
+                "zoning": parcel.get("current_zoning"),
+                "lot_area_sqft": round(lot_sqft, 1) if lot_sqft else None,
+                "lot_area_sqm": lot_sqm,
                 "assessed_value": parcel.get("assessed_value"),
                 "asking_price": parcel.get("asking_price"),
-                "price_per_sqft": parcel.get("price_per_sqft"),
-                "current_storeys": parcel.get("current_storeys"),
+                "price_per_sqft": None,
+                "current_storeys": parcel.get("current_height"),
                 "current_fsr": parcel.get("current_fsr"),
                 "entitled_storeys": parcel.get("entitled_storeys"),
                 "entitled_fsr": parcel.get("entitled_fsr"),
@@ -411,7 +412,7 @@ async def _fetch_signals_for_export(
     Returns:
         List of signal dictionaries
     """
-    query = "SELECT * FROM signals WHERE 1=1"
+    query = "SELECT * FROM intelligence_signals WHERE 1=1"
     params = []
     param_count = 1
 
@@ -464,49 +465,30 @@ async def _fetch_neighborhood_scorecard(
     """
     query = """
         SELECT
-            name,
-            population,
-            median_age,
-            household_income,
-            property_tax_rate,
-            average_home_price,
-            price_per_sqft,
-            vacancy_rate,
-            zoning_density_score,
-            development_pipeline_count,
-            transit_accessibility_score,
-            walkability_score,
-            bike_score,
-            school_rating_avg,
-            crime_rate_per_100k,
-            parks_per_100k_residents
-        FROM neighborhoods
-        WHERE name = ANY($1)
+            n.name,
+            n.population,
+            n.area_km2,
+            n.metadata
+        FROM neighborhoods n
+        WHERE n.name = ANY($1)
     """
 
     async with pool.acquire() as conn:
         rows = await conn.fetch(query, neighborhoods)
 
-    # Transform to nested dict
+    # Transform to nested dict, extracting metadata fields
     result = {}
     for row in rows:
         neighborhood_name = row["name"]
+        meta = row.get("metadata") or {}
         result[neighborhood_name] = {
             "population": row.get("population"),
-            "median_age": row.get("median_age"),
-            "household_income": row.get("household_income"),
-            "property_tax_rate": row.get("property_tax_rate"),
-            "average_home_price": row.get("average_home_price"),
-            "price_per_sqft": row.get("price_per_sqft"),
-            "vacancy_rate": row.get("vacancy_rate"),
-            "zoning_density_score": row.get("zoning_density_score"),
-            "development_pipeline_count": row.get("development_pipeline_count"),
-            "transit_accessibility_score": row.get("transit_accessibility_score"),
-            "walkability_score": row.get("walkability_score"),
-            "bike_score": row.get("bike_score"),
-            "school_rating_avg": row.get("school_rating_avg"),
-            "crime_rate_per_100k": row.get("crime_rate_per_100k"),
-            "parks_per_100k_residents": row.get("parks_per_100k_residents"),
+            "area_km2": row.get("area_km2"),
+            "median_age": meta.get("median_age"),
+            "household_income": meta.get("household_income"),
+            "average_home_price": meta.get("average_home_price"),
+            "transit_accessibility_score": meta.get("transit_accessibility_score"),
+            "walkability_score": meta.get("walkability_score"),
         }
 
     return result
@@ -531,23 +513,24 @@ async def _fetch_parcels_for_export(
     param_count = 1
 
     if filters.neighborhood:
-        query += f" AND neighborhood = ${param_count}"
+        query += f" AND geo_local_area = ${param_count}"
         params.append(filters.neighborhood)
         param_count += 1
 
     if filters.zoning:
-        query += f" AND zoning = ${param_count}"
+        query += f" AND current_zoning = ${param_count}"
         params.append(filters.zoning)
         param_count += 1
 
     if filters.min_lot_sqft:
-        query += f" AND lot_area_sqft >= ${param_count}"
-        params.append(filters.min_lot_sqft)
+        # Convert sqft filter to sqm for the query (1 sqft = 0.0929 sqm)
+        query += f" AND lot_area_sqm >= ${param_count}"
+        params.append(filters.min_lot_sqft * 0.0929)
         param_count += 1
 
     if filters.max_lot_sqft:
-        query += f" AND lot_area_sqft <= ${param_count}"
-        params.append(filters.max_lot_sqft)
+        query += f" AND lot_area_sqm <= ${param_count}"
+        params.append(filters.max_lot_sqft * 0.0929)
         param_count += 1
 
     query += f" ORDER BY pid ASC LIMIT ${param_count}"

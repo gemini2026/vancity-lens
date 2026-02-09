@@ -10,7 +10,7 @@ Provides:
 import asyncio
 import json
 import logging
-from typing import AsyncIterator, Any, Dict, List, Optional, Tuple
+from typing import AsyncIterator, Any, Dict, List, Optional
 
 import asyncpg
 from starlette.responses import StreamingResponse

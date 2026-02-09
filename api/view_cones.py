@@ -7,7 +7,6 @@ when parcels intersect protected view cones.
 """
 
 import logging
-from decimal import Decimal
 from typing import List, Optional, Dict, Any
 
 import asyncpg

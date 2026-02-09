@@ -11,7 +11,6 @@ import logging
 from decimal import Decimal
 from typing import Optional, List
 from datetime import datetime
-from io import BytesIO
 
 from fpdf import FPDF
 from pydantic import BaseModel, Field
@@ -156,8 +155,8 @@ class ReportGenerator:
             row = await conn.fetchrow(
                 """
                 SELECT
-                    pid, civic_address, current_zoning, proposed_zoning,
-                    lot_area_sqm, coordinates, created_at
+                    pid, civic_address, current_zoning,
+                    lot_area_sqm, created_at
                 FROM parcels
                 WHERE pid = $1
                 LIMIT 1
@@ -172,26 +171,29 @@ class ReportGenerator:
             lot_area_sqm = Decimal(str(row["lot_area_sqm"]))
             lot_area_sqft = lot_area_sqm * Decimal("10.7639")
 
-            # Fetch entitlement data
-            entitlement_row = await conn.fetchrow(
-                """
-                SELECT
-                    current_storeys, entitled_storeys,
-                    current_fsr, entitled_fsr,
-                    estimated_land_value, assessed_value, asking_price, value_delta
-                FROM parcel_entitlements
-                WHERE pid = $1
-                LIMIT 1
-                """,
-                pid,
-            )
+            # Fetch entitlement data (table may not exist)
+            try:
+                entitlement_row = await conn.fetchrow(
+                    """
+                    SELECT
+                        current_storeys, entitled_storeys,
+                        current_fsr, entitled_fsr,
+                        estimated_land_value, assessed_value, asking_price, value_delta
+                    FROM parcel_entitlements
+                    WHERE pid = $1
+                    LIMIT 1
+                    """,
+                    pid,
+                )
+            except Exception:
+                entitlement_row = None
 
             # Build report data
             data = ParcelReport(
                 pid=pid,
                 civic_address=row.get("civic_address"),
                 current_zoning=row.get("current_zoning"),
-                proposed_zoning=row.get("proposed_zoning"),
+                proposed_zoning=None,
                 lot_area_sqm=lot_area_sqm,
                 lot_area_sqft=lot_area_sqft,
                 buildable_sqft=self._compute_buildable_sqft(

@@ -7,7 +7,7 @@ FastAPI routes for Stripe checkout, webhook handling, and subscription managemen
 import logging
 from typing import Dict
 
-from fastapi import APIRouter, HTTPException, Request, status, Depends, Body
+from fastapi import APIRouter, HTTPException, Request, status, Depends
 from pydantic import BaseModel
 import asyncpg
 

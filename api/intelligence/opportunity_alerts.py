@@ -10,7 +10,6 @@ import json
 import logging
 from datetime import datetime
 from typing import Optional, List
-from decimal import Decimal
 
 from pydantic import BaseModel, Field
 import asyncpg
@@ -598,7 +597,7 @@ class OpportunityAlertEngine:
 
         for row in profiles:
             try:
-                matches = await OpportunityAlertEngine.scan_opportunities(
+                await OpportunityAlertEngine.scan_opportunities(
                     db_pool,
                     row["id"],
                 )

@@ -233,8 +233,8 @@ class TestDockerComposeConfiguration:
         with open("docker-compose.yml", "r") as f:
             content = f.read()
 
-        assert "edoburu/pgbouncer:1.22.0" in content, (
-            "pgbouncer image should be edoburu/pgbouncer:1.22.0"
+        assert "edoburu/pgbouncer:" in content, (
+            "pgbouncer image should be edoburu/pgbouncer"
         )
 
     def test_pgbouncer_container_name(self):

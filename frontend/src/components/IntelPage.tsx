@@ -222,7 +222,7 @@ export default function IntelPage() {
     <div
       style={{
         display: "flex",
-        height: "100vh",
+        height: "100%",
         background: "#0a0a0a",
         fontFamily: "system-ui, sans-serif",
         color: "#f3f4f6",

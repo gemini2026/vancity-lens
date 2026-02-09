@@ -13,7 +13,6 @@ Features:
 - Ingest pipeline data from intelligence signals
 """
 
-import asyncio
 import logging
 from datetime import date, datetime
 from enum import Enum
@@ -819,7 +818,7 @@ class SupplyPipelineTracker:
                 SELECT COUNT(*) as count
                 FROM supply_pipeline
                 WHERE pipeline_stage IN ('building_permit', 'under_construction')
-                {f"AND neighborhood = $1" if neighborhood else ""}
+                {"AND neighborhood = $1" if neighborhood else ""}
             """
 
             async with db_pool.acquire() as conn:

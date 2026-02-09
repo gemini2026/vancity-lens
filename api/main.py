@@ -19,10 +19,29 @@ from .compression import CompressionMiddleware
 from .db import db
 from .cache import CacheManager
 from .entitlement import ParcelNotFoundError, compute_entitlement
-from .models import EntitlementRequest, ParcelEntitlementResponse
+from .models import ParcelEntitlementResponse
 from .admin import router as admin_router
 from .intelligence.routes import router as intelligence_router
+from .intelligence.digest_routes import admin_router as digest_admin_router
+from .intelligence.pipeline_routes import admin_router as pipeline_admin_router
 from .auth_routes import router as auth_router
+from .api_key_routes import router as api_key_router
+from .analytics_routes import router as analytics_router
+from .checklist import router as checklist_router
+from .comparable_sales_routes import router as comparable_sales_router
+from .csv_export_routes import router as csv_export_router
+from .metrics_routes import router as metrics_router
+from .parcel_search import router as parcel_search_router
+from .report_routes import router as report_router
+from .stripe_routes import router as stripe_router
+from .subscription_routes import router as subscription_router
+from .subscription_routes import admin_router as subscription_admin_router
+from .view_cones_routes import router as view_cones_router
+from .financing_routes import router as financing_router
+from .webhook_routes import router as webhook_router
+from .bulk_analysis_routes import router as bulk_analysis_router
+from .geocoding import router as geocoding_router
+from .tasks.routes import router as jobs_router
 from .rate_limit import rate_limit_general
 from .json_logging import setup_json_logging
 from .versioning import APIVersionMiddleware, get_api_versions
@@ -33,7 +52,7 @@ from .streaming import (
     async_geojson_generator,
     async_json_generator,
 )
-from .pagination import MaxPageSizeMiddleware, PaginationParams, paginate
+from .pagination import MaxPageSizeMiddleware, paginate
 
 logger = logging.getLogger(__name__)
 
@@ -93,11 +112,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
         # Add to request state for use in route handlers
         request.state.request_id = request_id
-
-        # Add to log context by creating a custom logger adapter
-        logger_with_context = logging.LoggerAdapter(
-            logger, {"request_id": request_id}
-        )
 
         # Process request
         response = await call_next(request)
@@ -176,12 +190,12 @@ async def lifespan(app: FastAPI):
     from .intelligence.scheduler import ScraperScheduler
     scheduler = ScraperScheduler(db.pool)
 
-    # Register actual scraper functions
+    # Register actual scraper functions (use correct function names per module)
     from .intelligence.scraper_council import scrape_and_store as scrape_council
-    from .intelligence.scraper_dpb import scrape_and_store as scrape_dpb
+    from .intelligence.scraper_dpb import download_and_store as scrape_dpb
     from .intelligence.scraper_rezoning import scrape_and_store as scrape_rezoning
-    from .intelligence.scraper_news import scrape_and_store as scrape_news
-    from .intelligence.scraper_opendata import scrape_and_store as scrape_opendata
+    from .intelligence.scraper_news import scrape_news_feeds as scrape_news
+    from .intelligence.scraper_opendata import run_all_scrapers as scrape_opendata
 
     scheduler.register_scraper("council", scrape_council, "0 6 * * *", enabled=True)
     scheduler.register_scraper("dpb", scrape_dpb, "0 7 * * *", enabled=True)
@@ -291,6 +305,25 @@ app.add_middleware(MaxPageSizeMiddleware)
 app.include_router(admin_router)
 app.include_router(intelligence_router)
 app.include_router(auth_router)
+app.include_router(api_key_router)
+app.include_router(analytics_router)
+app.include_router(checklist_router)
+app.include_router(comparable_sales_router)
+app.include_router(csv_export_router)
+app.include_router(metrics_router)
+app.include_router(parcel_search_router)
+app.include_router(report_router)
+app.include_router(stripe_router)
+app.include_router(subscription_router)
+app.include_router(subscription_admin_router)
+app.include_router(digest_admin_router, prefix="/api/v1/admin")
+app.include_router(pipeline_admin_router, prefix="/api/v1/admin")
+app.include_router(view_cones_router)
+app.include_router(financing_router)
+app.include_router(webhook_router)
+app.include_router(bulk_analysis_router)
+app.include_router(geocoding_router)
+app.include_router(jobs_router)
 
 
 # ── Routes ───────────────────────────────────────────────────

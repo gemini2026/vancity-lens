@@ -16,8 +16,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timedelta
-from io import BytesIO
-from typing import Optional, Dict, List, Tuple, Any
+from typing import Optional, Dict, List, Any
 from urllib.parse import urljoin, urlparse
 
 import aiohttp

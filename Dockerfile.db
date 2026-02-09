@@ -1,6 +1,7 @@
 # Custom PostgreSQL with PostGIS + pgvector
 # PostGIS for geospatial queries, pgvector for AI embeddings
-FROM postgis/postgis:16-3.4
+# Using imresamu/postgis for multi-arch (amd64 + arm64) support
+FROM imresamu/postgis:16-3.4
 
 # Install pgvector from the PostgreSQL APT repo (pre-built, no compilation)
 RUN apt-get update && \

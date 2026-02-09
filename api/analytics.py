@@ -16,7 +16,7 @@ from enum import Enum
 from typing import List, Dict, Optional, Any
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

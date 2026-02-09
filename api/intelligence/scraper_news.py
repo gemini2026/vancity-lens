@@ -19,10 +19,8 @@ Architecture:
 
 import asyncio
 import logging
-import re
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
-from urllib.parse import urlparse
 
 import aiohttp
 import asyncpg

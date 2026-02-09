@@ -9,7 +9,6 @@ This module handles:
 - Neighborhood enumeration
 """
 
-import json
 import logging
 from datetime import date
 from typing import Optional, List, Dict, Any
@@ -17,7 +16,7 @@ from typing import Optional, List, Dict, Any
 import asyncpg
 
 from ..cache import cached, CACHE_TTL_SHORT, CACHE_TTL_MEDIUM, CACHE_TTL_LONG
-from .models import SignalResponse, SignalFeedResponse, Severity
+from .models import SignalResponse, SignalFeedResponse
 from .prepared_queries import build_signal_feed_query, build_signal_count_query
 
 logger = logging.getLogger(__name__)
@@ -454,8 +453,9 @@ async def get_signals_geojson(
             JOIN documents d ON isig.document_id = d.id
             WHERE
                 isig.geom IS NOT NULL
-                AND isig.event_date >= CURRENT_DATE - $1 * INTERVAL '1 day'
-            ORDER BY isig.event_date DESC
+                AND (isig.event_date >= CURRENT_DATE - $1 * INTERVAL '1 day'
+                     OR isig.event_date IS NULL)
+            ORDER BY isig.event_date DESC NULLS LAST
             LIMIT $2
         """
 

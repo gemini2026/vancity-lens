@@ -8,7 +8,6 @@ import logging
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-import asyncpg
 
 from .db import db
 from .user_auth import (
@@ -24,12 +23,10 @@ from .user_auth import (
     authenticate,
     refresh_access_token,
     deactivate_user,
-    get_user_by_id,
-    validate_api_key,
     create_api_key,
     revoke_api_key,
     list_user_api_keys,
-    get_current_user,
+    get_current_user_from_request,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,7 +108,7 @@ async def refresh(request: RefreshTokenRequest) -> Dict:
     summary="Get current user profile",
     description="Retrieve the authenticated user's profile information.",
 )
-async def get_profile(user: Dict = Depends(get_current_user(db.pool))) -> UserResponse:
+async def get_profile(user: Dict = Depends(get_current_user_from_request)) -> UserResponse:
     """
     Get the current authenticated user's profile.
 
@@ -126,7 +123,7 @@ async def get_profile(user: Dict = Depends(get_current_user(db.pool))) -> UserRe
     summary="Logout (invalidate user)",
     description="Deactivate the current user account.",
 )
-async def logout(user: Dict = Depends(get_current_user(db.pool))):
+async def logout(user: Dict = Depends(get_current_user_from_request)):
     """
     Logout by deactivating the user account.
 
@@ -150,7 +147,7 @@ async def logout(user: Dict = Depends(get_current_user(db.pool))):
 )
 async def create_api_key_endpoint(
     request: APIKeyCreate,
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ) -> APIKeyCreateResponse:
     """
     Create a new API key for the current user.
@@ -174,7 +171,7 @@ async def create_api_key_endpoint(
     summary="List user's API keys",
     description="Get all API keys for the authenticated user (without full key values).",
 )
-async def list_api_keys(user: Dict = Depends(get_current_user(db.pool))) -> List[APIKeyResponse]:
+async def list_api_keys(user: Dict = Depends(get_current_user_from_request)) -> List[APIKeyResponse]:
     """
     List all API keys for the current user.
 
@@ -192,7 +189,7 @@ async def list_api_keys(user: Dict = Depends(get_current_user(db.pool))) -> List
 )
 async def delete_api_key(
     key_id: int,
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ):
     """
     Revoke (deactivate) an API key.

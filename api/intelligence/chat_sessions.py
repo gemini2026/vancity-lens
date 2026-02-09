@@ -12,7 +12,7 @@ Provides functions to:
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 from uuid import UUID
 
 import asyncpg

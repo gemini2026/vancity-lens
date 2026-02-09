@@ -1,531 +1,339 @@
 """
 VCL-76 [DATA-003] Scraper Deduplication Logic
-Deduplicates documents across multiple scrapers using content hashing,
-URL matching, and fuzzy similarity detection.
+
+In-memory deduplication engine for scraped documents. Supports multiple
+detection strategies:
+
+- URL_EXACT: Exact normalized URL match
+- CONTENT_HASH: SHA-256 of normalized content
+- URL_AND_DATE: URL + publication date combination
+- TITLE_SIMILARITY: Fuzzy title matching via SequenceMatcher (>0.9 threshold)
 
 Key components:
-- ContentHasher: SHA-256 fingerprinting of normalized text
-- TextNormalizer: Whitespace/punctuation/case normalization
-- DuplicateDetector: Core deduplication engine with 4 detection methods
-- SimHash: Locality-sensitive hashing for fast near-duplicate detection
-- deduplicate_document: Main entry point for dedupe workflow
+- DedupStrategy: Enum of available dedup strategies
+- DedupResult: Result of a single dedup check
+- DedupStats: Aggregate statistics for a batch run
+- DedupEngine: Core deduplication engine with register/check/batch workflow
 """
 
 import hashlib
-import re
 import logging
+from dataclasses import dataclass
+from difflib import SequenceMatcher
 from enum import Enum
-from typing import Optional, List, Tuple, Dict, Any
-import asyncpg
+from typing import Optional
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
-
-class DeduplicationResult(Enum):
-    """Deduplication result types."""
-    NEW = "new"
-    EXACT_DUPLICATE = "exact_duplicate"
-    NEAR_DUPLICATE = "near_duplicate"
-    UPDATED = "updated"
-
-
-class TextNormalizer:
-    """Normalize text for consistent comparison."""
-
-    @staticmethod
-    def normalize(text: str) -> str:
-        """
-        Normalize text by:
-        - Converting to lowercase
-        - Removing punctuation
-        - Normalizing whitespace
-        - Removing common HTML entities
-
-        Args:
-            text: Raw text to normalize
-
-        Returns:
-            Normalized text
-        """
-        if not text:
-            return ""
-
-        # Convert to lowercase
-        text = text.lower()
-
-        # Remove HTML entities and special characters
-        text = text.replace("&nbsp;", " ")
-        text = text.replace("&amp;", "&")
-        text = text.replace("&lt;", "<")
-        text = text.replace("&gt;", ">")
-        text = text.replace("&quot;", '"')
-        text = text.replace("&#39;", "'")
-
-        # Remove URLs
-        text = re.sub(r'http[s]?://\S+', '', text)
-
-        # Remove email addresses
-        text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '', text)
-
-        # Remove punctuation and symbols, keep alphanumeric and whitespace
-        text = re.sub(r'[^\w\s]', '', text)
-
-        # Normalize whitespace: replace multiple spaces/newlines with single space
-        text = re.sub(r'\s+', ' ', text)
-
-        # Strip leading/trailing whitespace
-        text = text.strip()
-
-        return text
+# Tracking query parameters to strip during URL normalization
+_TRACKING_PARAMS = frozenset([
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "ref",
+    "fbclid",
+    "gclid",
+    "mc_cid",
+    "mc_eid",
+])
 
 
-class ContentHasher:
-    """Generate content fingerprints using SHA-256."""
+class DedupStrategy(str, Enum):
+    """Available deduplication strategies."""
 
-    @staticmethod
-    def hash_content(text: str) -> str:
-        """
-        Generate SHA-256 hash of normalized text.
-
-        Args:
-            text: Raw text to hash
-
-        Returns:
-            Hexadecimal SHA-256 hash string
-        """
-        if not text:
-            return hashlib.sha256(b"").hexdigest()
-
-        normalized = TextNormalizer.normalize(text)
-        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
-
-    @staticmethod
-    def hash_title_and_text(title: Optional[str], text: str) -> str:
-        """
-        Generate combined hash of title and text (for strict matching).
-
-        Args:
-            title: Document title
-            text: Document text
-
-        Returns:
-            Hexadecimal SHA-256 hash string
-        """
-        combined = f"{title or ''}\n{text}"
-        normalized = TextNormalizer.normalize(combined)
-        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+    URL_EXACT = "url_exact"              # Exact URL match (after normalization)
+    CONTENT_HASH = "content_hash"        # SHA-256 of normalized content
+    URL_AND_DATE = "url_and_date"        # URL + publication date combo
+    TITLE_SIMILARITY = "title_similarity"  # Fuzzy title matching (>0.9 similarity)
 
 
-class SimHash:
-    """Locality-sensitive hash for fast approximate duplicate detection.
+@dataclass
+class DedupResult:
+    """Result of a deduplication check for a single document."""
 
-    Uses 64-bit simhash based on token shingles.
-    Simhash allows distance-based similarity (Hamming distance).
+    is_duplicate: bool
+    strategy_matched: Optional[str] = None
+    existing_id: Optional[str] = None
+    content_hash: str = ""
+
+
+@dataclass
+class DedupStats:
+    """Aggregate statistics for a deduplication batch run."""
+
+    total_processed: int = 0
+    new_items: int = 0
+    duplicates_skipped: int = 0
+    duplicates_updated: int = 0
+    errors: int = 0
+
+    def summary(self) -> str:
+        """Human-readable one-line summary."""
+        return (
+            f"{self.new_items} new, "
+            f"{self.duplicates_skipped} duplicates skipped, "
+            f"{self.duplicates_updated} updated, "
+            f"{self.errors} errors"
+        )
+
+
+class DedupEngine:
+    """In-memory deduplication engine for scraped documents.
+
+    Maintains dictionaries of seen URLs, content hashes, URL+date combos,
+    and titles to detect duplicates across multiple check strategies.
+
+    Usage::
+
+        engine = DedupEngine()
+
+        # Single-item workflow
+        result = engine.check_duplicate(url="https://example.com/doc", content="...")
+        if not result.is_duplicate:
+            engine.register(doc_id="doc-1", url="https://example.com/doc", content="...")
+
+        # Batch workflow
+        new_items, stats = engine.process_batch(items)
     """
 
-    @staticmethod
-    def _hash_token(token: str) -> int:
-        """Hash a single token to a 64-bit integer."""
-        h = hashlib.md5(token.encode('utf-8')).digest()
-        return int.from_bytes(h[:8], byteorder='big')
+    def __init__(self, title_similarity_threshold: float = 0.9):
+        self._seen_urls: dict[str, str] = {}           # normalized_url -> doc_id
+        self._seen_hashes: dict[str, str] = {}          # content_hash -> doc_id
+        self._seen_url_dates: dict[str, str] = {}       # "url|date" -> doc_id
+        self._seen_titles: list[tuple[str, str]] = []   # [(title, doc_id), ...]
+        self._title_threshold = title_similarity_threshold
+        self._stats = DedupStats()
+
+    # ------------------------------------------------------------------
+    # Static helpers
+    # ------------------------------------------------------------------
 
     @staticmethod
-    def compute(text: str, shingle_size: int = 4) -> int:
-        """
-        Compute simhash fingerprint for text.
-
-        Uses shingle-based approach:
-        1. Generate k-grams (shingles) of tokens
-        2. Hash each shingle
-        3. Compute bit vectors and aggregate
-
-        Args:
-            text: Text to hash
-            shingle_size: Token shingle size (default 4)
-
-        Returns:
-            64-bit simhash integer
-        """
-        if not text:
-            return 0
-
-        normalized = TextNormalizer.normalize(text)
-        tokens = normalized.split()
-
-        if len(tokens) < shingle_size:
-            tokens = tokens + [''] * (shingle_size - len(tokens))
-
-        # Create token shingles
-        shingles = []
-        for i in range(len(tokens) - shingle_size + 1):
-            shingle = ' '.join(tokens[i:i + shingle_size])
-            shingles.append(shingle)
-
-        if not shingles:
-            return 0
-
-        # Compute bit vector aggregation
-        bit_vector = [0] * 64
-        for shingle in shingles:
-            h = SimHash._hash_token(shingle)
-            for i in range(64):
-                if (h >> i) & 1:
-                    bit_vector[i] += 1
-
-        # Create simhash: bits with more votes become 1
-        simhash = 0
-        for i in range(64):
-            if bit_vector[i] > len(shingles) / 2:
-                simhash |= (1 << i)
-
-        return simhash
+    def compute_content_hash(content: str) -> str:
+        """SHA-256 hash of normalized (stripped + lowercased) content."""
+        normalized = content.strip().lower()
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def hamming_distance(hash1: int, hash2: int) -> int:
+    def normalize_url(url: str) -> str:
+        """Normalize a URL for comparison.
+
+        - Strip whitespace and trailing slash
+        - Remove common tracking / analytics query parameters
+        - Sort remaining query parameters for deterministic comparison
+        - Lowercase the scheme and netloc
         """
-        Calculate Hamming distance between two simhashes.
+        url = url.strip().rstrip("/")
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
 
-        Args:
-            hash1: First simhash
-            hash2: Second simhash
+        # Remove tracking params
+        for param in _TRACKING_PARAMS:
+            params.pop(param, None)
 
-        Returns:
-            Hamming distance (0-64)
-        """
-        xor = hash1 ^ hash2
-        distance = 0
-        while xor:
-            distance += xor & 1
-            xor >>= 1
-        return distance
-
-    @staticmethod
-    def similarity(hash1: int, hash2: int) -> float:
-        """
-        Calculate similarity score (0-1) between two simhashes.
-
-        Args:
-            hash1: First simhash
-            hash2: Second simhash
-
-        Returns:
-            Similarity score (1.0 = identical, 0.0 = completely different)
-        """
-        if hash1 == hash2:
-            return 1.0
-        distance = SimHash.hamming_distance(hash1, hash2)
-        return 1.0 - (distance / 64.0)
-
-
-class DuplicateDetector:
-    """Core deduplication detector using multiple strategies."""
-
-    @staticmethod
-    async def check_url_exists(db_pool: asyncpg.Pool, url: str) -> bool:
-        """
-        Check if URL already exists in documents table.
-
-        Args:
-            db_pool: asyncpg connection pool
-            url: Source URL to check
-
-        Returns:
-            True if URL exists, False otherwise
-        """
-        try:
-            async with db_pool.acquire() as conn:
-                result = await conn.fetchval(
-                    """
-                    SELECT id FROM documents WHERE source_url = $1 LIMIT 1
-                    """,
-                    url
-                )
-                return result is not None
-        except Exception as e:
-            logger.error(f"Error checking URL existence: {e}")
-            return False
-
-    @staticmethod
-    async def check_content_hash(db_pool: asyncpg.Pool, content_hash: str) -> Optional[int]:
-        """
-        Check if content hash exists and return existing document ID.
-
-        Args:
-            db_pool: asyncpg connection pool
-            content_hash: SHA-256 hash of normalized content
-
-        Returns:
-            Existing document ID if found, None otherwise
-        """
-        try:
-            async with db_pool.acquire() as conn:
-                result = await conn.fetchval(
-                    """
-                    SELECT id FROM documents WHERE content_hash = $1 LIMIT 1
-                    """,
-                    content_hash
-                )
-                return result
-        except Exception as e:
-            logger.error(f"Error checking content hash: {e}")
-            return None
-
-    @staticmethod
-    async def find_near_duplicates(
-        db_pool: asyncpg.Pool,
-        text: str,
-        threshold: float = 0.85
-    ) -> List[Tuple[int, float]]:
-        """
-        Find documents with similar content using PostgreSQL trigram similarity.
-
-        Requires pg_trgm extension (added in migration 011).
-        Uses normalized title and text for fuzzy matching.
-
-        Args:
-            db_pool: asyncpg connection pool
-            text: Text to compare
-            threshold: Similarity threshold (0.0-1.0), default 0.85
-
-        Returns:
-            List of (doc_id, similarity_score) tuples sorted by similarity desc
-        """
-        try:
-            # Extract first 200 chars as representative text
-            normalized = TextNormalizer.normalize(text)
-            search_text = normalized[:200] if normalized else ""
-
-            if not search_text:
-                return []
-
-            async with db_pool.acquire() as conn:
-                results = await conn.fetch(
-                    """
-                    SELECT id, similarity(%s, COALESCE(title, '') || ' ' || COALESCE(raw_text, '')) as sim
-                    FROM documents
-                    WHERE similarity(%s, COALESCE(title, '') || ' ' || COALESCE(raw_text, '')) > %s
-                    ORDER BY sim DESC
-                    LIMIT 10
-                    """,
-                    search_text,
-                    search_text,
-                    threshold
-                )
-                return [(row['id'], float(row['sim'])) for row in results]
-        except Exception as e:
-            logger.error(f"Error finding near duplicates: {e}")
-            return []
-
-    @staticmethod
-    async def get_existing_doc_by_url(
-        db_pool: asyncpg.Pool,
-        url: str
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Fetch existing document by URL.
-
-        Args:
-            db_pool: asyncpg connection pool
-            url: Source URL
-
-        Returns:
-            Document dict or None if not found
-        """
-        try:
-            async with db_pool.acquire() as conn:
-                doc = await conn.fetchrow(
-                    """
-                    SELECT id, source_url, raw_text, content_hash, simhash, processed_at
-                    FROM documents WHERE source_url = $1 LIMIT 1
-                    """,
-                    url
-                )
-                return dict(doc) if doc else None
-        except Exception as e:
-            logger.error(f"Error fetching document by URL: {e}")
-            return None
-
-
-async def deduplicate_document(
-    db_pool: asyncpg.Pool,
-    source_url: str,
-    raw_text: str,
-    metadata: Optional[Dict[str, Any]] = None,
-    title: Optional[str] = None
-) -> DeduplicationResult:
-    """
-    Main deduplication workflow.
-
-    Checks in order:
-    1. Exact URL match -> EXACT_DUPLICATE
-    2. Content hash match -> EXACT_DUPLICATE
-    3. Fuzzy text match (>85% similarity) -> NEAR_DUPLICATE
-    4. No match -> NEW
-    5. URL exists but content changed -> UPDATED
-
-    Args:
-        db_pool: asyncpg connection pool
-        source_url: URL of document to check
-        raw_text: Full text content
-        metadata: Optional metadata dict
-        title: Optional document title
-
-    Returns:
-        DeduplicationResult enum value
-    """
-    if not raw_text or not raw_text.strip():
-        logger.warning("Empty raw_text provided for deduplication")
-        return DeduplicationResult.NEW
-
-    # Step 1: Check exact URL match
-    url_exists = await DuplicateDetector.check_url_exists(db_pool, source_url)
-    if url_exists:
-        existing_doc = await DuplicateDetector.get_existing_doc_by_url(db_pool, source_url)
-        if existing_doc:
-            # Check if content changed
-            existing_hash = existing_doc.get('content_hash')
-            new_hash = ContentHasher.hash_content(raw_text)
-
-            if existing_hash == new_hash:
-                logger.info(f"URL {source_url}: exact URL + content match")
-                return DeduplicationResult.EXACT_DUPLICATE
-
-            # Content changed, mark for re-processing
-            logger.info(f"URL {source_url}: content changed since last scrape")
-            return DeduplicationResult.UPDATED
-
-        logger.info(f"URL {source_url}: exact URL match found")
-        return DeduplicationResult.EXACT_DUPLICATE
-
-    # Step 2: Check content hash match
-    content_hash = ContentHasher.hash_content(raw_text)
-    existing_id = await DuplicateDetector.check_content_hash(db_pool, content_hash)
-    if existing_id:
-        logger.info(f"Content hash match: duplicate of document {existing_id}")
-        return DeduplicationResult.EXACT_DUPLICATE
-
-    # Step 3: Check fuzzy text match (trigram similarity)
-    near_dupes = await DuplicateDetector.find_near_duplicates(db_pool, raw_text, threshold=0.85)
-    if near_dupes:
-        best_match_id, similarity = near_dupes[0]
-        logger.info(f"Near duplicate found: doc {best_match_id} with similarity {similarity:.2f}")
-        return DeduplicationResult.NEAR_DUPLICATE
-
-    # Step 4: New document
-    logger.info(f"No duplicates found for {source_url}: new document")
-    return DeduplicationResult.NEW
-
-
-async def should_scrape(db_pool: asyncpg.Pool, url: str) -> bool:
-    """
-    Determine if a URL should be scraped based on dedup status.
-
-    Returns True for NEW or UPDATED documents, False for duplicates.
-
-    Args:
-        db_pool: asyncpg connection pool
-        url: URL to check
-
-    Returns:
-        True if URL should be scraped, False otherwise
-    """
-    url_exists = await DuplicateDetector.check_url_exists(db_pool, url)
-    return not url_exists
-
-
-async def mark_scraped(db_pool: asyncpg.Pool, doc_id: int) -> None:
-    """
-    Update document's scraped_at timestamp.
-
-    Args:
-        db_pool: asyncpg connection pool
-        doc_id: Document ID to update
-    """
-    try:
-        async with db_pool.acquire() as conn:
-            await conn.execute(
-                """
-                UPDATE documents SET scraped_at = now() WHERE id = $1
-                """,
-                doc_id
+        clean_query = urlencode(sorted(params.items()), doseq=True)
+        normalized = urlunparse(
+            parsed._replace(
+                scheme=parsed.scheme.lower(),
+                netloc=parsed.netloc.lower(),
+                query=clean_query,
             )
-            logger.debug(f"Marked document {doc_id} as scraped")
-    except Exception as e:
-        logger.error(f"Error marking document {doc_id} as scraped: {e}")
+        )
+        return normalized
 
+    @staticmethod
+    def title_similarity(title_a: str, title_b: str) -> float:
+        """Compute similarity ratio between two titles using SequenceMatcher.
 
-async def get_scrape_history(
-    db_pool: asyncpg.Pool,
-    source_type: str,
-    days: int = 30
-) -> Dict[str, Any]:
-    """
-    Get scraping statistics for a source type over N days.
+        Returns a float in [0.0, 1.0].
+        """
+        if not title_a or not title_b:
+            return 0.0
+        return SequenceMatcher(
+            None,
+            title_a.strip().lower(),
+            title_b.strip().lower(),
+        ).ratio()
 
-    Args:
-        db_pool: asyncpg connection pool
-        source_type: Source type to filter (e.g., 'council_minutes')
-        days: Look back this many days (default 30)
+    # ------------------------------------------------------------------
+    # Core API
+    # ------------------------------------------------------------------
 
-    Returns:
-        Dict with statistics:
-        {
-            'total_documents': int,
-            'new_documents': int,
-            'duplicate_documents': int,
-            'updated_documents': int,
-            'source_type': str,
-            'period_days': int,
-            'documents_per_day': float
-        }
-    """
-    try:
-        async with db_pool.acquire() as conn:
-            # Get counts
-            total_count = await conn.fetchval(
-                """
-                SELECT COUNT(*) FROM documents
-                WHERE source_type = $1
-                AND scraped_at >= now() - interval '1 day' * $2
-                """,
-                source_type,
-                days
-            )
+    def check_duplicate(
+        self,
+        url: str,
+        content: str = "",
+        title: str = "",
+        pub_date: Optional[str] = None,
+        strategies: Optional[list[DedupStrategy]] = None,
+    ) -> DedupResult:
+        """Check whether a document is a duplicate using the given strategies.
 
-            # Count documents not matching duplicates
-            # This is a rough approximation - actual duplicate tracking needs more metadata
-            new_count = await conn.fetchval(
-                """
-                SELECT COUNT(*) FROM documents
-                WHERE source_type = $1
-                AND scraped_at >= now() - interval '1 day' * $2
-                AND processed_at IS NULL
-                """,
-                source_type,
-                days
-            )
+        Strategies are evaluated in order; the first match wins.
 
-            # Calculate rate
-            docs_per_day = total_count / max(days, 1)
+        Args:
+            url: Source URL of the document.
+            content: Full text content (used for CONTENT_HASH strategy).
+            title: Document title (used for TITLE_SIMILARITY strategy).
+            pub_date: Publication date string (used for URL_AND_DATE strategy).
+            strategies: Ordered list of strategies to apply.  Defaults to
+                ``[URL_EXACT, CONTENT_HASH]``.
 
-            return {
-                'total_documents': total_count or 0,
-                'new_documents': new_count or 0,
-                'duplicate_documents': (total_count or 0) - (new_count or 0),
-                'updated_documents': 0,  # Would require explicit tracking
-                'source_type': source_type,
-                'period_days': days,
-                'documents_per_day': round(docs_per_day, 2)
-            }
+        Returns:
+            A ``DedupResult`` indicating whether the document is a duplicate.
+        """
+        if strategies is None:
+            strategies = [DedupStrategy.URL_EXACT, DedupStrategy.CONTENT_HASH]
 
-    except Exception as e:
-        logger.error(f"Error retrieving scrape history: {e}")
-        return {
-            'total_documents': 0,
-            'new_documents': 0,
-            'duplicate_documents': 0,
-            'updated_documents': 0,
-            'source_type': source_type,
-            'period_days': days,
-            'documents_per_day': 0.0
-        }
+        content_hash = self.compute_content_hash(content) if content else ""
+
+        for strategy in strategies:
+            if strategy == DedupStrategy.URL_EXACT:
+                normalized = self.normalize_url(url)
+                if normalized in self._seen_urls:
+                    return DedupResult(
+                        is_duplicate=True,
+                        strategy_matched="url_exact",
+                        existing_id=self._seen_urls[normalized],
+                        content_hash=content_hash,
+                    )
+
+            elif strategy == DedupStrategy.CONTENT_HASH and content_hash:
+                if content_hash in self._seen_hashes:
+                    return DedupResult(
+                        is_duplicate=True,
+                        strategy_matched="content_hash",
+                        existing_id=self._seen_hashes[content_hash],
+                        content_hash=content_hash,
+                    )
+
+            elif strategy == DedupStrategy.URL_AND_DATE and pub_date:
+                key = f"{self.normalize_url(url)}|{pub_date}"
+                if key in self._seen_url_dates:
+                    return DedupResult(
+                        is_duplicate=True,
+                        strategy_matched="url_and_date",
+                        existing_id=self._seen_url_dates[key],
+                        content_hash=content_hash,
+                    )
+
+            elif strategy == DedupStrategy.TITLE_SIMILARITY and title:
+                for seen_title, doc_id in self._seen_titles:
+                    if self.title_similarity(title, seen_title) >= self._title_threshold:
+                        return DedupResult(
+                            is_duplicate=True,
+                            strategy_matched="title_similarity",
+                            existing_id=doc_id,
+                            content_hash=content_hash,
+                        )
+
+        return DedupResult(is_duplicate=False, content_hash=content_hash)
+
+    def register(
+        self,
+        doc_id: str,
+        url: str,
+        content: str = "",
+        title: str = "",
+        pub_date: Optional[str] = None,
+    ) -> None:
+        """Register a document as seen so future checks can detect it.
+
+        Args:
+            doc_id: Unique identifier for this document.
+            url: Source URL.
+            content: Full text content.
+            title: Document title.
+            pub_date: Publication date string.
+        """
+        self._seen_urls[self.normalize_url(url)] = doc_id
+
+        if content:
+            content_hash = self.compute_content_hash(content)
+            self._seen_hashes[content_hash] = doc_id
+
+        if title:
+            self._seen_titles.append((title, doc_id))
+
+        if pub_date:
+            key = f"{self.normalize_url(url)}|{pub_date}"
+            self._seen_url_dates[key] = doc_id
+
+    def process_batch(
+        self,
+        items: list[dict],
+        strategies: Optional[list[DedupStrategy]] = None,
+    ) -> tuple[list[dict], DedupStats]:
+        """Process a batch of scraped items, returning only new (non-duplicate) ones.
+
+        Each item dict should contain at least ``url``; optionally ``content``,
+        ``title``, ``pub_date``, and ``id``.
+
+        Args:
+            items: List of scraped item dicts.
+            strategies: Dedup strategies to apply (defaults to URL_EXACT + CONTENT_HASH).
+
+        Returns:
+            Tuple of (new_items_list, stats).
+        """
+        stats = DedupStats(total_processed=len(items))
+        new_items: list[dict] = []
+
+        for item in items:
+            try:
+                result = self.check_duplicate(
+                    url=item.get("url", ""),
+                    content=item.get("content", ""),
+                    title=item.get("title", ""),
+                    pub_date=item.get("pub_date"),
+                    strategies=strategies,
+                )
+
+                if result.is_duplicate:
+                    stats.duplicates_skipped += 1
+                else:
+                    new_items.append(item)
+                    stats.new_items += 1
+                    self.register(
+                        doc_id=item.get("id", item.get("url", "")),
+                        url=item.get("url", ""),
+                        content=item.get("content", ""),
+                        title=item.get("title", ""),
+                        pub_date=item.get("pub_date"),
+                    )
+            except Exception as exc:
+                logger.error("Error processing item %s: %s", item.get("url", "?"), exc)
+                stats.errors += 1
+
+        self._stats = stats
+        return new_items, stats
+
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
+
+    @property
+    def stats(self) -> DedupStats:
+        """Return the most recent batch stats."""
+        return self._stats
+
+    @property
+    def seen_url_count(self) -> int:
+        """Number of distinct URLs registered."""
+        return len(self._seen_urls)
+
+    @property
+    def seen_hash_count(self) -> int:
+        """Number of distinct content hashes registered."""
+        return len(self._seen_hashes)
+
+    def clear(self) -> None:
+        """Reset all internal state."""
+        self._seen_urls.clear()
+        self._seen_hashes.clear()
+        self._seen_url_dates.clear()
+        self._seen_titles.clear()
+        self._stats = DedupStats()

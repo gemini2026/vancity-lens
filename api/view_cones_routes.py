@@ -19,7 +19,6 @@ from .auth import require_admin
 from .view_cones import (
     ViewCone,
     ViewConeImpactSummary,
-    ViewConeIntersection,
     ParcelViewConeStats,
     check_view_cone_intersection,
     load_view_cones_from_geojson,

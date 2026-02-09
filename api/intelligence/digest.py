@@ -9,8 +9,6 @@ This module handles:
 - Digest scheduler for batch processing
 """
 
-import asyncio
-import json
 import logging
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
@@ -165,7 +163,7 @@ class DigestGenerator:
             logger.info(f"Fetched {len(signals)} signals for digest")
 
             # Summarize signals
-            summary = DigestGenerator._summarize_signals(signals)
+            _summary = DigestGenerator._summarize_signals(signals)  # noqa: F841
 
             # Generate highlights (top 5 most impactful)
             highlights = DigestGenerator._generate_highlights(signals)
@@ -494,7 +492,7 @@ class DigestGenerator:
         """
         lines = []
 
-        lines.append(f"VanCity Lens Weekly Digest")
+        lines.append("VanCity Lens Weekly Digest")
         lines.append(f"Period: {stats.period_days} days")
         lines.append("")
 

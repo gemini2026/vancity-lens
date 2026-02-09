@@ -10,7 +10,6 @@ import asyncpg
 
 from .models import (
     DataSource,
-    EntitlementSignal,
     ParcelEntitlementResponse,
     SourceAttribution,
     StationEntitlement,
@@ -19,7 +18,6 @@ from .models import (
 )
 from .validation import compute_validation
 
-import base64
 from datetime import datetime
 
 # ── SQL Queries ──────────────────────────────────────────────

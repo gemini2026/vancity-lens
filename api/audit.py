@@ -23,7 +23,7 @@ import time
 import uuid
 from typing import Optional
 
-from fastapi import Request, Response
+from fastapi import Request
 
 
 def _hash_admin_key_tail(admin_key: Optional[str]) -> str:

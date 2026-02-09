@@ -11,8 +11,7 @@ from api.intelligence.comparable_sales import (
     ComparableSalesService,
     ComparableResult,
     MarketStats,
-    PriceTrend,
-    ComparableSale
+    PriceTrend
 )
 from api.user_auth import get_current_user_from_request
 

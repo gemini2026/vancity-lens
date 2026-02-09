@@ -11,20 +11,19 @@ Endpoints:
 """
 
 import logging
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-import asyncpg
 
 from .scraper_schools import VSBSchoolScraper
-from ...auth import require_admin
-from ...db import db
+from ..auth import require_admin
+from ..db import db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["schools"])
+router = APIRouter(tags=["schools"])
 
 
 # ── Request/Response Models ────────────────────────────────────
@@ -239,7 +238,7 @@ async def get_school_scrape_status() -> Dict[str, Any]:
 # ── Public Endpoints ───────────────────────────────────────────
 
 
-@router.get("/intel/schools/metrics", response_model=SchoolMetricsListResponse)
+@router.get("/schools/metrics", response_model=SchoolMetricsListResponse)
 async def get_all_school_metrics() -> Dict[str, Any]:
     """
     Get school metrics for all neighborhoods.
@@ -308,7 +307,7 @@ async def get_all_school_metrics() -> Dict[str, Any]:
 
 
 @router.get(
-    "/intel/schools/metrics/{neighborhood}",
+    "/schools/metrics/{neighborhood}",
     response_model=SchoolMetricsResponse,
 )
 async def get_neighborhood_school_metrics(neighborhood: str) -> Dict[str, Any]:

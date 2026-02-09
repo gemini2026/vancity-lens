@@ -34,7 +34,6 @@ from .models import (
     ChatResponse,
     SignalResponse,
     SignalFeedResponse,
-    Severity,
     NeighborhoodSummary,
     NeighborhoodScorecard,
     NeighborhoodComparison,
@@ -52,6 +51,9 @@ from .signals import (
 )
 from . import alert_routes
 from . import opportunity_routes
+from . import digest_routes
+from . import pipeline_routes
+from . import scraper_schools_routes
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,15 @@ router.include_router(alert_routes.router)
 
 # Include opportunity routes
 router.include_router(opportunity_routes.router)
+
+# Include digest routes
+router.include_router(digest_routes.router)
+
+# Include pipeline routes
+router.include_router(pipeline_routes.router)
+
+# Include scraper schools routes
+router.include_router(scraper_schools_routes.router)
 
 
 # ── Utility: Get API keys from environment ────────────────────────────

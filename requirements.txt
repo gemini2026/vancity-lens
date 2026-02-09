@@ -26,8 +26,21 @@ feedparser>=6.0.0
 
 # Authentication (VCL-74 / BIZ-001)
 passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<5.0.0
 python-jose[cryptography]>=3.3.0
 pyjwt>=2.8.0
 
 # Payment Integration (VCL-82 / BIZ-003)
 stripe>=5.0.0
+
+# Job Queue (VCL-95 / PERF-015)
+celery>=5.3.0
+
+# Monitoring (VCL-49 / INFRA-007)
+prometheus_client>=0.20.0
+
+# PDF Reports (VCL-94 / BIZ-006)
+fpdf2>=2.7.0
+
+# Redis Cache (VCL-91 / PERF-014)
+redis>=5.0.0

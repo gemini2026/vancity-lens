@@ -9,7 +9,7 @@ Provides REST API for:
 """
 
 import logging
-from typing import Optional, Dict
+from typing import Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -26,7 +26,7 @@ from .opportunity_alerts import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/intel/opportunities", tags=["opportunities"])
+router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
 
 # ────────────────────────────────────────────────────────────────────────────

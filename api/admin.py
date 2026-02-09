@@ -9,16 +9,13 @@ Uses only stdlib (urllib) so no Docker rebuild is needed.
 import asyncio
 import json
 import re
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Request
 
 from .auth import require_admin
-from .audit import audit_log_dependency
 from .db import db
 
 router = APIRouter(
@@ -796,15 +793,15 @@ async def scrape_realtor(
         total_priced = 0
 
     return {
-        "api_approach": api_approach,
+        "api_approach": "RapidAPI",
         "scraped": len(all_listings),
         "matched": matched,
         "total_with_price": total_priced,
         "matches": match_details[:50],
         "errors": errors,
         "sample_listings": [
-            {"address": l.get("address"), "price": l.get("price"), "mls": l.get("mls")}
-            for l in all_listings[:5]
+            {"address": listing.get("address"), "price": listing.get("price"), "mls": listing.get("mls")}
+            for listing in all_listings[:5]
         ],
     }
 

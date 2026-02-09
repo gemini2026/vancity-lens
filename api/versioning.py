@@ -13,10 +13,10 @@ Supports both URL-based (/api/v1/, /api/v2/) and header-based (X-API-Version: 2)
 versioning strategies.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
-from typing import Optional, List
-from fastapi import APIRouter, Request, Response
+from typing import Optional
+from fastapi import APIRouter, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 

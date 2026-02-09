@@ -220,7 +220,7 @@ async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
         """)
 
         # Get actual count instead of hardcoding
-        total = await conn.fetchval("SELECT COUNT(*) FROM neighborhoods")
+        _total = await conn.fetchval("SELECT COUNT(*) FROM neighborhoods")  # noqa: F841
 
         summaries = []
         for i, row in enumerate(rows):

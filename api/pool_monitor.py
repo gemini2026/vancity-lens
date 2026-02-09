@@ -8,7 +8,7 @@ Tracks utilization, timing, errors, and pool exhaustion events.
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 from contextlib import asynccontextmanager
 

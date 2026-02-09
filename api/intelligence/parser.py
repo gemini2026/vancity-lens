@@ -15,7 +15,6 @@ import logging
 import tempfile
 import os
 from io import BytesIO
-from pathlib import Path
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -31,8 +30,8 @@ def _check_docling():
     if _docling_available is not None:
         return _docling_available
     try:
-        from docling.document_converter import DocumentConverter
-        _docling_available = True
+        import importlib.util
+        _docling_available = importlib.util.find_spec("docling") is not None
         logger.info("docling available for document parsing")
     except ImportError:
         _docling_available = False

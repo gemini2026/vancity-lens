@@ -16,7 +16,6 @@ from datetime import date
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-import asyncpg
 
 from ..user_auth import get_current_user_from_request
 from ..db import db
@@ -33,12 +32,12 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(
-    prefix="/api/v1/intel/digests",
+    prefix="/digests",
     tags=["intelligence", "digests"],
 )
 
 admin_router = APIRouter(
-    prefix="/api/v1/admin/digests",
+    prefix="/digests",
     tags=["admin", "digests"],
 )
 
@@ -244,7 +243,7 @@ async def update_subscription(
                 updated_at=row["updated_at"],
             )
 
-        updates.append(f"updated_at = NOW()")
+        updates.append("updated_at = NOW()")
         query = f"UPDATE digest_subscriptions SET {', '.join(updates)} WHERE id = ${param_idx} RETURNING *"
         params.append(subscription_id)
 

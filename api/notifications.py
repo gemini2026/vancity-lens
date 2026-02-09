@@ -17,9 +17,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
@@ -99,7 +99,7 @@ async def get_notifications(
             param_idx += 1
 
         if unread_only:
-            query += f" AND read_at IS NULL"
+            query += " AND read_at IS NULL"
 
         total_query = query.replace("SELECT *", "SELECT COUNT(*)")
         total_count = await conn.fetchval(total_query, *params)

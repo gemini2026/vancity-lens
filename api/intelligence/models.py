@@ -115,14 +115,14 @@ class SignalResponse(BaseModel):
     signal_type: str
     summary: str
     headline: Optional[str] = None
-    addresses: list[str]
+    addresses: list[str] = []
     neighborhood: Optional[str] = None
     decision: Optional[str] = None
     vote_for: Optional[int] = None
     vote_against: Optional[int] = None
-    sentiment: str
-    severity: str
-    confidence: float
+    sentiment: Optional[str] = None
+    severity: str = "info"
+    confidence: float = 0.5
     event_date: Optional[date] = None
     # Source info (joined)
     source_title: Optional[str] = None

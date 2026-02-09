@@ -17,7 +17,7 @@ import os
 import logging
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 logger = logging.getLogger(__name__)
@@ -43,11 +43,10 @@ async def require_admin(
     expected = _get_admin_key()
 
     if not expected:
-        logger.warning(
-            "ADMIN_API_KEY not set — admin endpoints are UNPROTECTED. "
-            "Set ADMIN_API_KEY env var for production."
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ADMIN_API_KEY not configured. Admin access is disabled.",
         )
-        return "dev-mode"
 
     if not api_key:
         raise HTTPException(

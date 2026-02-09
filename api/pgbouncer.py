@@ -12,7 +12,6 @@ Features:
 - get_connection_info(): Return pool utilization metrics
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
@@ -262,7 +261,7 @@ class PgBouncerMonitor:
         start_time = datetime.utcnow()
         try:
             pools = await self.get_pools()
-            stats = await self.get_stats()
+            await self.get_stats()  # validate stats are accessible
 
             total_client_conn = sum(p.client_connections for p in pools)
             total_server_conn = sum(p.server_connections for p in pools)

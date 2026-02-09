@@ -10,7 +10,6 @@ This module handles:
 Search pipeline uses Cohere embeddings + BM25 hybrid search with RRF fusion.
 """
 
-import json
 import asyncio
 import logging
 import uuid

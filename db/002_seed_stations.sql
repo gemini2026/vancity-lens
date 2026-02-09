@@ -47,7 +47,7 @@ REFRESH MATERIALIZED VIEW toa_buffers;
 
 -- Demo Parcel 1: ~150m from Broadway-City Hall (Tier 1, Red Dot)
 INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_height,
-                     lot_area_sqm, assessed_value, asking_price, geom) VALUES
+                     lot_area_sqm, assessed_value, asking_price, geo_local_area, geom) VALUES
     (
         '009-123-456',
         '163 W 8th Ave, Vancouver',
@@ -57,6 +57,7 @@ INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_he
         557.4,
         1890000,
         2195000,
+        'Mount Pleasant',
         ST_SetSRID(ST_GeomFromText(
             'POLYGON((-123.1168 49.2638, -123.1163 49.2638,
                       -123.1163 49.2634, -123.1168 49.2634,
@@ -66,7 +67,7 @@ INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_he
 
 -- Demo Parcel 2: ~350m from station (Tier 2)
 INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_height,
-                     lot_area_sqm, assessed_value, asking_price, geom) VALUES
+                     lot_area_sqm, assessed_value, asking_price, geo_local_area, geom) VALUES
     (
         '010-456-789',
         '2875 Yukon St, Vancouver',
@@ -76,6 +77,7 @@ INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_he
         502.0,
         1650000,
         1850000,
+        'Mount Pleasant',
         ST_SetSRID(ST_GeomFromText(
             'POLYGON((-123.1120 49.2610, -123.1115 49.2610,
                       -123.1115 49.2606, -123.1120 49.2606,
@@ -85,7 +87,7 @@ INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_he
 
 -- Demo Parcel 3: outside all TOA zones (control case)
 INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_height,
-                     lot_area_sqm, assessed_value, asking_price, geom) VALUES
+                     lot_area_sqm, assessed_value, asking_price, geo_local_area, geom) VALUES
     (
         '011-789-012',
         '4567 W 33rd Ave, Vancouver',
@@ -95,6 +97,7 @@ INSERT INTO parcels (pid, civic_address, current_zoning, current_fsr, current_he
         610.0,
         1980000,
         NULL,
+        'Dunbar-Southlands',
         ST_SetSRID(ST_GeomFromText(
             'POLYGON((-123.1800 49.2420, -123.1795 49.2420,
                       -123.1795 49.2416, -123.1800 49.2416,

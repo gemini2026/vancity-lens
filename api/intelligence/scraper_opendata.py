@@ -577,7 +577,7 @@ async def _compute_and_store_scores(db_pool) -> int:
                 written += 1
 
         # Compute and store composite scores
-        hood_names = dict(await conn.fetch("SELECT id, name FROM neighborhoods"))
+        await conn.fetch("SELECT id, name FROM neighborhoods")  # verify neighborhoods exist
         ranked = []
         for hood_id, cat_scores in all_hood_scores.items():
             composite = compute_composite_score(cat_scores, DEFAULT_WEIGHTS)

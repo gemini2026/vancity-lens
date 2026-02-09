@@ -161,11 +161,11 @@ INSERT INTO subscription_tiers (
 (
     'enterprise',
     'Enterprise',
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+    499.99,
+    4999.99,
+    -1,
+    -1,
+    -1,
     '{
         "chat_enabled": true,
         "digest_enabled": true,

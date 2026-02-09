@@ -7,6 +7,7 @@ Grades on BASE case, not bull case. If only the optimistic scenario is profitabl
 that's not a real deal.
 """
 
+import datetime
 from decimal import Decimal
 from typing import Optional
 import asyncpg
@@ -368,6 +369,362 @@ def _calculate_execution_difficulty(
     return min(10, max(1, score)), factors
 
 
+# ── VAL-006 through VAL-011: Standalone Validation Checks ──
+
+
+async def check_non_market_housing_proximity(
+    conn: asyncpg.Connection,
+    pid: str,
+    parcel: asyncpg.Record,
+) -> Optional[RiskFlag]:
+    """
+    VAL-006: Non-Market Housing Proximity Check.
+
+    RED:    NMH directly on parcel — displacement/replacement risk.
+    YELLOW: NMH within 100m — community scrutiny risk.
+    GREEN:  No NMH nearby.
+
+    Uses ST_DWithin with ~100m in SRID 4326 (~0.001 degrees).
+    """
+    try:
+        # Check if NMH is directly on the parcel
+        on_parcel = await conn.fetchrow(
+            "SELECT name FROM non_market_housing "
+            "WHERE ST_Intersects(geom, (SELECT geom FROM parcels WHERE pid = $1)) "
+            "LIMIT 1",
+            pid,
+        )
+        if on_parcel:
+            return RiskFlag(
+                code="VAL006_NMH_ON_PARCEL",
+                severity="red",
+                label="Non-Market Housing On Parcel",
+                detail=f"Community opposition risk: social housing on-site ('{on_parcel['name']}')",
+                cost_impact="$50K-150K per unit displacement risk",
+                verify_url="https://opendata.vancouver.ca/explore/dataset/non-market-housing/map/",
+            )
+
+        # Check within ~100m (0.001 degrees at Vancouver's latitude)
+        nearby = await conn.fetchrow(
+            "SELECT name, "
+            "ST_Distance("
+            "  geom::geography, "
+            "  (SELECT ST_Centroid(geom)::geography FROM parcels WHERE pid = $1)"
+            ") AS distance_m "
+            "FROM non_market_housing "
+            "WHERE ST_DWithin("
+            "  geom, "
+            "  (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1), "
+            "  0.001"
+            ") "
+            "ORDER BY ST_Distance(geom, (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1)) "
+            "LIMIT 1",
+            pid,
+        )
+        if nearby:
+            dist = int(nearby["distance_m"]) if nearby["distance_m"] else 0
+            return RiskFlag(
+                code="VAL006_NMH_NEARBY",
+                severity="yellow",
+                label="Non-Market Housing Nearby",
+                detail=f"Non-market housing within {dist}m — may face community scrutiny",
+                cost_impact="Minimal direct cost",
+                verify_url="https://opendata.vancouver.ca/explore/dataset/non-market-housing/map/",
+            )
+
+        return RiskFlag(
+            code="VAL006_NMH_CLEAR",
+            severity="green",
+            label="No Non-Market Housing Conflict",
+            detail="No non-market housing conflict",
+        )
+    except Exception:
+        return None
+
+
+async def check_cd1_zoning(
+    conn: asyncpg.Connection,
+    pid: str,
+    parcel: asyncpg.Record,
+) -> Optional[RiskFlag]:
+    """
+    VAL-007: CD-1 Zoning Detection.
+
+    RED:   Parcel is in a CD-1 zone — requires manual bylaw review.
+    GREEN: Standard zoning classification.
+    """
+    try:
+        zoning = await conn.fetchrow(
+            "SELECT zoning_classification, zoning_category FROM zoning_districts "
+            "WHERE ST_Intersects(geom, (SELECT geom FROM parcels WHERE pid = $1)) "
+            "LIMIT 1",
+            pid,
+        )
+        if zoning:
+            zc = zoning["zoning_classification"] or ""
+            cat = zoning["zoning_category"] or ""
+            if zc.upper().startswith("CD-1") or cat.upper() == "CD-1":
+                return RiskFlag(
+                    code="VAL007_CD1_ZONING",
+                    severity="red",
+                    label="CD-1 Zoning Detected",
+                    detail="CD-1 zone: site-specific zoning requires manual bylaw review",
+                    cost_impact="$50K-200K rezoning application",
+                    verify_url="https://opendata.vancouver.ca/explore/dataset/zoning-districts-and-labels/map/",
+                )
+
+        return RiskFlag(
+            code="VAL007_STANDARD_ZONING",
+            severity="green",
+            label="Standard Zoning",
+            detail="Standard zoning classification",
+        )
+    except Exception:
+        return None
+
+
+async def check_building_age(
+    conn: asyncpg.Connection,
+    pid: str,
+    parcel: asyncpg.Record,
+) -> Optional[RiskFlag]:
+    """
+    VAL-008: Building Age Assessment.
+
+    RED:    Pre-1940 — heritage-era structure, likely heritage review.
+    YELLOW: Pre-1960 — asbestos remediation likely.
+    YELLOW: Pre-1980 — environmental screening recommended.
+    GREEN:  Post-1980 or no data — modern structure or undeveloped.
+    """
+    try:
+        year_built = parcel["year_built"]
+    except (KeyError, TypeError):
+        year_built = None
+
+    if not year_built:
+        return RiskFlag(
+            code="VAL008_BUILDING_AGE_UNKNOWN",
+            severity="green",
+            label="Building Age Unknown",
+            detail="Modern structure or undeveloped",
+        )
+
+    current_year = datetime.datetime.now().year
+
+    if year_built < 1940:
+        return RiskFlag(
+            code="VAL008_HERITAGE_ERA",
+            severity="red",
+            label=f"Heritage-Era Structure ({year_built})",
+            detail=f"Heritage-era structure (built {year_built}): likely heritage review",
+            cost_impact="$100K-500K+ heritage compliance",
+        )
+    elif year_built < 1960:
+        return RiskFlag(
+            code="VAL008_ASBESTOS_LIKELY",
+            severity="yellow",
+            label=f"Pre-1960 Structure ({year_built})",
+            detail=f"Pre-1960 structure (built {year_built}): asbestos remediation likely",
+            cost_impact="$50K-200K remediation",
+        )
+    elif year_built < 1980:
+        return RiskFlag(
+            code="VAL008_ENVIRO_SCREENING",
+            severity="yellow",
+            label=f"Pre-1980 Structure ({year_built})",
+            detail=f"Pre-1980 structure (built {year_built}): environmental screening recommended",
+            cost_impact="$50K-200K remediation",
+        )
+    else:
+        return RiskFlag(
+            code="VAL008_MODERN",
+            severity="green",
+            label=f"Modern Structure ({year_built})",
+            detail="Modern structure or undeveloped",
+        )
+
+
+async def check_community_opposition_score(
+    conn: asyncpg.Connection,
+    pid: str,
+    parcel: asyncpg.Record,
+) -> Optional[RiskFlag]:
+    """
+    VAL-009: Community Opposition Score (Composite).
+
+    Proximity scoring:
+    - Community gardens within 200m: +2 points
+    - Non-market housing within 200m: +3 points
+    - Protected trees within 50m: count/5, max 3 points
+
+    Score 0-2:  GREEN  — Low opposition risk
+    Score 3-5:  YELLOW — Moderate community sensitivity
+    Score 6+:   RED    — High opposition risk
+    """
+    score = 0
+    factors: list[str] = []
+
+    try:
+        # Community gardens within ~200m (0.002 degrees)
+        garden_count = await conn.fetchval(
+            "SELECT count(*) FROM community_gardens "
+            "WHERE ST_DWithin("
+            "  geom, "
+            "  (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1), "
+            "  0.002"
+            ")",
+            pid,
+        )
+        if garden_count and garden_count > 0:
+            score += 2
+            factors.append(f"{garden_count} community garden(s) within 200m (+2)")
+    except Exception:
+        pass
+
+    try:
+        # Non-market housing within ~200m (0.002 degrees)
+        nmh_count = await conn.fetchval(
+            "SELECT count(*) FROM non_market_housing "
+            "WHERE ST_DWithin("
+            "  geom, "
+            "  (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1), "
+            "  0.002"
+            ")",
+            pid,
+        )
+        if nmh_count and nmh_count > 0:
+            score += 3
+            factors.append(f"{nmh_count} non-market housing site(s) within 200m (+3)")
+    except Exception:
+        pass
+
+    try:
+        # Protected trees within ~50m (0.0005 degrees)
+        tree_count = await conn.fetchval(
+            "SELECT count(*) FROM protected_trees "
+            "WHERE ST_DWithin("
+            "  geom, "
+            "  (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1), "
+            "  0.0005"
+            ")",
+            pid,
+        )
+        if tree_count and tree_count > 0:
+            tree_points = min(3, tree_count // 5)
+            if tree_points > 0:
+                score += tree_points
+                factors.append(f"{tree_count} protected tree(s) within 50m (+{tree_points})")
+    except Exception:
+        pass
+
+    factors_str = "; ".join(factors) if factors else "No community assets nearby"
+
+    if score >= 6:
+        return RiskFlag(
+            code="VAL009_HIGH_OPPOSITION",
+            severity="red",
+            label=f"High Opposition Risk (score {score})",
+            detail=f"High opposition risk — multiple community assets nearby. {factors_str}",
+            cost_impact="6-12 month rezoning delay + legal/consulting costs",
+        )
+    elif score >= 3:
+        return RiskFlag(
+            code="VAL009_MODERATE_OPPOSITION",
+            severity="yellow",
+            label=f"Moderate Community Sensitivity (score {score})",
+            detail=f"Moderate community sensitivity. {factors_str}",
+            cost_impact="3-6 month potential delay",
+        )
+    else:
+        return RiskFlag(
+            code="VAL009_LOW_OPPOSITION",
+            severity="green",
+            label="Low Opposition Risk",
+            detail=f"Low opposition risk. {factors_str}",
+        )
+
+
+async def check_contamination_risk(
+    conn: asyncpg.Connection,
+    pid: str,
+    parcel: asyncpg.Record,
+) -> Optional[RiskFlag]:
+    """
+    VAL-010: Contamination Risk.
+
+    Checks for industrial zoning (contains 'I') or parcels in DTES/Strathcona.
+    Also checks a hypothetical `contaminated_sites` table if it exists.
+
+    YELLOW: Industrial zoning or high-risk neighborhood.
+    GREEN:  No contamination indicators.
+    """
+    # Check current zoning for industrial indicator
+    try:
+        current_zoning = parcel["current_zoning"]
+    except (KeyError, TypeError):
+        current_zoning = None
+
+    # Check geo_local_area for DTES/Strathcona
+    try:
+        geo_local_area = parcel["geo_local_area"]
+    except (KeyError, TypeError):
+        geo_local_area = None
+
+    # Check contaminated_sites table if it exists
+    try:
+        contaminated = await conn.fetchrow(
+            "SELECT site_name FROM contaminated_sites "
+            "WHERE ST_DWithin("
+            "  geom, "
+            "  (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1), "
+            "  0.001"
+            ") LIMIT 1",
+            pid,
+        )
+        if contaminated:
+            site_name = contaminated["site_name"] or "Unknown"
+            return RiskFlag(
+                code="VAL010_CONTAMINATED_SITE",
+                severity="yellow",
+                label=f"Contaminated Site Nearby ({site_name[:30]})",
+                detail=f"Near known contaminated site '{site_name}' — Phase 1 ESA recommended",
+                cost_impact="$50K-500K+ environmental remediation",
+            )
+    except Exception:
+        # Table doesn't exist — fall through to heuristic checks
+        pass
+
+    # Heuristic: industrial zoning
+    if current_zoning and "I" in current_zoning.upper().split("-")[0]:
+        return RiskFlag(
+            code="VAL010_INDUSTRIAL_ZONING",
+            severity="yellow",
+            label="Industrial Zoning — Contamination Risk",
+            detail=f"Industrial zoning ({current_zoning}) — Phase 1 ESA recommended",
+            cost_impact="$50K-500K+ environmental remediation",
+        )
+
+    # Heuristic: DTES / Strathcona neighborhoods (historically industrial)
+    if geo_local_area:
+        area_upper = geo_local_area.upper().strip()
+        high_risk_areas = ["DOWNTOWN EASTSIDE", "DTES", "STRATHCONA"]
+        if any(hra in area_upper for hra in high_risk_areas):
+            return RiskFlag(
+                code="VAL010_HIGH_RISK_AREA",
+                severity="yellow",
+                label=f"Contamination Risk ({geo_local_area})",
+                detail=f"{geo_local_area} area — historically industrial, Phase 1 ESA recommended",
+                cost_impact="$50K-500K+ environmental remediation",
+            )
+
+    return RiskFlag(
+        code="VAL010_CLEAN",
+        severity="green",
+        label="No Contamination Indicators",
+        detail="No contamination indicators detected",
+    )
+
+
 # ── Main Validation Function ────────────────────────────────
 
 async def compute_validation(
@@ -386,7 +743,6 @@ async def compute_validation(
     econ_score = 100   # Economics axis
     friction_score = 0  # Friction axis
     data_points_available = 0
-    data_points_possible = 10
 
     lot_area = parcel["lot_area_sqm"] or Decimal("0")
     asking = parcel["asking_price"]
@@ -469,7 +825,6 @@ async def compute_validation(
     # ── 16. Building age assessment ──
     if year_built:
         data_points_available += 1
-        import datetime
         building_age = datetime.datetime.now().year - year_built
         if building_age < 15:
             risk_flags.append(RiskFlag(
@@ -805,6 +1160,57 @@ async def compute_validation(
         pass
 
     # ══════════════════════════════════════════════════════════
+    # VAL-006 through VAL-010: NEW STANDALONE RISK CHECKS
+    # ══════════════════════════════════════════════════════════
+
+    # ── VAL-006: Non-Market Housing Proximity ──
+    val006_flag = await check_non_market_housing_proximity(conn, pid, parcel)
+    if val006_flag is not None:
+        risk_flags.append(val006_flag)
+        if val006_flag.severity == "red":
+            econ_score -= 15
+            friction_score += 20
+        elif val006_flag.severity == "yellow":
+            friction_score += 5
+
+    # ── VAL-007: CD-1 Zoning Detection ──
+    val007_flag = await check_cd1_zoning(conn, pid, parcel)
+    if val007_flag is not None:
+        risk_flags.append(val007_flag)
+        if val007_flag.severity == "red":
+            econ_score -= 10
+            friction_score += 15
+
+    # ── VAL-008: Building Age Assessment ──
+    val008_flag = await check_building_age(conn, pid, parcel)
+    if val008_flag is not None:
+        risk_flags.append(val008_flag)
+        if val008_flag.severity == "red":
+            econ_score -= 20
+            friction_score += 20
+        elif val008_flag.severity == "yellow":
+            econ_score -= 5
+            friction_score += 10
+
+    # ── VAL-009: Community Opposition Score ──
+    val009_flag = await check_community_opposition_score(conn, pid, parcel)
+    if val009_flag is not None:
+        risk_flags.append(val009_flag)
+        if val009_flag.severity == "red":
+            econ_score -= 10
+            friction_score += 20
+        elif val009_flag.severity == "yellow":
+            friction_score += 10
+
+    # ── VAL-010: Contamination Risk ──
+    val010_flag = await check_contamination_risk(conn, pid, parcel)
+    if val010_flag is not None:
+        risk_flags.append(val010_flag)
+        if val010_flag.severity == "yellow":
+            econ_score -= 10
+            friction_score += 10
+
+    # ══════════════════════════════════════════════════════════
     # STRUCTURAL CHECKS
     # ══════════════════════════════════════════════════════════
 
@@ -938,7 +1344,7 @@ async def compute_validation(
                     code="OVERPRICED", severity="red",
                     label="Overpriced for Development",
                     detail=f"Asking price ({_fmt(asking)}) exceeds developer residual even in bull case ({_fmt(three_scenario.bull.residual_land_value)}). No rational developer would pay this.",
-                    cost_impact=f"Negative alpha across all scenarios",
+                    cost_impact="Negative alpha across all scenarios",
                 ))
                 econ_score -= 20
         elif base_alpha > 1_000_000:

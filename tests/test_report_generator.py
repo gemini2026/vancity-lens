@@ -289,7 +289,7 @@ async def test_report_generator_fetch_parcel_data(mock_db_pool, sample_parcel_da
     assert report.pid == "012-345-678"
     assert report.civic_address == "1234 Main Street"
     assert report.current_zoning == "RM-4"
-    assert report.proposed_zoning == "CD-1"
+    assert report.proposed_zoning is None  # Column not in parcels table
 
 
 # ────────────────────────────────────────────────────────────────────────────

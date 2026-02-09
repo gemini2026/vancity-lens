@@ -117,14 +117,14 @@ def estimate_environmental(
 
     if is_gas_station:
         cost = 500_000
-        return cost, f"Environmental remediation (former gas station/fuel site): Phase 1-3 ESA + UST removal + soil remediation — est. $500K"
+        return cost, "Environmental remediation (former gas station/fuel site): Phase 1-3 ESA + UST removal + soil remediation — est. $500K"
 
     # Dry cleaners — solvent contamination
     is_dry_cleaner = any("DRY CLEAN" in b.upper() or "LAUNDRY PLANT" in b.upper()
                          for b in risk_businesses)
     if is_dry_cleaner:
         cost = 350_000
-        return cost, f"Environmental remediation (former dry cleaner): PERC solvent contamination likely — est. $350K"
+        return cost, "Environmental remediation (former dry cleaner): PERC solvent contamination likely — est. $350K"
 
     # Other industrial — moderate risk
     cost = 200_000

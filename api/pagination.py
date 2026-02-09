@@ -15,7 +15,7 @@ import logging
 import os
 from typing import Generic, Optional, TypeVar, List, Any
 
-from fastapi import Query, HTTPException
+from fastapi import Query
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request

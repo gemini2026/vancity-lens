@@ -17,11 +17,7 @@ from .db import db
 from .report_generator import (
     generate_parcel_report,
     ParcelReport,
-    ProFormaScenario,
-    RiskFlag,
-    ComparableSale,
 )
-from .user_auth import get_current_user_from_request
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +98,7 @@ async def download_parcel_report_pdf(
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=report_{pid}.pdf"},
         )
-    except ValueError as e:
+    except ValueError:
         logger.warning(f"Parcel not found: {pid}")
         raise HTTPException(status_code=404, detail=f"Parcel {pid} not found")
     except Exception as e:

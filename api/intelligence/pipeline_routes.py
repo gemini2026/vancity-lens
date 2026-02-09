@@ -18,23 +18,17 @@ from ..auth import require_admin
 from ..db import db
 from .supply_pipeline import (
     SupplyPipelineTracker,
-    PipelineEntry,
     PipelineEntryCreate,
     PipelineStage,
-    PipelineSummary,
-    NeighborhoodSupply,
-    PipelineStats,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api/v1/intel",
     tags=["intelligence", "supply_pipeline"],
 )
 
 admin_router = APIRouter(
-    prefix="/api/v1/admin",
     tags=["admin", "supply_pipeline"],
     dependencies=[Depends(require_admin)],
 )
@@ -89,6 +83,107 @@ async def list_pipeline(
         raise HTTPException(status_code=500, detail="Failed to list pipeline entries")
 
 
+@router.get("/pipeline/summary", response_model=dict)
+async def get_summary() -> dict:
+    """
+    Get high-level pipeline summary.
+
+    Returns:
+    - total_entries: Total pipeline entries
+    - total_units: Total residential units in pipeline
+    - total_sqft: Total floor space in pipeline
+    - by_stage: Breakdown by pipeline stage
+    - by_neighborhood: Breakdown by neighborhood
+    """
+    try:
+        summary = await SupplyPipelineTracker.get_pipeline_summary(db.pool)
+
+        return {
+            "total_entries": summary.total_entries,
+            "total_units": summary.total_units,
+            "total_sqft": summary.total_sqft,
+            "by_stage": [stage.model_dump() for stage in summary.by_stage],
+            "by_neighborhood": summary.by_neighborhood,
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving pipeline summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline summary")
+
+
+@router.get("/pipeline/stats", response_model=dict)
+async def get_stats(
+    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood")
+) -> dict:
+    """
+    Get detailed pipeline statistics.
+
+    Query Parameters:
+    - neighborhood: Optional filter to specific neighborhood
+
+    Returns:
+    - total_projects: Total count of projects
+    - total_units: Total units in pipeline
+    - total_sqft: Total floor space
+    - average_units_per_project: Mean units per project
+    - average_storeys_per_project: Mean storeys per project
+    - projects_by_stage: Breakdown by pipeline stage
+    - projects_by_neighborhood: Breakdown by neighborhood
+    - near_completion_count: Projects in building_permit or under_construction stages
+    """
+    try:
+        stats = await SupplyPipelineTracker.get_pipeline_stats(
+            db.pool, neighborhood=neighborhood
+        )
+
+        return {
+            "total_projects": stats.total_projects,
+            "total_units": stats.total_units,
+            "total_sqft": stats.total_sqft,
+            "average_units_per_project": stats.average_units_per_project,
+            "average_storeys_per_project": stats.average_storeys_per_project,
+            "projects_by_stage": stats.projects_by_stage,
+            "projects_by_neighborhood": stats.projects_by_neighborhood,
+            "near_completion_count": stats.near_completion_count,
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving pipeline statistics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline statistics")
+
+
+@router.get("/pipeline/neighborhood/{neighborhood}", response_model=dict)
+async def get_neighborhood_supply(neighborhood: str) -> dict:
+    """
+    Get detailed supply analysis for a neighborhood.
+
+    Returns:
+    - neighborhood: Neighborhood name
+    - total_projects: Count of projects
+    - total_units: Total units in pipeline
+    - total_sqft: Total floor space
+    - by_stage: Breakdown by pipeline stage
+    - estimated_completion_range: Projects grouped by completion quarter
+    """
+    try:
+        supply = await SupplyPipelineTracker.get_neighborhood_supply(
+            db.pool, neighborhood
+        )
+
+        return {
+            "neighborhood": supply.neighborhood,
+            "total_projects": supply.total_projects,
+            "total_units": supply.total_units,
+            "total_sqft": supply.total_sqft,
+            "by_stage": supply.by_stage,
+            "estimated_completion_range": supply.estimated_completion_range,
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving neighborhood supply: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve neighborhood supply")
+
+
 @router.get("/pipeline/{pipeline_id}", response_model=dict)
 async def get_pipeline_entry(pipeline_id: int) -> dict:
     """
@@ -138,107 +233,6 @@ async def get_stage_history(pipeline_id: int) -> dict:
     except Exception as e:
         logger.error(f"Error retrieving stage history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve stage history")
-
-
-@router.get("/pipeline/summary", response_model=dict)
-async def get_summary() -> dict:
-    """
-    Get high-level pipeline summary.
-
-    Returns:
-    - total_entries: Total pipeline entries
-    - total_units: Total residential units in pipeline
-    - total_sqft: Total floor space in pipeline
-    - by_stage: Breakdown by pipeline stage
-    - by_neighborhood: Breakdown by neighborhood
-    """
-    try:
-        summary = await SupplyPipelineTracker.get_pipeline_summary(db.pool)
-
-        return {
-            "total_entries": summary.total_entries,
-            "total_units": summary.total_units,
-            "total_sqft": summary.total_sqft,
-            "by_stage": [stage.model_dump() for stage in summary.by_stage],
-            "by_neighborhood": summary.by_neighborhood,
-        }
-
-    except Exception as e:
-        logger.error(f"Error retrieving pipeline summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline summary")
-
-
-@router.get("/pipeline/neighborhood/{neighborhood}", response_model=dict)
-async def get_neighborhood_supply(neighborhood: str) -> dict:
-    """
-    Get detailed supply analysis for a neighborhood.
-
-    Returns:
-    - neighborhood: Neighborhood name
-    - total_projects: Count of projects
-    - total_units: Total units in pipeline
-    - total_sqft: Total floor space
-    - by_stage: Breakdown by pipeline stage
-    - estimated_completion_range: Projects grouped by completion quarter
-    """
-    try:
-        supply = await SupplyPipelineTracker.get_neighborhood_supply(
-            db.pool, neighborhood
-        )
-
-        return {
-            "neighborhood": supply.neighborhood,
-            "total_projects": supply.total_projects,
-            "total_units": supply.total_units,
-            "total_sqft": supply.total_sqft,
-            "by_stage": supply.by_stage,
-            "estimated_completion_range": supply.estimated_completion_range,
-        }
-
-    except Exception as e:
-        logger.error(f"Error retrieving neighborhood supply: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve neighborhood supply")
-
-
-@router.get("/pipeline/stats", response_model=dict)
-async def get_stats(
-    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood")
-) -> dict:
-    """
-    Get detailed pipeline statistics.
-
-    Query Parameters:
-    - neighborhood: Optional filter to specific neighborhood
-
-    Returns:
-    - total_projects: Total count of projects
-    - total_units: Total units in pipeline
-    - total_sqft: Total floor space
-    - average_units_per_project: Mean units per project
-    - average_storeys_per_project: Mean storeys per project
-    - projects_by_stage: Breakdown by pipeline stage
-    - projects_by_neighborhood: Breakdown by neighborhood
-    - near_completion_count: Projects in building_permit or under_construction stages
-    """
-    try:
-        stats = await SupplyPipelineTracker.get_pipeline_stats(
-            db.pool, neighborhood=neighborhood
-        )
-
-        return {
-            "total_projects": stats.total_projects,
-            "total_units": stats.total_units,
-            "total_sqft": stats.total_sqft,
-            "average_units_per_project": stats.average_units_per_project,
-            "average_storeys_per_project": stats.average_storeys_per_project,
-            "projects_by_stage": stats.projects_by_stage,
-            "projects_by_neighborhood": stats.projects_by_neighborhood,
-            "near_completion_count": stats.near_completion_count,
-        }
-
-    except Exception as e:
-        logger.error(f"Error retrieving pipeline statistics: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline statistics")
 
 
 # ════════════════════════════════════════════════════════════════════════════

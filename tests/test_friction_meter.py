@@ -151,8 +151,8 @@ class TestConfidenceStarsComponent:
     def test_size_prop_has_correct_type(self):
         assert '"sm" | "md" | "lg"' in self.content
 
-    def test_default_max_stars_is_five(self):
-        assert "= 5" in self.content
+    def test_default_max_stars_is_three(self):
+        assert "= 3" in self.content
 
     def test_filled_stars_are_gold(self):
         assert 'yellow' in self.content.lower() or '#fbbf24' in self.content or 'yellow-400' in self.content
@@ -486,8 +486,8 @@ class TestDefaultValues:
     def test_friction_default_size_md(self):
         assert 'size = "md"' in self.friction_content or "size='md'" in self.friction_content
 
-    def test_stars_default_max_stars_5(self):
-        assert "= 5" in self.stars_content
+    def test_stars_default_max_stars_3(self):
+        assert "= 3" in self.stars_content
 
     def test_stars_default_size_md(self):
         assert 'size = "md"' in self.stars_content or "size='md'" in self.stars_content

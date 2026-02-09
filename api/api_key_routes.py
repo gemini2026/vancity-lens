@@ -8,13 +8,12 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from pydantic import BaseModel, Field
-import asyncpg
 
 from .api_keys import APIKeyManager, VALID_SCOPES, DEFAULT_RATE_LIMIT
 from .db import db
-from .user_auth import get_current_user
+from .user_auth import get_current_user_from_request
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +139,7 @@ async def get_api_key_user(
 )
 async def create_api_key(
     request: APIKeyCreateRequest,
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ) -> APIKeyCreateResponse:
     """
     Generate a new API key for third-party integrations.
@@ -211,7 +210,7 @@ async def create_api_key(
     summary="List user's API keys",
 )
 async def list_api_keys(
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ) -> List[APIKeyListResponse]:
     """
     List all API keys for the authenticated user.
@@ -243,7 +242,7 @@ async def list_api_keys(
 )
 async def revoke_api_key(
     key_id: int,
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ):
     """Revoke (deactivate) an API key for the authenticated user."""
     success = await APIKeyManager.revoke_api_key(db.pool, key_id, user["id"])
@@ -262,7 +261,7 @@ async def revoke_api_key(
 )
 async def rotate_api_key(
     key_id: int,
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ) -> APIKeyRotateResponse:
     """
     Rotate an API key (create new key, revoke old).
@@ -293,7 +292,7 @@ async def rotate_api_key(
 )
 async def get_api_key_usage(
     key_id: int,
-    user: Dict = Depends(get_current_user(db.pool)),
+    user: Dict = Depends(get_current_user_from_request),
 ) -> APIKeyUsageResponse:
     """
     Get usage statistics for an API key.

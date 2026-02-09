@@ -8,7 +8,6 @@ Provides REST API access to:
 """
 
 import logging
-from typing import Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -26,7 +25,7 @@ from .alerts import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/intel", tags=["alerts"])
+router = APIRouter(tags=["alerts"])
 
 
 # ────────────────────────────────────────────────────────────────────────────

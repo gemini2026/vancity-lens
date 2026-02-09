@@ -85,3 +85,10 @@ async def _connect_wrapper():
 
 # Replace the connect method for transparent operation
 db.connect = _connect_wrapper
+
+
+async def get_db_pool() -> asyncpg.Pool:
+    """Return the database connection pool. Used as a FastAPI dependency."""
+    if db.pool is None:
+        raise RuntimeError("Database not connected. Call connect() first.")
+    return db.pool

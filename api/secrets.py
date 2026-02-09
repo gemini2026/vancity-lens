@@ -19,7 +19,7 @@ Features:
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 from .secrets_config import SECRET_DEFINITIONS, SecretDefinition
 

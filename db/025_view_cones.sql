@@ -3,26 +3,28 @@
 -- Vancouver's 23 protected view corridors from CoV Open Data
 -- Geometry-based parcel validation using PostGIS ST_Intersects
 --
+-- Note: view_cones table base was created in 005_v2_risk_layers.sql
+-- This migration adds additional columns needed by the API layer
+--
 
--- ────────────────────────────────────────────────────────────────────────────
--- View Cones Table
--- ────────────────────────────────────────────────────────────────────────────
+-- Add columns that the API expects (safe if they already exist)
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS name VARCHAR(200);
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS max_height_m NUMERIC(8, 2);
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS max_height_ft NUMERIC(8, 2);
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS source_location VARCHAR(200);
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS target_location VARCHAR(200);
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS cone_type VARCHAR(50) DEFAULT 'protected_view';
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS bylaw_reference VARCHAR(100);
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE view_cones ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
-CREATE TABLE IF NOT EXISTS view_cones (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    description TEXT,
-    max_height_m NUMERIC(8, 2),
-    max_height_ft NUMERIC(8, 2),
-    source_location VARCHAR(200),
-    target_location VARCHAR(200),
-    cone_type VARCHAR(50) DEFAULT 'protected_view',
-    bylaw_reference VARCHAR(100),
-    geom geometry(Polygon, 4326) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Backfill name from view_cone_name if it exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'view_cones' AND column_name = 'view_cone_name') THEN
+        UPDATE view_cones SET name = view_cone_name WHERE name IS NULL AND view_cone_name IS NOT NULL;
+    END IF;
+END $$;
 
 -- GIST index for spatial queries (ST_Intersects, etc.)
 CREATE INDEX IF NOT EXISTS idx_view_cones_geom ON view_cones USING GIST(geom);

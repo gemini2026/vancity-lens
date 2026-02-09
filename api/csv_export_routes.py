@@ -6,10 +6,10 @@ FastAPI endpoints for exporting signals, neighborhood comparisons, and parcels t
 
 import logging
 from datetime import date
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 import asyncpg
 
 from .db import db
@@ -122,8 +122,8 @@ async def export_signals(
         content = csv_buffer.getvalue()
 
         # Return as downloadable CSV
-        return StreamingResponse(
-            iter([content]),
+        return Response(
+            content=content,
             media_type="text/csv",
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
@@ -200,8 +200,8 @@ async def export_neighborhood_comparison(
         content = csv_buffer.getvalue()
 
         # Return as downloadable CSV
-        return StreamingResponse(
-            iter([content]),
+        return Response(
+            content=content,
             media_type="text/csv",
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
@@ -276,8 +276,8 @@ async def export_parcels(
         content = csv_buffer.getvalue()
 
         # Return as downloadable CSV
-        return StreamingResponse(
-            iter([content]),
+        return Response(
+            content=content,
             media_type="text/csv",
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",

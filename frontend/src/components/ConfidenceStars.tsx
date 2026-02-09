@@ -8,7 +8,7 @@ interface ConfidenceStarsProps {
 
 export const ConfidenceStars: React.FC<ConfidenceStarsProps> = ({
   rating,
-  maxStars = 5,
+  maxStars = 3,
   size = "md",
 }) => {
   const clampedRating = Math.min(Math.max(rating, 0), maxStars);

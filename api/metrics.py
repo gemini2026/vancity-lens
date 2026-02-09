@@ -19,8 +19,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Callable, Any, Optional
-from contextlib import asynccontextmanager
+from typing import Callable, Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -29,7 +28,6 @@ from prometheus_client import (
     Histogram,
     Gauge,
     generate_latest,
-    CONTENT_TYPE_LATEST,
 )
 
 logger = logging.getLogger(__name__)
@@ -240,7 +238,7 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status_code = response.status_code
-        except Exception as e:
+        except Exception:
             # Track error
             self.metrics.decrement_active_requests()
             raise

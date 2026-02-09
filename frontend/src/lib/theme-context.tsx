@@ -25,11 +25,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(
     "light"
   );
-  const [isMounted, setIsMounted] = useState(false);
-
   useEffect(() => {
-    setIsMounted(true);
-
     const storedTheme = localStorage.getItem("vancity-theme") as Theme | null;
     if (storedTheme && ["light", "dark", "system"].includes(storedTheme)) {
       setThemeState(storedTheme);
@@ -96,10 +92,6 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({
       htmlElement.classList.remove("dark");
     }
   };
-
-  if (!isMounted) {
-    return <>{children}</>;
-  }
 
   return (
     <ThemeContext.Provider

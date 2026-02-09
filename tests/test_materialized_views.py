@@ -15,6 +15,7 @@ Tests cover:
 
 import asyncio
 import json
+import os
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -33,19 +34,19 @@ class TestMigrationStructure:
     def test_migration_file_exists(self):
         """Verify migration file exists at correct path."""
         import os
-        migration_path = "/sessions/zen-relaxed-lamport/mnt/bill47/db/012_materialized_views.sql"
+        migration_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "012_materialized_views.sql")
         assert os.path.exists(migration_path), "Migration file 012_materialized_views.sql missing"
 
     def test_migration_file_is_readable(self):
         """Verify migration file is readable."""
-        migration_path = "/sessions/zen-relaxed-lamport/mnt/bill47/db/012_materialized_views.sql"
+        migration_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "012_materialized_views.sql")
         with open(migration_path, 'r') as f:
             content = f.read()
         assert len(content) > 0, "Migration file is empty"
 
     def test_migration_contains_required_views(self):
         """Verify migration creates required materialized views."""
-        migration_path = "/sessions/zen-relaxed-lamport/mnt/bill47/db/012_materialized_views.sql"
+        migration_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "012_materialized_views.sql")
         with open(migration_path, 'r') as f:
             content = f.read()
 
@@ -54,7 +55,7 @@ class TestMigrationStructure:
 
     def test_migration_contains_refresh_functions(self):
         """Verify migration creates refresh functions."""
-        migration_path = "/sessions/zen-relaxed-lamport/mnt/bill47/db/012_materialized_views.sql"
+        migration_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "012_materialized_views.sql")
         with open(migration_path, 'r') as f:
             content = f.read()
 
@@ -64,7 +65,7 @@ class TestMigrationStructure:
 
     def test_migration_contains_unique_indexes(self):
         """Verify migration creates unique indexes for REFRESH CONCURRENTLY."""
-        migration_path = "/sessions/zen-relaxed-lamport/mnt/bill47/db/012_materialized_views.sql"
+        migration_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "012_materialized_views.sql")
         with open(migration_path, 'r') as f:
             content = f.read()
 
@@ -74,7 +75,7 @@ class TestMigrationStructure:
 
     def test_migration_contains_audit_table(self):
         """Verify migration creates audit table for refresh tracking."""
-        migration_path = "/sessions/zen-relaxed-lamport/mnt/bill47/db/012_materialized_views.sql"
+        migration_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "db", "012_materialized_views.sql")
         with open(migration_path, 'r') as f:
             content = f.read()
 

@@ -13,7 +13,7 @@ from enum import Enum
 
 import jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import asyncpg
@@ -362,7 +362,7 @@ async def register_user(
         raise ValueError("Password must be at least 8 characters")
 
     password_hash = hash_password(password)
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.utcnow()
 
     try:
         async with db_pool.acquire() as conn:

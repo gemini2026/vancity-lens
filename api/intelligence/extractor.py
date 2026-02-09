@@ -8,8 +8,7 @@ rezoning decisions, permits, and policy changes.
 import asyncio
 import json
 import logging
-import re
-from datetime import datetime, date, timezone
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 from difflib import SequenceMatcher
 
@@ -18,7 +17,7 @@ import anthropic
 import asyncpg
 
 from .external_clients import ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
-from .models import ExtractedSignal, SignalType, Decision, Sentiment, Severity
+from .models import ExtractedSignal
 
 logger = logging.getLogger(__name__)
 

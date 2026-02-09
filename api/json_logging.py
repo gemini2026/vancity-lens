@@ -17,7 +17,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 
 class JsonFormatter(logging.Formatter):
@@ -207,7 +207,7 @@ def setup_json_logging(
     # Log startup info
     logger = logging.getLogger(__name__)
     logger.debug(
-        f"JSON logging configured",
+        "JSON logging configured",
         extra={
             "format": log_format,
             "level": log_level,

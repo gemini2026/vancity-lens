@@ -14,7 +14,6 @@ from .user_auth import get_current_user_from_request
 from .analytics import (
     AnalyticsTracker,
     EventType,
-    AnalyticsEvent,
     UserActivitySummary,
     PlatformMetrics,
     TopItemsResponse,
@@ -140,7 +139,7 @@ async def get_my_activity(
 
 @router.get("/admin/analytics/metrics")
 async def get_platform_metrics(
-    period: str = Query("daily", regex="^(daily|weekly|monthly)$"),
+    period: str = Query("daily", pattern="^(daily|weekly|monthly)$"),
     user: Dict = Depends(get_current_user_from_request),
 ) -> PlatformMetrics:
     """
@@ -290,7 +289,7 @@ async def get_top_signals(
 
 @router.get("/admin/analytics/active-users")
 async def get_active_users(
-    period: str = Query("daily", regex="^(daily|weekly|monthly)$"),
+    period: str = Query("daily", pattern="^(daily|weekly|monthly)$"),
     user: Dict = Depends(get_current_user_from_request),
 ) -> ActiveUsersMetrics:
     """
