@@ -124,6 +124,20 @@ async def compute_entitlement(
         est_value = int(buildable_sqft * price_per_sqft)
         compare_to = parcel["asking_price"] or parcel["assessed_value"] or 0
 
+        # NLA / Unit Count calculations (Phase 2.5)
+        # Avg unit sizes: highrise 700sqft, midrise 900sqft, townhouse 1200sqft
+        # Efficiency ratios: highrise 0.85, midrise 0.88, townhouse 0.92
+        entitled_storeys = best.entitled_storeys
+        if entitled_storeys >= 12:
+            avg_unit_size, efficiency = 700, Decimal("0.85")
+        elif entitled_storeys >= 5:
+            avg_unit_size, efficiency = 900, Decimal("0.88")
+        else:
+            avg_unit_size, efficiency = 1200, Decimal("0.92")
+
+        nla_sqft = int(buildable_sqft * efficiency)
+        estimated_units = max(1, int(buildable_sqft / avg_unit_size))
+
         value_estimate = ValueEstimate(
             lot_area_sqm=lot_sqm,
             entitled_fsr=best.entitled_fsr,
@@ -133,6 +147,8 @@ async def compute_entitlement(
             asking_price=parcel["asking_price"],
             value_delta=est_value - compare_to,
             price_per_sqft_assumption=price_per_sqft,
+            estimated_units=estimated_units,
+            nla_sqft=nla_sqft,
         )
 
     # 5. Build source attribution

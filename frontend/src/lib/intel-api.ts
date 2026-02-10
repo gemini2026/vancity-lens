@@ -1,6 +1,7 @@
 import type {
   ChatResponse,
   SignalFeedResponse,
+  SignalDocument,
   IntelSignal,
   IntelStats,
   SignalType,
@@ -9,6 +10,9 @@ import type {
   NeighborhoodSummary,
   NeighborhoodScorecard,
   NeighborhoodComparison,
+  IngestResult,
+  DocumentView,
+  DocumentStatus,
 } from "./intel-types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -66,6 +70,16 @@ export async function getSignalById(id: string): Promise<IntelSignal> {
   return res.json();
 }
 
+export async function getSignalDocument(
+  signalId: string | number
+): Promise<SignalDocument | null> {
+  const res = await fetch(
+    `${API_BASE}/api/v1/intel/signals/${signalId}/document`
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function getSignalsForParcel(
   pid: string,
   radius?: number
@@ -108,6 +122,37 @@ export async function getNeighborhoodScorecard(slug: string): Promise<Neighborho
 export async function compareNeighborhoods(slugs: string[]): Promise<NeighborhoodComparison | null> {
   const params = new URLSearchParams({ slugs: slugs.join(",") });
   const res = await fetch(`${API_BASE}/api/v1/intel/neighborhoods/compare?${params}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ── RAG-001: Document Viewer API ──────────────────
+
+export async function getDocumentView(documentId: number): Promise<DocumentView | null> {
+  const res = await fetch(`${API_BASE}/api/v1/intel/documents/${documentId}/view`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+// ── URL Ingestion API ─────────────────────────────
+
+export async function ingestUrl(url: string): Promise<IngestResult> {
+  const res = await fetch(`${API_BASE}/api/v1/intel/ingest-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(body.detail || `Ingestion failed: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+// ── RAG-011: Document Processing Status API ────────
+
+export async function getDocumentStatus(documentId: number): Promise<DocumentStatus | null> {
+  const res = await fetch(`${API_BASE}/api/v1/intel/documents/${documentId}/status`);
   if (!res.ok) return null;
   return res.json();
 }

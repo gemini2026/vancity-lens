@@ -150,6 +150,49 @@ async def preview_parcel_report(
         raise HTTPException(status_code=500, detail="Failed to fetch report data")
 
 
+@router.get(
+    "/parcels/{pid}/memo.pdf",
+    responses={200: {"content": {"application/pdf": {}}}},
+    summary="Download investor memo as PDF",
+    description="Generate a professional investor memo with executive summary, investment thesis, entitlement analysis, three-scenario pro forma, risk assessment, and due diligence checklist.",
+)
+async def download_investor_memo_pdf(
+    pid: str,
+    request=None,
+    pool: asyncpg.Pool = Depends(lambda: db.pool),
+) -> StreamingResponse:
+    """Generate and download an investor memo PDF for a parcel."""
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database not connected")
+
+    try:
+        from .report_generator import ReportGenerator
+
+        generator = ReportGenerator()
+        parcel_data = await generator._fetch_parcel_data(pool, pid)
+        if not parcel_data:
+            raise HTTPException(status_code=404, detail=f"Parcel {pid} not found")
+
+        # Generate investor memo (enhanced format)
+        pdf = generator._generate_investor_memo(parcel_data)
+        pdf_bytes = pdf.output()
+        if isinstance(pdf_bytes, str):
+            pdf_bytes = pdf_bytes.encode("utf-8")
+
+        return StreamingResponse(
+            iter([pdf_bytes]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=investor_memo_{pid}.pdf"},
+        )
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Parcel {pid} not found")
+    except Exception as e:
+        logger.exception(f"Error generating investor memo for {pid}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate investor memo")
+
+
 @router.post(
     "/reports/batch",
     summary="Generate reports for multiple parcels",

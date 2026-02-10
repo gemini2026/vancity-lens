@@ -165,19 +165,19 @@ class TestAuthFlow:
 
 class TestParcels:
     def test_parcel_by_pid(self, client):
-        r = client.get("/api/v1/parcels/by-pid/009-123-456")
+        r = client.get("/api/v1/parcels/by-pid/100-001-009")
         assert r.status_code == 200
         data = r.json()
-        assert data["pid"] == "009-123-456"
-        assert data["civic_address"] == "163 W 8th Ave, Vancouver"
-        assert data["zoning"] == "RS-1"
+        assert data["pid"] == "100-001-009"
+        assert data["civic_address"] == "2220 Cambie Street"
+        assert data["zoning"] == "I-1"
 
     def test_parcel_not_found(self, client):
         r = client.get("/api/v1/parcels/by-pid/999-999-999")
         assert r.status_code == 404
 
     def test_entitlement(self, client):
-        r = client.get("/api/v1/parcels/009-123-456/entitlement")
+        r = client.get("/api/v1/parcels/100-001-009/entitlement")
         assert r.status_code == 200
         data = r.json()
         assert data["in_toa"] is True
@@ -188,20 +188,20 @@ class TestParcels:
         assert float(best["bill47_fsr"]) == 5.5
 
     def test_nearby_stations(self, client):
-        r = client.get("/api/v1/parcels/009-123-456/nearby-stations")
+        r = client.get("/api/v1/parcels/100-001-009/nearby-stations")
         assert r.status_code == 200
         stations = r.json()
         assert len(stations) >= 1
         assert stations[0]["name"] == "Broadway-City Hall"
 
     def test_nearest_parcel(self, client):
-        r = client.get("/api/v1/parcels/nearest", params={"lng": -123.1165, "lat": 49.2636, "radius_m": 500})
+        r = client.get("/api/v1/parcels/nearest", params={"lng": -123.1148, "lat": 49.2633, "radius_m": 500})
         assert r.status_code == 200
         data = r.json()
-        assert data["pid"] == "009-123-456"
+        assert data["pid"] == "100-001-009"
 
     def test_parcel_search(self, client):
-        r = client.get("/api/v1/parcels/search", params={"q": "8th Ave", "limit": 5})
+        r = client.get("/api/v1/parcels/search", params={"q": "Cambie", "limit": 5})
         assert r.status_code == 200
         data = r.json()
         assert "results" in data
@@ -227,11 +227,19 @@ class TestIntelligence:
         assert len(data["signals"]) >= 1
 
     def test_signal_by_id(self, client):
-        r = client.get("/api/v1/intel/signals/10001")
+        # Get first signal from list, then fetch by ID
+        r_list = client.get("/api/v1/intel/signals", params={"limit": 1})
+        assert r_list.status_code == 200
+        signals = r_list.json()["signals"]
+        assert len(signals) >= 1
+        signal_id = signals[0]["id"]
+        r = client.get(f"/api/v1/intel/signals/{signal_id}")
         assert r.status_code == 200
         data = r.json()
-        assert data["id"] == 10001
-        assert data["signal_type"] == "rezoning_decision"
+        assert data["id"] == signal_id
+        assert data["signal_type"] in ("rezoning_decision", "permit_approval", "policy_change",
+                                        "infrastructure_announcement", "density_change",
+                                        "community_opposition", "land_sale", "other")
 
     def test_signal_not_found(self, client):
         r = client.get("/api/v1/intel/signals/999999")

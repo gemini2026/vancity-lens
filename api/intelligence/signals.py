@@ -419,6 +419,97 @@ async def get_neighborhoods(
         raise
 
 
+async def get_signal_document(
+    db_pool: asyncpg.Pool,
+    signal_id: int
+) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve a signal's linked document content and extracted details.
+
+    Joins intelligence_signals with documents to return the full source
+    document text alongside the signal's extracted metadata.
+
+    Args:
+        db_pool: AsyncPG connection pool
+        signal_id: ID of the signal
+
+    Returns:
+        Dictionary with document and signal details, or None if not found
+    """
+    try:
+        query = """
+            SELECT
+                isig.id AS signal_id,
+                isig.signal_type,
+                isig.headline,
+                isig.summary,
+                isig.addresses,
+                isig.neighborhood,
+                isig.decision,
+                isig.vote_for,
+                isig.vote_against,
+                isig.sentiment,
+                isig.severity,
+                isig.confidence,
+                isig.event_date,
+                isig.zoning_from,
+                isig.zoning_to,
+                isig.unit_count,
+                d.id AS document_id,
+                d.title AS document_title,
+                d.source_type,
+                d.source_url,
+                d.published_date,
+                d.raw_text,
+                d.url_status,
+                d.archive_url
+            FROM intelligence_signals isig
+            JOIN documents d ON isig.document_id = d.id
+            WHERE isig.id = $1
+        """
+
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(query, signal_id)
+
+        if not row:
+            return None
+
+        return {
+            "signal": {
+                "id": row["signal_id"],
+                "signal_type": row["signal_type"],
+                "headline": row["headline"],
+                "summary": row["summary"],
+                "addresses": row["addresses"] or [],
+                "neighborhood": row["neighborhood"],
+                "decision": row["decision"],
+                "vote_for": row["vote_for"],
+                "vote_against": row["vote_against"],
+                "sentiment": row["sentiment"],
+                "severity": row["severity"],
+                "confidence": float(row["confidence"]),
+                "event_date": str(row["event_date"]) if row["event_date"] else None,
+                "zoning_from": row["zoning_from"],
+                "zoning_to": row["zoning_to"],
+                "unit_count": row["unit_count"],
+            },
+            "document": {
+                "id": row["document_id"],
+                "title": row["document_title"],
+                "source_type": row["source_type"],
+                "source_url": row["source_url"],
+                "published_date": str(row["published_date"]) if row["published_date"] else None,
+                "raw_text": row["raw_text"],
+                "url_status": row["url_status"],
+                "archive_url": row["archive_url"],
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving document for signal {signal_id}: {e}", exc_info=True)
+        raise
+
+
 @cached(ttl=CACHE_TTL_MEDIUM, key_prefix="signals_geojson")
 async def get_signals_geojson(
     db_pool: asyncpg.Pool,

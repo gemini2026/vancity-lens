@@ -42,6 +42,9 @@ from .webhook_routes import router as webhook_router
 from .bulk_analysis_routes import router as bulk_analysis_router
 from .geocoding import router as geocoding_router
 from .tasks.routes import router as jobs_router
+from .share_routes import router as share_router
+from .saved_views_routes import router as saved_views_router
+from .org_routes import router as org_router
 from .rate_limit import rate_limit_general
 from .json_logging import setup_json_logging
 from .versioning import APIVersionMiddleware, get_api_versions
@@ -324,6 +327,9 @@ app.include_router(webhook_router)
 app.include_router(bulk_analysis_router)
 app.include_router(geocoding_router)
 app.include_router(jobs_router)
+app.include_router(share_router)
+app.include_router(saved_views_router)
+app.include_router(org_router)
 
 
 # ── Routes ───────────────────────────────────────────────────
