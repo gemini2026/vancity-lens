@@ -17,6 +17,7 @@ from typing import Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
+from fastapi.responses import HTMLResponse
 
 from ..auth import require_admin
 from ..rate_limit import rate_limit_llm
@@ -40,10 +41,17 @@ from .models import (
     ChatSession,
     ChatSessionList,
     ChatMessageHistory,
+    IngestUrlRequest,
+    IngestUrlResponse,
+    DocumentViewResponse,
+    DocumentStatusResponse,
+    SearchConfigRequest,
+    SearchConfigResponse,
 )
 from .signals import (
     get_signal_feed,
     get_signal_by_id,
+    get_signal_document,
     get_signals_for_parcel,
     get_signal_stats,
     get_neighborhoods,
@@ -79,7 +87,7 @@ router.include_router(scraper_schools_routes.router)
 
 
 def get_anthropic_api_key() -> str:
-    """Get Anthropic API key from environment."""
+    """Get Anthropic API key from environment. Raises 500 if missing."""
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         logger.error("ANTHROPIC_API_KEY not set in environment")
@@ -91,7 +99,7 @@ def get_anthropic_api_key() -> str:
 
 
 def get_cohere_api_key() -> str:
-    """Get Cohere API key from environment for embeddings + reranking."""
+    """Get Cohere API key from environment. Raises 500 if missing."""
     key = os.environ.get("COHERE_API_KEY")
     if not key:
         logger.error("COHERE_API_KEY not set in environment")
@@ -100,6 +108,16 @@ def get_cohere_api_key() -> str:
             detail="COHERE_API_KEY not configured. Please set the environment variable.",
         )
     return key
+
+
+def get_anthropic_api_key_optional() -> Optional[str]:
+    """Get Anthropic API key from environment, or None if not set."""
+    return os.environ.get("ANTHROPIC_API_KEY") or None
+
+
+def get_cohere_api_key_optional() -> Optional[str]:
+    """Get Cohere API key from environment, or None if not set."""
+    return os.environ.get("COHERE_API_KEY") or None
 
 
 def get_db_pool(request: Request) -> asyncpg.Pool:
@@ -132,16 +150,24 @@ async def post_chat(request: Request, chat_request: ChatRequest) -> ChatResponse
     """
     Ask a question about Vancouver development, zoning, or real estate intelligence.
 
-    The system will search relevant documents and signals using hybrid search
-    (dense Cohere embeddings + sparse BM25), then generate a contextual
-    answer with proper citations.
+    Operates in three tiers based on available API keys:
+    - FULL:    Anthropic + Cohere → hybrid search + Claude RAG
+    - PARTIAL: Anthropic only    → sparse (BM25) search + Claude RAG
+    - DEMO:    No keys           → sparse (BM25) search + formatted results
     """
     try:
         db_pool = get_db_pool(request)
-        anthropic_key = get_anthropic_api_key()
-        cohere_key = get_cohere_api_key()
+        anthropic_key = get_anthropic_api_key_optional()
+        cohere_key = get_cohere_api_key_optional()
 
-        logger.info(f"Chat query received: {chat_request.query[:100]}...")
+        # Log operating mode
+        if anthropic_key and cohere_key:
+            mode = "FULL"
+        elif anthropic_key:
+            mode = "PARTIAL"
+        else:
+            mode = "DEMO"
+        logger.info(f"Chat query received ({mode} mode): {chat_request.query[:100]}...")
 
         response = await handle_chat(
             db_pool=db_pool,
@@ -300,6 +326,254 @@ async def get_parcel_signals(
             status_code=500,
             detail=f"Failed to retrieve parcel signals: {str(e)}",
         )
+
+
+@router.get(
+    "/signals/{signal_id}/document",
+    summary="Get signal's source document",
+    description=(
+        "Retrieve the full source document content linked to a signal, "
+        "including the document's raw text and the signal's extracted details."
+    ),
+)
+async def get_signal_document_endpoint(request: Request, signal_id: int):
+    """
+    Get the source document and extracted details for a signal.
+
+    Returns the document title, source type, published date, raw text content,
+    plus the signal's extracted metadata (decision, vote, zoning changes, etc).
+    """
+    try:
+        db_pool = get_db_pool(request)
+
+        result = await get_signal_document(db_pool, signal_id)
+
+        if not result:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Signal {signal_id} not found",
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving document for signal {signal_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve signal document: {str(e)}",
+        )
+
+
+@router.get(
+    "/documents/{document_id}/view",
+    response_model=DocumentViewResponse,
+    summary="RAG-001: View archived document content",
+    description=(
+        "View the cached/archived content of a document. Useful when the original "
+        "source_url is dead or inaccessible. Returns the stored raw_text with "
+        "URL health status and archive fallback link."
+    ),
+)
+async def get_document_view(request: Request, document_id: int) -> DocumentViewResponse:
+    """
+    View archived document content (RAG-001).
+
+    Returns the stored raw_text along with URL health info and archive fallback.
+    """
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, title, source_url, source_type, published_date,
+                       raw_text, text_length, page_count, url_status, archive_url
+                FROM documents WHERE id = $1
+                """,
+                document_id,
+            )
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+
+        return DocumentViewResponse(
+            id=row["id"],
+            title=row["title"],
+            source_url=row["source_url"],
+            source_type=row["source_type"],
+            published_date=row["published_date"],
+            raw_text=row["raw_text"] or "",
+            text_length=row["text_length"] or 0,
+            page_count=row["page_count"] or 0,
+            url_status=row["url_status"],
+            archive_url=row["archive_url"],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error viewing document {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to view document: {str(e)}")
+
+
+@router.get(
+    "/documents/{document_id}/page",
+    response_class=HTMLResponse,
+    summary="Render document as readable HTML page",
+    description="Serves the cached document content as a styled HTML page for demo/viewing.",
+)
+async def get_document_page(request: Request, document_id: int):
+    """Render a document as a standalone HTML page."""
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT d.id, d.title, d.source_url, d.source_type, d.published_date,
+                       d.raw_text, d.url_status, d.archive_url,
+                       (SELECT COUNT(*) FROM intelligence_signals s WHERE s.document_id = d.id) AS signal_count
+                FROM documents d WHERE d.id = $1
+                """,
+                document_id,
+            )
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+
+        import html as html_mod
+
+        title = html_mod.escape(row["title"] or "Untitled Document")
+        source_type = (row["source_type"] or "document").replace("_", " ").title()
+        pub_date = str(row["published_date"]) if row["published_date"] else ""
+        raw_text = html_mod.escape(row["raw_text"] or "No content available.")
+        source_url = html_mod.escape(row["source_url"] or "")
+        url_status = row["url_status"] or "unchecked"
+        signal_count = row["signal_count"] or 0
+
+        # Convert plain text paragraphs to HTML
+        paragraphs = raw_text.split("\n")
+        body_html = "\n".join(f"<p>{p.strip()}</p>" for p in paragraphs if p.strip())
+
+        page_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title} — VanCity Lens</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ font-family: 'Georgia', 'Times New Roman', serif; background: #0f172a; color: #e2e8f0; line-height: 1.8; }}
+  .banner {{ background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-bottom: 1px solid #334155; padding: 12px 0; text-align: center; font-size: 13px; color: #94a3b8; font-family: system-ui, sans-serif; }}
+  .banner a {{ color: #60a5fa; text-decoration: none; font-weight: 600; }}
+  .container {{ max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }}
+  .meta {{ font-family: system-ui, sans-serif; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #334155; }}
+  .badge {{ display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }}
+  .badge-type {{ background: #1e3a5f; color: #93c5fd; }}
+  .badge-signals {{ background: #1a2e1a; color: #86efac; }}
+  .badge-status {{ background: #3b1a1a; color: #fca5a5; }}
+  h1 {{ font-size: 28px; font-weight: 700; color: #f1f5f9; margin: 16px 0 12px; line-height: 1.3; }}
+  .pub-info {{ font-size: 14px; color: #94a3b8; font-family: system-ui, sans-serif; margin-top: 8px; }}
+  .content p {{ margin-bottom: 1.2em; font-size: 17px; color: #cbd5e1; }}
+  .source-box {{ margin-top: 40px; padding: 16px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; font-family: system-ui, sans-serif; font-size: 13px; color: #94a3b8; }}
+  .source-box a {{ color: #60a5fa; word-break: break-all; }}
+  .footer {{ text-align: center; margin-top: 48px; padding-top: 24px; border-top: 1px solid #1e293b; font-size: 12px; color: #475569; font-family: system-ui, sans-serif; }}
+</style>
+</head>
+<body>
+  <div class="banner">Cached document from <a href="/">VanCity Lens</a> intelligence archive</div>
+  <div class="container">
+    <div class="meta">
+      <span class="badge badge-type">{source_type}</span>
+      {"" if not signal_count else f' <span class="badge badge-signals">{signal_count} signal{"s" if signal_count != 1 else ""} extracted</span>'}
+      {f' <span class="badge badge-status">Source offline</span>' if url_status == "dead" else ""}
+      <h1>{title}</h1>
+      <div class="pub-info">
+        {"Published " + pub_date + " &middot; " if pub_date else ""}Document ID {document_id}
+      </div>
+    </div>
+    <div class="content">
+      {body_html}
+    </div>
+    <div class="source-box">
+      <strong>Original source:</strong> {f'<a href="{source_url}" target="_blank" rel="noopener">{source_url}</a>' if url_status != "dead" else f'<span style="color: #64748b; word-break: break-all;">{source_url}</span>'}
+      <br><strong>Status:</strong> {f'Content served from VanCity Lens intelligence archive' if url_status == "dead" else f'<a href="{source_url}" target="_blank" rel="noopener" style="color: #86efac;">Live — visit original source &rarr;</a>'}
+    </div>
+    <div class="footer">VanCity Lens &mdash; Intelligence for Vancouver Real Estate Development</div>
+  </div>
+</body>
+</html>"""
+        return HTMLResponse(content=page_html)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rendering document page {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to render document: {str(e)}")
+
+
+@router.get(
+    "/documents/{document_id}/status",
+    response_model=DocumentStatusResponse,
+    summary="RAG-011: Poll document processing status",
+    description=(
+        "Check the processing status of a document. Use after ingestion to poll "
+        "whether chunking, embedding, and signal extraction have completed."
+    ),
+)
+async def get_document_status(request: Request, document_id: int) -> DocumentStatusResponse:
+    """
+    Poll document processing status (RAG-011).
+
+    Returns the current state: pending (no raw_text), processing (has text but
+    not yet processed), completed (processed_at set), or failed.
+    """
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT d.id, d.title, d.raw_text IS NOT NULL AS has_raw_text,
+                       d.scraped_at, d.processed_at,
+                       (SELECT COUNT(*) FROM document_chunks dc WHERE dc.document_id = d.id) AS chunk_count,
+                       (SELECT COUNT(*) FROM intelligence_signals isig WHERE isig.document_id = d.id) AS signal_count
+                FROM documents d WHERE d.id = $1
+                """,
+                document_id,
+            )
+
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+
+        # Determine status
+        if row["processed_at"]:
+            status = "completed"
+        elif row["has_raw_text"] and row["chunk_count"] > 0:
+            status = "processing"
+        elif row["has_raw_text"]:
+            status = "processing"
+        else:
+            status = "pending"
+
+        return DocumentStatusResponse(
+            document_id=row["id"],
+            title=row["title"],
+            status=status,
+            has_raw_text=row["has_raw_text"],
+            chunk_count=row["chunk_count"],
+            signal_count=row["signal_count"],
+            scraped_at=row["scraped_at"],
+            processed_at=row["processed_at"],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting document status {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get document status: {str(e)}")
 
 
 @router.get(
@@ -709,6 +983,443 @@ async def admin_get_status(request: Request):
             status_code=500,
             detail=f"Failed to get status: {str(e)}",
         )
+
+
+# ── URL Ingestion Endpoints ─────────────────────────────────────────
+
+
+async def _background_ingest_url_process(db_pool: asyncpg.Pool, document_id: int):
+    """Background task: chunk, embed, and extract signals from an ingested URL document."""
+    logger.info(f"Background processing started for ingested document {document_id}")
+    try:
+        cohere_key = os.environ.get("COHERE_API_KEY", "")
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+        from .embeddings import process_document_chunks
+        from .extractor import process_document
+
+        chunks_stored = await process_document_chunks(db_pool, document_id, cohere_key)
+        logger.info(f"Ingested doc {document_id}: {chunks_stored} chunks embedded")
+
+        signals_stored = await process_document(db_pool, document_id, anthropic_key)
+        logger.info(f"Ingested doc {document_id}: {signals_stored} signals extracted")
+    except Exception as e:
+        logger.error(f"Background processing failed for document {document_id}: {e}", exc_info=True)
+
+
+@router.post(
+    "/admin/ingest-url",
+    response_model=IngestUrlResponse,
+    summary="Admin: ingest a document from URL",
+    dependencies=[Depends(require_admin)],
+    description=(
+        "Download a document from an external URL (PDF or HTML), parse it, store it, "
+        "and automatically trigger the full intelligence pipeline (chunk, embed, extract). "
+        "Admin-only. Returns immediately; processing continues in background."
+    ),
+)
+async def admin_ingest_url(
+    request: Request,
+    body: IngestUrlRequest,
+    background_tasks: BackgroundTasks,
+) -> IngestUrlResponse:
+    """
+    Ingest a document from a URL with full pipeline processing.
+
+    Downloads, parses (PDF or HTML), stores in documents table,
+    then runs chunking + embedding + signal extraction in background.
+    Duplicate URLs return the existing document without reprocessing.
+    """
+    try:
+        from .scraper_url import scrape_url
+
+        db_pool = get_db_pool(request)
+
+        result = await scrape_url(
+            db_pool, body.url, source_type=body.source_type, title=body.title
+        )
+
+        processing = False
+        if result["status"] == "new":
+            background_tasks.add_task(
+                _background_ingest_url_process, db_pool, result["document_id"]
+            )
+            processing = True
+
+        return IngestUrlResponse(
+            document_id=result["document_id"],
+            title=result["title"],
+            text_length=result["text_length"],
+            page_count=result["page_count"],
+            status=result["status"],
+            processing=processing,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error ingesting URL: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to ingest URL: {str(e)}",
+        )
+
+
+@router.post(
+    "/ingest-url",
+    response_model=IngestUrlResponse,
+    summary="Ingest a document from URL",
+    dependencies=[Depends(rate_limit_llm)],
+    description=(
+        "Download a document from an external URL (PDF or HTML), parse it, store it, "
+        "and automatically trigger the full intelligence pipeline. "
+        "Rate-limited since it triggers LLM extraction."
+    ),
+)
+async def public_ingest_url(
+    request: Request,
+    body: IngestUrlRequest,
+    background_tasks: BackgroundTasks,
+) -> IngestUrlResponse:
+    """
+    Ingest a document from a URL (public, rate-limited).
+
+    Same as admin endpoint but with LLM rate limiting applied.
+    """
+    try:
+        from .scraper_url import scrape_url
+
+        db_pool = get_db_pool(request)
+
+        result = await scrape_url(
+            db_pool, body.url, source_type=body.source_type, title=body.title
+        )
+
+        processing = False
+        if result["status"] == "new":
+            background_tasks.add_task(
+                _background_ingest_url_process, db_pool, result["document_id"]
+            )
+            processing = True
+
+        return IngestUrlResponse(
+            document_id=result["document_id"],
+            title=result["title"],
+            text_length=result["text_length"],
+            page_count=result["page_count"],
+            status=result["status"],
+            processing=processing,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error ingesting URL: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to ingest URL: {str(e)}",
+        )
+
+
+# ── RAG-002 + RAG-003: URL Health Check Endpoints ──────────────────
+
+
+@router.post(
+    "/admin/url-health-check",
+    summary="Admin: check source URL health",
+    dependencies=[Depends(require_admin)],
+    description=(
+        "Check liveness of document source URLs. Marks dead URLs and auto-generates "
+        "Internet Archive (Wayback Machine) fallback links. Runs in background."
+    ),
+)
+async def admin_url_health_check(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    limit: int = Query(100, ge=1, le=1000, description="Max URLs to check"),
+    recheck_hours: int = Query(24, ge=1, le=720, description="Skip URLs checked within this window"),
+):
+    """Trigger URL health checking for document source URLs."""
+    try:
+        from .url_health import check_document_urls
+
+        db_pool = get_db_pool(request)
+
+        async def _run_health_check(pool, lim, hrs):
+            stats = await check_document_urls(pool, limit=lim, recheck_hours=hrs)
+            logger.info(f"URL health check complete: {stats}")
+
+        background_tasks.add_task(_run_health_check, db_pool, limit, recheck_hours)
+
+        return {
+            "status": "url_health_check_started",
+            "limit": limit,
+            "recheck_hours": recheck_hours,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initiating URL health check: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to start URL health check: {str(e)}")
+
+
+@router.get(
+    "/admin/url-health-stats",
+    summary="Admin: URL health statistics",
+    dependencies=[Depends(require_admin)],
+    description="Get aggregate URL health status across all documents.",
+)
+async def admin_url_health_stats(request: Request):
+    """Get URL health statistics."""
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT url_status, COUNT(*) AS cnt
+                FROM documents
+                GROUP BY url_status
+                ORDER BY cnt DESC
+                """
+            )
+
+        stats = {row["url_status"] or "unchecked": row["cnt"] for row in rows}
+        total = sum(stats.values())
+
+        return {
+            "total_documents": total,
+            "by_status": stats,
+            "dead_count": stats.get("dead", 0),
+            "alive_count": stats.get("alive", 0),
+            "unchecked_count": stats.get("unchecked", 0),
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting URL health stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get URL health stats")
+
+
+# ── RAG-007: Search Configuration Endpoints ────────────────────────
+
+
+@router.get(
+    "/admin/search-config",
+    response_model=SearchConfigResponse,
+    summary="Admin: get search configuration",
+    dependencies=[Depends(require_admin)],
+    description="Get current hybrid search weight configuration.",
+)
+async def admin_get_search_config(request: Request) -> SearchConfigResponse:
+    """Get current search configuration."""
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT vector_weight, text_weight, rrf_k, rerank_enabled, updated_at FROM search_config ORDER BY id DESC LIMIT 1"
+            )
+
+        if not row:
+            return SearchConfigResponse(
+                vector_weight=0.5, text_weight=0.5, rrf_k=60, rerank_enabled=True
+            )
+
+        return SearchConfigResponse(
+            vector_weight=float(row["vector_weight"]),
+            text_weight=float(row["text_weight"]),
+            rrf_k=row["rrf_k"],
+            rerank_enabled=row["rerank_enabled"],
+            updated_at=row["updated_at"],
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting search config: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get search config")
+
+
+@router.post(
+    "/admin/search-config",
+    response_model=SearchConfigResponse,
+    summary="Admin: update search configuration",
+    dependencies=[Depends(require_admin)],
+    description="Update hybrid search weights, RRF k, and reranking toggle.",
+)
+async def admin_update_search_config(
+    request: Request,
+    body: SearchConfigRequest,
+) -> SearchConfigResponse:
+    """Update search configuration."""
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            # Get current config
+            current = await conn.fetchrow(
+                "SELECT vector_weight, text_weight, rrf_k, rerank_enabled FROM search_config ORDER BY id DESC LIMIT 1"
+            )
+
+            vw = body.vector_weight if body.vector_weight is not None else (float(current["vector_weight"]) if current else 0.5)
+            tw = body.text_weight if body.text_weight is not None else (float(current["text_weight"]) if current else 0.5)
+            rk = body.rrf_k if body.rrf_k is not None else (current["rrf_k"] if current else 60)
+            re = body.rerank_enabled if body.rerank_enabled is not None else (current["rerank_enabled"] if current else True)
+
+            row = await conn.fetchrow(
+                """
+                UPDATE search_config
+                SET vector_weight = $1, text_weight = $2, rrf_k = $3,
+                    rerank_enabled = $4, updated_at = NOW(), updated_by = 'admin'
+                WHERE id = (SELECT id FROM search_config ORDER BY id DESC LIMIT 1)
+                RETURNING vector_weight, text_weight, rrf_k, rerank_enabled, updated_at
+                """,
+                vw, tw, rk, re,
+            )
+
+        if not row:
+            raise HTTPException(status_code=500, detail="No search config row to update")
+
+        logger.info(f"Search config updated: vw={vw}, tw={tw}, rrf_k={rk}, rerank={re}")
+
+        return SearchConfigResponse(
+            vector_weight=float(row["vector_weight"]),
+            text_weight=float(row["text_weight"]),
+            rrf_k=row["rrf_k"],
+            rerank_enabled=row["rerank_enabled"],
+            updated_at=row["updated_at"],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating search config: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update search config")
+
+
+# ── RAG-012: Scheduler Admin Endpoints ────────────────────────────
+
+
+@router.get(
+    "/admin/scheduler/status",
+    summary="Admin: get scraper scheduler status",
+    dependencies=[Depends(require_admin)],
+    description="Get status of all registered scrapers including schedule, last/next run, and enabled state.",
+)
+async def admin_scheduler_status(request: Request):
+    """Get scheduler status for all registered scrapers (RAG-012)."""
+    try:
+        from .scheduler import ScraperScheduler
+
+        db_pool = get_db_pool(request)
+        scheduler = ScraperScheduler(db_pool)
+        return scheduler.get_status()
+    except Exception as e:
+        logger.error(f"Error getting scheduler status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get scheduler status")
+
+
+@router.post(
+    "/admin/scheduler/{scraper_name}/trigger",
+    summary="Admin: manually trigger a scraper",
+    dependencies=[Depends(require_admin)],
+    description="Manually trigger a named scraper (council, dpb, rezoning, news, opendata). Runs in background.",
+)
+async def admin_scheduler_trigger(
+    request: Request,
+    scraper_name: str,
+    background_tasks: BackgroundTasks,
+):
+    """Manually trigger a scraper run (RAG-012)."""
+    valid_names = ["council", "dpb", "rezoning", "news", "opendata"]
+    if scraper_name not in valid_names:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown scraper. Must be one of: {', '.join(valid_names)}",
+        )
+
+    try:
+        db_pool = get_db_pool(request)
+
+        background_tasks.add_task(
+            _background_scrape_task, db_pool, scraper_name, 7
+        )
+
+        return {
+            "status": "triggered",
+            "scraper_name": scraper_name,
+        }
+    except Exception as e:
+        logger.error(f"Error triggering scraper {scraper_name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to trigger scraper: {str(e)}")
+
+
+@router.get(
+    "/admin/scheduler/history",
+    summary="Admin: get scraper run history",
+    dependencies=[Depends(require_admin)],
+    description="Get recent scraper run history from the scraper_runs table.",
+)
+async def admin_scheduler_history(
+    request: Request,
+    scraper_name: Optional[str] = Query(None, description="Filter by scraper name"),
+    limit: int = Query(20, ge=1, le=100, description="Number of results"),
+):
+    """Get recent scraper run history (RAG-012)."""
+    try:
+        db_pool = get_db_pool(request)
+
+        async with db_pool.acquire() as conn:
+            if scraper_name:
+                rows = await conn.fetch(
+                    """
+                    SELECT scraper_name, started_at, completed_at, status,
+                           documents_found, documents_new, documents_skipped, errors
+                    FROM scraper_runs
+                    WHERE scraper_name = $1
+                    ORDER BY started_at DESC LIMIT $2
+                    """,
+                    scraper_name, limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT scraper_name, started_at, completed_at, status,
+                           documents_found, documents_new, documents_skipped, errors
+                    FROM scraper_runs
+                    ORDER BY started_at DESC LIMIT $1
+                    """,
+                    limit,
+                )
+
+        import json as json_mod
+        runs = []
+        for row in rows:
+            errors_raw = row["errors"]
+            if isinstance(errors_raw, str):
+                try:
+                    errors_raw = json_mod.loads(errors_raw)
+                except Exception:
+                    errors_raw = [errors_raw] if errors_raw else []
+            runs.append({
+                "scraper_name": row["scraper_name"],
+                "started_at": row["started_at"].isoformat() if row["started_at"] else None,
+                "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
+                "status": row["status"],
+                "documents_found": row["documents_found"],
+                "documents_new": row["documents_new"],
+                "documents_skipped": row["documents_skipped"],
+                "errors": errors_raw or [],
+            })
+
+        return {"runs": runs, "count": len(runs)}
+
+    except Exception as e:
+        logger.error(f"Error getting scheduler history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get scheduler history")
 
 
 @router.post(

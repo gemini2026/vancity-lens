@@ -369,11 +369,15 @@ async def hybrid_search(
     use_rerank: bool = True,
     vector_weight: float = 0.5,
     text_weight: float = 0.5,
+    neighborhood: Optional[str] = None,
+    date_from: Optional[Any] = None,
+    date_to: Optional[Any] = None,
+    signal_type: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Hybrid search: dense (pgvector) + sparse (tsvector) with RRF fusion.
 
-    Stage 1: Parallel vector + full-text retrieval (top 20 each)
+    Stage 1: Parallel vector + full-text retrieval (top 30 each)
     Stage 2: Reciprocal Rank Fusion (k=60)
     Stage 3: Optional Cohere rerank on top candidates
 
@@ -385,6 +389,10 @@ async def hybrid_search(
         use_rerank: Whether to apply Cohere reranking
         vector_weight: RRF weight for vector results (default 0.5)
         text_weight: RRF weight for text results (default 0.5)
+        neighborhood: RAG-008 — pre-filter by neighborhood
+        date_from: RAG-008 — pre-filter documents published on/after this date
+        date_to: RAG-008 — pre-filter documents published on/before this date
+        signal_type: RAG-008 — pre-filter by signal_type (via chunk metadata)
 
     Returns:
         List of result dicts with chunk_text, document_id, score, metadata
@@ -394,16 +402,43 @@ async def hybrid_search(
     query_embedding = await generate_embedding(query_text, api_key, input_type="search_query")
     embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
 
+    # RAG-008: Build optional metadata pre-filter JOIN and WHERE clauses
+    doc_filter_clauses = []
+    extra_params: list = []
+    param_offset = 6  # first 6 params are fixed ($1-$6)
+
+    if neighborhood:
+        param_offset += 1
+        doc_filter_clauses.append(f"d_filt.metadata->>'neighborhood' = ${param_offset} OR EXISTS (SELECT 1 FROM intelligence_signals isig WHERE isig.document_id = dc.document_id AND isig.neighborhood = ${param_offset})")
+        extra_params.append(neighborhood)
+
+    if date_from:
+        param_offset += 1
+        doc_filter_clauses.append(f"d_filt.published_date >= ${param_offset}")
+        extra_params.append(date_from)
+
+    if date_to:
+        param_offset += 1
+        doc_filter_clauses.append(f"d_filt.published_date <= ${param_offset}")
+        extra_params.append(date_to)
+
+    # Build the filter JOIN snippet
+    if doc_filter_clauses:
+        filter_join = "JOIN documents d_filt ON dc.document_id = d_filt.id"
+        filter_where = " AND (" + " AND ".join(f"({c})" for c in doc_filter_clauses) + ")"
+    else:
+        filter_join = ""
+        filter_where = ""
+
     # Step 2: Combined query with RRF fusion
-    # This runs vector search and full-text search in parallel via CTEs,
-    # then fuses results using Reciprocal Rank Fusion
-    rrf_query = """
+    rrf_query = f"""
         WITH vector_search AS (
             SELECT
                 dc.id, dc.chunk_text, dc.document_id, dc.section_header, dc.chunk_index,
                 ROW_NUMBER() OVER (ORDER BY dc.embedding <=> $1::vector) AS vrank
             FROM document_chunks dc
-            WHERE dc.embedding IS NOT NULL
+            {filter_join}
+            WHERE dc.embedding IS NOT NULL{filter_where}
             LIMIT 30
         ),
         text_search AS (
@@ -413,7 +448,8 @@ async def hybrid_search(
                     ORDER BY ts_rank_cd(dc.chunk_tsvector, plainto_tsquery('english', $2)) DESC
                 ) AS trank
             FROM document_chunks dc
-            WHERE dc.chunk_tsvector @@ plainto_tsquery('english', $2)
+            {filter_join}
+            WHERE dc.chunk_tsvector @@ plainto_tsquery('english', $2){filter_where}
             LIMIT 30
         ),
         fused AS (
@@ -450,17 +486,18 @@ async def hybrid_search(
     # Fetch more candidates than needed if we're going to rerank
     fetch_limit = limit * 3 if use_rerank else limit
 
+    all_params = [
+        embedding_str,      # $1: query embedding
+        query_text,          # $2: text query
+        vector_weight,       # $3: vector weight
+        text_weight,         # $4: text weight
+        RRF_K,               # $5: RRF k constant
+        fetch_limit,         # $6: limit
+    ] + extra_params
+
     async with db_pool.acquire() as conn:
         try:
-            rows = await conn.fetch(
-                rrf_query,
-                embedding_str,      # $1: query embedding
-                query_text,          # $2: text query
-                vector_weight,       # $3: vector weight
-                text_weight,         # $4: text weight
-                RRF_K,               # $5: RRF k constant
-                fetch_limit,         # $6: limit
-            )
+            rows = await conn.fetch(rrf_query, *all_params)
         except Exception as e:
             logger.error(f"Hybrid search query failed: {e}")
             raise
@@ -509,6 +546,117 @@ async def hybrid_search(
         r['final_score'] = r['rrf_score']
 
     logger.info(f"Hybrid search: {len(results)} final results (RRF only)")
+    return results
+
+
+# ── Sparse (BM25-only) search ─────────────────────────────────
+
+
+async def sparse_search(
+    db_pool: asyncpg.Pool,
+    query_text: str,
+    limit: int = 10,
+    neighborhood: Optional[str] = None,
+    date_from: Optional[Any] = None,
+    date_to: Optional[Any] = None,
+    signal_type: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    BM25-only text search — no API keys required.
+
+    Uses PostgreSQL tsvector/tsquery full-text search on document_chunks.
+    Returns the same dict format as hybrid_search() for drop-in compatibility.
+
+    Args:
+        db_pool: AsyncPG connection pool
+        query_text: Natural language search query
+        limit: Number of results to return
+        neighborhood: Optional neighborhood filter
+        date_from: Optional start date filter
+        date_to: Optional end date filter
+        signal_type: Optional signal type filter (unused, kept for interface compat)
+
+    Returns:
+        List of result dicts with chunk_text, document_id, score, metadata
+    """
+    logger.info(f"Sparse search (BM25): '{query_text[:80]}...'")
+
+    # Build parameterized query with optional filters
+    params: list = [query_text, limit]
+    filter_clauses: list = []
+    param_idx = 2  # $1=query, $2=limit
+
+    if neighborhood:
+        param_idx += 1
+        filter_clauses.append(
+            f"(d.metadata->>'neighborhood' = ${param_idx} OR EXISTS "
+            f"(SELECT 1 FROM intelligence_signals isig "
+            f"WHERE isig.document_id = dc.document_id AND isig.neighborhood = ${param_idx}))"
+        )
+        params.append(neighborhood)
+
+    if date_from:
+        param_idx += 1
+        filter_clauses.append(f"d.published_date >= ${param_idx}")
+        params.append(date_from)
+
+    if date_to:
+        param_idx += 1
+        filter_clauses.append(f"d.published_date <= ${param_idx}")
+        params.append(date_to)
+
+    extra_where = ""
+    if filter_clauses:
+        extra_where = " AND " + " AND ".join(filter_clauses)
+
+    query = f"""
+        SELECT
+            dc.id AS chunk_id,
+            dc.chunk_text,
+            dc.document_id,
+            dc.section_header,
+            dc.chunk_index,
+            ts_rank_cd(dc.chunk_tsvector, plainto_tsquery('english', $1)) AS text_score,
+            d.title AS document_title,
+            d.source_url,
+            d.source_type,
+            d.published_date
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        WHERE dc.chunk_tsvector @@ plainto_tsquery('english', $1){extra_where}
+        ORDER BY text_score DESC
+        LIMIT $2
+    """
+
+    async with db_pool.acquire() as conn:
+        try:
+            rows = await conn.fetch(query, *params)
+        except Exception as e:
+            logger.error(f"Sparse search query failed: {e}")
+            raise
+
+    if not rows:
+        logger.info("Sparse search returned 0 results")
+        return []
+
+    results = []
+    for row in rows:
+        results.append({
+            "chunk_id": row["chunk_id"],
+            "chunk_text": row["chunk_text"],
+            "document_id": row["document_id"],
+            "section_header": row["section_header"],
+            "chunk_index": row["chunk_index"],
+            "text_score": float(row["text_score"]),
+            "rrf_score": float(row["text_score"]),
+            "final_score": float(row["text_score"]),
+            "document_title": row["document_title"],
+            "source_url": row["source_url"],
+            "source_type": row["source_type"],
+            "published_date": row["published_date"],
+        })
+
+    logger.info(f"Sparse search: {len(results)} results")
     return results
 
 

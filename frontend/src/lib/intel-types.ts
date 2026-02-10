@@ -47,6 +47,11 @@ export interface SourceCitation {
   published_date: string;
   relevance_score: number;
   excerpt: string;
+  // RAG-005: Provenance chain fields
+  document_id?: number;
+  chunk_id?: number;
+  url_status?: string;
+  archive_url?: string;
 }
 
 export interface SignalFeedResponse {
@@ -60,6 +65,7 @@ export interface ChatResponse {
   citations: SourceCitation[];
   related_signals: IntelSignal[];
   session_id: string;
+  mode?: "full" | "partial" | "demo";
 }
 
 export interface IntelStats {
@@ -113,6 +119,74 @@ export interface NeighborhoodScorecard {
 export interface NeighborhoodComparison {
   neighborhoods: NeighborhoodScorecard[];
   categories: MetricCategory[];
+}
+
+/** Signal document response */
+export interface SignalDocument {
+  signal: {
+    id: number;
+    signal_type: string;
+    headline: string;
+    summary: string;
+    addresses: string[];
+    neighborhood: string;
+    decision?: string;
+    vote_for?: number;
+    vote_against?: number;
+    sentiment: string;
+    severity: string;
+    confidence: number;
+    event_date?: string;
+    zoning_from?: string;
+    zoning_to?: string;
+    unit_count?: number;
+  };
+  document: {
+    id: number;
+    title: string;
+    source_type: string;
+    source_url: string;
+    published_date?: string;
+    raw_text: string;
+    url_status?: string | null;
+    archive_url?: string | null;
+  };
+}
+
+/** RAG-001: Archived document viewer */
+export interface DocumentView {
+  id: number;
+  title: string | null;
+  source_url: string;
+  source_type: string;
+  published_date: string | null;
+  raw_text: string;
+  text_length: number;
+  page_count: number;
+  url_status: string | null;
+  archive_url: string | null;
+}
+
+/** URL ingestion result */
+export interface IngestResult {
+  document_id: number;
+  title: string | null;
+  text_length: number;
+  page_count: number;
+  status: "new" | "exists";
+  processing: boolean;
+}
+
+/** RAG-011: Document processing status */
+export interface DocumentStatus {
+  document_id: number;
+  title: string | null;
+  status: "pending" | "processing" | "completed" | "failed";
+  has_raw_text: boolean;
+  chunk_count: number;
+  signal_count: number;
+  scraped_at: string | null;
+  processed_at: string | null;
 }
 
 /** GeoJSON types for map overlay */

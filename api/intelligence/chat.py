@@ -19,10 +19,11 @@ from typing import Optional, List
 import asyncpg
 from anthropic import AsyncAnthropic
 
-from .embeddings import hybrid_search
+from .embeddings import hybrid_search, sparse_search
 from .external_clients import ANTHROPIC_CHAT_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
 from .models import ChatResponse, SourceCitation, SignalResponse
 from .prepared_queries import QueryBuilder
+from .query_planner import is_multi_hop, multi_hop_search
 from .chat_sessions import (
     create_session,
     get_session_history,
@@ -60,8 +61,8 @@ PROHIBITED:
 async def handle_chat(
     db_pool: asyncpg.Pool,
     query: str,
-    anthropic_api_key: str,
-    cohere_api_key: str,
+    anthropic_api_key: Optional[str] = None,
+    cohere_api_key: Optional[str] = None,
     session_id: Optional[str] = None,
     neighborhood_filter: Optional[str] = None,
     date_from: Optional[date] = None,
@@ -70,20 +71,16 @@ async def handle_chat(
     """
     Handle a chat query using RAG (Retrieval-Augmented Generation).
 
-    Pipeline:
-    1. Hybrid search (Cohere dense + BM25 sparse + RRF) for relevant chunks
-    2. Fetch matching intelligence signals
-    3. Build context from chunks and signals
-    4. Call Claude API with system prompt + context + query
-    5. Extract citations from used sources
-    6. Store message in chat_messages table
-    7. Return ChatResponse with answer and citations
+    Operates in three tiers based on available API keys:
+    - FULL:    Anthropic + Cohere → hybrid search + Claude RAG
+    - PARTIAL: Anthropic only    → sparse (BM25) search + Claude RAG
+    - DEMO:    No keys           → sparse (BM25) search + formatted results
 
     Args:
         db_pool: AsyncPG connection pool
         query: User's question
-        anthropic_api_key: Anthropic API key for Claude
-        cohere_api_key: Cohere API key for embeddings + reranking
+        anthropic_api_key: Anthropic API key for Claude (optional)
+        cohere_api_key: Cohere API key for embeddings + reranking (optional)
         session_id: Optional session ID for grouping messages
         neighborhood_filter: Optional neighborhood to filter results
         date_from: Optional start date for document filtering
@@ -92,6 +89,19 @@ async def handle_chat(
     Returns:
         ChatResponse with answer, citations, and related signals
     """
+
+    # Determine search mode
+    has_anthropic = bool(anthropic_api_key)
+    has_cohere = bool(cohere_api_key)
+
+    if has_anthropic and has_cohere:
+        search_mode = "full"
+    elif has_anthropic:
+        search_mode = "partial"
+    else:
+        search_mode = "demo"
+
+    logger.info(f"Chat mode: {search_mode} (anthropic={has_anthropic}, cohere={has_cohere})")
 
     # Create or retrieve session
     if not session_id:
@@ -115,16 +125,40 @@ async def handle_chat(
             # Continue anyway - session may be new
 
     try:
-        # Step 1: Retrieve relevant document chunks via hybrid search
+        # Step 1: Retrieve relevant document chunks
         logger.info(f"Retrieving document chunks for query: {query[:100]}...")
 
-        chunks = await hybrid_search(
-            db_pool,
-            query,
-            cohere_api_key,
-            limit=10,
-            use_rerank=True,
-        )
+        if search_mode == "full":
+            # Full hybrid search with Cohere embeddings + BM25 + reranking
+            if is_multi_hop(query):
+                logger.info("Multi-hop query detected, using decomposed retrieval")
+                chunks = await multi_hop_search(
+                    db_pool,
+                    query,
+                    cohere_api_key,
+                    search_fn=hybrid_search,
+                    limit_per_hop=8,
+                    final_limit=12,
+                    use_rerank=True,
+                )
+            else:
+                chunks = await hybrid_search(
+                    db_pool,
+                    query,
+                    cohere_api_key,
+                    limit=10,
+                    use_rerank=True,
+                )
+        else:
+            # Partial or demo mode: BM25 sparse search only (no API keys)
+            chunks = await sparse_search(
+                db_pool,
+                query,
+                limit=10,
+                neighborhood=neighborhood_filter,
+                date_from=date_from,
+                date_to=date_to,
+            )
 
         # Step 2: Retrieve matching intelligence signals
         logger.info("Retrieving intelligence signals...")
@@ -174,20 +208,23 @@ async def handle_chat(
             logger.warning("No relevant chunks or signals found for query")
             context = "No relevant information found in the knowledge base."
 
-        # Step 4: Build multi-turn context from conversation history
-        logger.info("Building multi-turn context...")
-        history_context = ""
-        try:
-            history_context = await build_context_window(db_pool, session_id, max_messages=10)
-        except Exception as e:
-            logger.warning(f"Could not build context window: {e}")
-            # Continue without history
+        # Step 4: Generate answer based on mode
+        if search_mode == "demo":
+            # Demo mode: format retrieval results without LLM
+            answer = _build_demo_answer(query, chunks, signals)
+        else:
+            # Full or partial mode: call Claude API
+            logger.info("Building multi-turn context...")
+            history_context = ""
+            try:
+                history_context = await build_context_window(db_pool, session_id, max_messages=10)
+            except Exception as e:
+                logger.warning(f"Could not build context window: {e}")
 
-        # Step 5: Call Claude API with system prompt + context + user query
-        logger.info("Calling Claude API...")
-        client = AsyncAnthropic(api_key=anthropic_api_key)
+            logger.info("Calling Claude API...")
+            client = AsyncAnthropic(api_key=anthropic_api_key)
 
-        user_content = f"""Context information:
+            user_content = f"""Context information:
 
 {context}
 
@@ -195,34 +232,55 @@ async def handle_chat(
 
 User query: {query}"""
 
-        messages = [
-            {
-                "role": "user",
-                "content": user_content
-            }
-        ]
+            messages = [
+                {
+                    "role": "user",
+                    "content": user_content
+                }
+            ]
 
-        try:
-            async with ANTHROPIC_SEMAPHORE:
-                response = await asyncio.wait_for(
-                    client.messages.create(
-                        model="claude-sonnet-4-5-20250514",
-                        max_tokens=2000,
-                        system=CHAT_SYSTEM_PROMPT,
-                        messages=messages,
-                    ),
-                    timeout=ANTHROPIC_CHAT_TIMEOUT_SECONDS,
-                )
-        finally:
-            await client.close()
+            try:
+                async with ANTHROPIC_SEMAPHORE:
+                    response = await asyncio.wait_for(
+                        client.messages.create(
+                            model="claude-sonnet-4-5-20250514",
+                            max_tokens=2000,
+                            system=CHAT_SYSTEM_PROMPT,
+                            messages=messages,
+                        ),
+                        timeout=ANTHROPIC_CHAT_TIMEOUT_SECONDS,
+                    )
+            finally:
+                await client.close()
 
-        answer = response.content[0].text
+            answer = response.content[0].text
 
-        # Step 6: Extract citations from used chunks
+        # Step 5: Extract citations from used chunks with provenance (RAG-005)
         citations: List[SourceCitation] = []
+
+        # Batch-fetch url_status and archive_url for cited documents
+        doc_ids = list({c.get('document_id') for c in chunks if c.get('document_id')})
+        url_health_map: dict = {}
+        if doc_ids:
+            try:
+                async with db_pool.acquire() as conn:
+                    health_rows = await conn.fetch(
+                        "SELECT id, url_status, archive_url FROM documents WHERE id = ANY($1)",
+                        doc_ids,
+                    )
+                    for hr in health_rows:
+                        url_health_map[hr["id"]] = {
+                            "url_status": hr["url_status"],
+                            "archive_url": hr["archive_url"],
+                        }
+            except Exception as e:
+                logger.warning(f"Could not fetch URL health for citations: {e}")
+
         for chunk in chunks:
             # Include top chunks as citations (reranking already sorted by relevance)
             score = chunk.get('final_score', chunk.get('rrf_score', 0.0))
+            doc_id = chunk.get('document_id')
+            health = url_health_map.get(doc_id, {})
             citations.append(
                 SourceCitation(
                     document_title=chunk.get('document_title', 'Unknown'),
@@ -230,14 +288,18 @@ User query: {query}"""
                     source_type=chunk.get('source_type', 'unknown'),
                     published_date=chunk.get('published_date'),
                     relevance_score=score,
-                    excerpt=chunk['chunk_text'][:300]
+                    excerpt=chunk['chunk_text'][:300],
+                    document_id=doc_id,
+                    chunk_id=chunk.get('chunk_id'),
+                    url_status=health.get('url_status'),
+                    archive_url=health.get('archive_url'),
                 )
             )
 
         # Limit citations to top 5
         citations = citations[:5]
 
-        # Step 7: Store chat message in database
+        # Step 6: Store chat message in database
         try:
             async with db_pool.acquire() as conn:
                 await conn.execute("""
@@ -269,18 +331,80 @@ User query: {query}"""
             logger.error(f"Failed to store chat message: {e}")
             # Continue anyway - don't fail the response
 
-        # Step 8: Return ChatResponse
-        logger.info(f"Chat response generated with {len(citations)} citations")
+        # Step 7: Return ChatResponse
+        logger.info(f"Chat response generated ({search_mode} mode) with {len(citations)} citations")
         return ChatResponse(
             answer=answer,
             citations=citations,
             related_signals=signals[:5],
-            session_id=session_id
+            session_id=session_id,
+            mode=search_mode,
         )
 
     except Exception as e:
         logger.error(f"Error in handle_chat: {e}", exc_info=True)
         raise
+
+
+def _build_demo_answer(
+    query: str,
+    chunks: List[dict],
+    signals: List[SignalResponse],
+) -> str:
+    """
+    Build a formatted answer from retrieval results without calling an LLM.
+
+    Used in demo mode when no API keys are configured.
+    """
+    parts: List[str] = []
+
+    parts.append(f"**Search results for:** {query}\n")
+
+    if not chunks and not signals:
+        parts.append(
+            "No relevant documents or signals were found for this query. "
+            "Try broadening your search terms or checking that document chunks have been seeded."
+        )
+        parts.append(
+            "\n---\n*This is a retrieval-only result. "
+            "For AI-generated analysis, configure ANTHROPIC_API_KEY.*"
+        )
+        return "\n".join(parts)
+
+    if chunks:
+        parts.append(f"### Top {min(len(chunks), 5)} Document Matches\n")
+        for i, chunk in enumerate(chunks[:5], 1):
+            score = chunk.get("final_score", chunk.get("rrf_score", 0.0))
+            title = chunk.get("document_title", "Unknown Document")
+            section = chunk.get("section_header")
+            excerpt = chunk["chunk_text"][:400]
+            if len(chunk["chunk_text"]) > 400:
+                excerpt += "..."
+
+            parts.append(f"**{i}. {title}** (relevance: {score:.3f})")
+            if section:
+                parts.append(f"   Section: {section}")
+            parts.append(f"   > {excerpt}\n")
+
+    if signals:
+        parts.append(f"### Related Intelligence Signals ({len(signals)})\n")
+        for signal in signals[:5]:
+            headline = signal.headline or signal.summary[:60]
+            parts.append(
+                f"- **{headline}** — {signal.signal_type} | "
+                f"Severity: {signal.severity}"
+            )
+            if signal.decision:
+                parts.append(f"  Decision: {signal.decision}")
+            if signal.neighborhood:
+                parts.append(f"  Neighborhood: {signal.neighborhood}")
+
+    parts.append(
+        "\n---\n*This is a retrieval-only result. "
+        "For AI-generated analysis, configure ANTHROPIC_API_KEY.*"
+    )
+
+    return "\n".join(parts)
 
 
 async def get_relevant_signals(

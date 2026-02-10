@@ -162,6 +162,11 @@ class SourceCitation(BaseModel):
     published_date: Optional[date] = None
     relevance_score: float
     excerpt: str  # the chunk text that was used
+    # RAG-005: Provenance chain fields
+    document_id: Optional[int] = None
+    chunk_id: Optional[int] = None
+    url_status: Optional[str] = None
+    archive_url: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -169,6 +174,7 @@ class ChatResponse(BaseModel):
     citations: list[SourceCitation] = Field(default_factory=list)
     related_signals: list[SignalResponse] = Field(default_factory=list)
     session_id: str
+    mode: str = Field(default="full", description="Operating mode: full, partial, or demo")
 
 
 # ── Feed / Alert models ─────────────────────────────────────
@@ -261,6 +267,70 @@ class MetricIngestion(BaseModel):
     source_name: str
     source_url: Optional[str] = None
     metadata: dict = Field(default_factory=dict)
+
+
+# ── Chat Session Management models ───────────────────────────
+
+# ── URL Ingestion models ──────────────────────────────────────
+
+class DocumentViewResponse(BaseModel):
+    """RAG-001: Archived document viewer response."""
+    id: int
+    title: Optional[str] = None
+    source_url: str
+    source_type: str
+    published_date: Optional[date] = None
+    raw_text: str
+    text_length: int = 0
+    page_count: int = 0
+    url_status: Optional[str] = None
+    archive_url: Optional[str] = None
+
+
+class SearchConfigRequest(BaseModel):
+    """RAG-007: Search configuration update request."""
+    vector_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    text_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    rrf_k: Optional[int] = Field(default=None, ge=1, le=200)
+    rerank_enabled: Optional[bool] = None
+
+
+class SearchConfigResponse(BaseModel):
+    """RAG-007: Search configuration response."""
+    vector_weight: float
+    text_weight: float
+    rrf_k: int
+    rerank_enabled: bool
+    updated_at: Optional[datetime] = None
+
+
+class DocumentStatusResponse(BaseModel):
+    """RAG-011: Document processing status for polling."""
+    document_id: int
+    title: Optional[str] = None
+    status: str = Field(description="'pending', 'processing', 'completed', or 'failed'")
+    has_raw_text: bool = False
+    chunk_count: int = 0
+    signal_count: int = 0
+    scraped_at: Optional[datetime] = None
+    processed_at: Optional[datetime] = None
+
+
+class IngestUrlRequest(BaseModel):
+    """Request body for URL document ingestion."""
+    url: str = Field(..., min_length=10, max_length=2048, description="URL to download and analyze")
+    source_type: str = Field(default="external", description="Document source type")
+    title: Optional[str] = Field(default=None, max_length=500, description="Optional title override")
+
+
+class IngestUrlResponse(BaseModel):
+    """Response from URL document ingestion."""
+    document_id: int
+    title: Optional[str] = None
+    text_length: int = 0
+    page_count: int = 0
+    status: str = Field(description="'new' if freshly ingested, 'exists' if already in DB")
+    processing: bool = Field(default=False, description="True if background processing was triggered")
 
 
 # ── Chat Session Management models ───────────────────────────
