@@ -32,7 +32,8 @@
 | Frontend & UX | `FE` | 12 | 12 | 0 |
 | Infrastructure & DevOps | `INFRA` | 12 | 12 | 0 |
 | Business Value & Monetization | `BIZ` | 16 | 16 | 0 |
-| **TOTAL** | | **117** | **117** | **0** |
+| RAG & Hybrid Search Hardening | `RAG` | 12 | 12 | 0 |
+| **TOTAL** | | **129** | **129** | **0** |
 
 ---
 
@@ -1447,6 +1448,158 @@ This table maps every item from the docx consolidated action plan (42 items acro
 - 22 neighborhoods with composite scores
 - 405 backend tests passing
 - 0 intelligence documents (needs real data seeding)
+
+---
+
+## Epic: RAG & Hybrid Search Hardening (`RAG`)
+
+> **Context:** The hybrid search infrastructure (Dense + Sparse + Metadata) is already implemented:
+> - **Dense**: Cohere embed-english-v3.0 (1024-dim) → pgvector IVFFLAT cosine index
+> - **Sparse**: PostgreSQL tsvector + BM25 → GIN index (auto-populated via trigger)
+> - **Fusion**: Reciprocal Rank Fusion (k=60) with configurable vector/text weights (0.5/0.5)
+> - **Reranking**: Cohere rerank-english-v3.0 as optional Stage 3
+> - **Metadata**: `documents` table stores source_url, title, published_date, source_type, raw_text; `document_chunks` stores section_header, chunk_index
+>
+> **Problem:** Source URLs in seed data frequently point to dead links (City of Vancouver pages rotate). The system stores raw_text but doesn't surface it as a fallback when the original URL is unavailable. Metadata provenance needs strengthening for the hybrid index.
+
+### Tier 0 — Source Provenance & Dead Link Handling
+
+#### RAG-001: Archived document viewer endpoint `✅ DONE`
+**Why:** When source_url returns 404/410, users see "resource not found" with no fallback. We already store `raw_text` — surface it.
+- Add `GET /api/v1/intel/documents/{id}/view` endpoint returning formatted raw_text
+- Frontend: link signal cards to this cached viewer instead of (or as fallback to) external URLs
+- Show banner: "Viewing archived copy — original at {source_url}" with external link
+- **Files:** `api/intelligence/routes.py`, `frontend/src/components/IntelPage.tsx`
+
+#### RAG-002: Source URL health checker `✅ DONE`
+**Why:** Proactively detect dead links instead of letting users discover them.
+- Background task: HEAD-check all `documents.source_url` values periodically
+- Add `url_status` column to `documents`: `alive | dead | redirect | unchecked`
+- Add `url_checked_at` timestamptz column
+- Frontend: show warning icon on signals whose source URL is dead
+- **Files:** `db/008_rag_hardening.sql`, `api/intelligence/url_health.py`
+
+#### RAG-003: Wayback Machine fallback links `✅ DONE`
+**Why:** When a source URL dies, Internet Archive often has a cached copy.
+- On dead URL detection, auto-generate `web.archive.org/web/{url}` fallback
+- Add `archive_url` column to `documents`
+- Frontend: show "View on Internet Archive" when original is dead
+- **Files:** `db/008_rag_hardening.sql`, `api/intelligence/url_health.py`
+
+### Tier 1 — Metadata Enrichment for Hybrid Index
+
+#### RAG-004: Structured metadata in document_chunks `✅ DONE`
+**Why:** Hybrid search currently uses only chunk_text for sparse matching and embedding for dense matching. Metadata-aware filtering would improve precision.
+- Add `metadata JSONB` column to `document_chunks` storing: neighborhood, addresses, signal_types, date_range extracted from the chunk
+- Populate during signal extraction (backfill from intelligence_signals)
+- Use in hybrid_search as pre-filter (e.g., `WHERE metadata->>'neighborhood' = $3`)
+- **Files:** `db/008_rag_hardening.sql`, `api/intelligence/embeddings.py`
+
+#### RAG-005: Citation provenance chain `✅ DONE`
+**Why:** Chat responses cite documents but don't show the full provenance: URL → document → chunk → signal → chat answer.
+- Enrich `ChatResponse.citations` with: `document_id`, `chunk_id`, `archive_url`, `url_status`
+- Frontend: show provenance breadcrumb in citation chips: Source → Document → Signal
+- **Files:** `api/intelligence/chat.py`, `api/intelligence/models.py`, `frontend/src/lib/intel-types.ts`
+
+#### RAG-006: Ingestion metadata capture `✅ DONE`
+**Why:** URL ingestion via the Ingest tab stores minimal metadata. Capture more context at ingest time for downstream retrieval quality.
+- Extract and store: `og:title`, `og:description`, `og:site_name`, `article:published_time` from HTML meta tags
+- For PDFs: extract author, creation_date, subject from PDF metadata
+- Store in `documents.metadata` JSONB
+- **Files:** `api/intelligence/scraper_url.py`, `api/intelligence/parser.py`
+
+### Tier 2 — Search Quality & Tuning
+
+#### RAG-007: Hybrid search weight tuning endpoint `✅ DONE`
+**Why:** Current weights (0.5 dense / 0.5 sparse) are hardcoded defaults. Allow experimentation.
+- Add admin endpoint `POST /api/v1/intel/admin/search-config` to update vector_weight, text_weight, rrf_k, rerank_enabled
+- Store config in DB or env vars
+- Log search quality metrics: MRR, recall@k for evaluation
+- **Files:** `api/intelligence/embeddings.py`, `api/intelligence/routes.py`
+
+#### RAG-008: Metadata-filtered hybrid search `✅ DONE`
+**Why:** Chat queries like "What's happening in Mount Pleasant?" should pre-filter by neighborhood before running dense+sparse, not post-filter.
+- Extend `hybrid_search()` with optional `neighborhood`, `date_from`, `date_to`, `signal_type` parameters
+- Apply as SQL WHERE clauses before RRF fusion (not after)
+- Wire to chat handler's existing filter params (currently unused in hybrid_search)
+- **Files:** `api/intelligence/embeddings.py`, `api/intelligence/chat.py`
+
+#### RAG-009: Embedding model upgrade path `✅ DONE`
+**Why:** Cohere embed-english-v3.0 is good but models improve. Plan for zero-downtime migration.
+- Add `embedding_model` text column to `document_chunks` (default: 'cohere-v3')
+- Dual-write strategy: re-embed with new model into parallel column, switch index when ready
+- Admin endpoint to trigger bulk re-embedding by model version
+- **Files:** `db/008_rag_hardening.sql`, `api/intelligence/embeddings.py`
+
+### Tier 3 — Advanced Retrieval
+
+#### RAG-010: Multi-hop retrieval for complex queries `✅ DONE`
+**Why:** "Compare the rezoning at 123 Main to the one at 456 Oak" requires retrieving context for two separate locations and synthesizing.
+- Implement query decomposition: split complex queries into sub-queries
+- Run hybrid_search for each sub-query independently
+- Merge and deduplicate results before sending to Claude
+- **Files:** `api/intelligence/chat.py`, `api/intelligence/query_planner.py` (new)
+
+#### RAG-011: Incremental chunk embedding pipeline `✅ DONE`
+**Why:** After URL ingestion, chunks are embedded synchronously. For large documents (100+ pages), this blocks the response.
+- Move chunk embedding to background task queue (asyncio.create_task or Celery)
+- Return ingestion result immediately with `processing: true`
+- Add `GET /api/v1/intel/documents/{id}/status` to poll processing state
+- Frontend: show progress indicator on Ingest tab for documents being processed
+- **Files:** `api/intelligence/embeddings.py`, `api/intelligence/scraper_url.py`, `api/intelligence/routes.py`
+
+#### RAG-012: Real-time source seeding from City of Vancouver `✅ DONE`
+**Why:** Current seed data is static JSON files. Need continuous ingestion of new council minutes, permits, and rezoning decisions.
+- Scheduled scrapers (cron / APScheduler) for: vancouver.ca council minutes, DPB agendas, rezoning application pages
+- Dedup via existing `source_url UNIQUE` constraint
+- Auto-trigger signal extraction + embedding pipeline on new documents
+- **Files:** `api/intelligence/scheduler.py` (new), `api/intelligence/scraper_council.py`, `api/intelligence/scraper_dpb.py`
+
+---
+
+### RAG Architecture Diagram
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    HYBRID RAG PIPELINE                             │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  INGESTION (scraper_url.py, scraper_council.py, ...)              │
+│  ├─ Download URL → Parse PDF/HTML → Extract metadata (RAG-006)   │
+│  ├─ Dedup via source_url UNIQUE constraint                        │
+│  ├─ Store raw_text + metadata JSONB in documents table            │
+│  └─ Health-check source URL (RAG-002) → archive fallback (RAG-003)│
+│                                                                    │
+│  CHUNKING (chunker.py)                                            │
+│  ├─ Semantic chunking ~800 tokens via semchunk                    │
+│  ├─ Section header detection (government doc patterns)            │
+│  └─ Chunk metadata extraction (RAG-004)                           │
+│                                                                    │
+│  INDEXING (embeddings.py)                                         │
+│  ├─ DENSE: Cohere embed-english-v3.0 → pgvector (1024-dim)       │
+│  │  └─ IVFFLAT index (cosine, lists=100)                         │
+│  ├─ SPARSE: tsvector trigger → GIN index (BM25)                  │
+│  └─ METADATA: JSONB (neighborhood, addresses, dates, signal_types)│
+│                                                                    │
+│  RETRIEVAL (embeddings.py::hybrid_search)                         │
+│  ├─ Stage 1: Parallel dense + sparse retrieval (top 30 each)     │
+│  ├─ Stage 2: RRF fusion (k=60, configurable weights — RAG-007)   │
+│  ├─ Stage 3: Cohere Rerank v3.0 (optional)                       │
+│  └─ Pre-filter by metadata (RAG-008)                              │
+│                                                                    │
+│  GENERATION (chat.py)                                             │
+│  ├─ Context: top 10 chunks + top 5 signals + chat history         │
+│  ├─ Claude claude-sonnet-4-5 (grounded, no hallucination)                    │
+│  ├─ Citation extraction with provenance chain (RAG-005)           │
+│  └─ Multi-hop for complex queries (RAG-010)                       │
+│                                                                    │
+│  PROVENANCE (RAG-001, RAG-003, RAG-005)                          │
+│  ├─ Cached document viewer when source URL is dead                │
+│  ├─ Wayback Machine fallback links                                │
+│  └─ Full chain: URL → Document → Chunk → Signal → Answer         │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 

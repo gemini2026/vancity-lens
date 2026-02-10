@@ -14,6 +14,7 @@ import type {
   CategoryScore,
   TrendDirection,
 } from "@/lib/intel-types";
+import ExportButton from "./ExportButton";
 
 // ── Constants ────────────────────────────────────────────
 
@@ -49,6 +50,59 @@ const TREND_COLORS: Record<TrendDirection, string> = {
   improving: "#10b981",
   stable: "#6b7280",
   declining: "#ef4444",
+};
+
+const CATEGORY_SOURCES: Record<MetricCategory, { source: string; metric: string; url?: string }> = {
+  safety: {
+    source: "Vancouver Police Dept.",
+    metric: "Crime incidents per capita (lower = safer)",
+    url: "https://geodash.vpd.ca/opendata/",
+  },
+  schools: {
+    source: "BC Ministry of Education",
+    metric: "Fraser Institute school ratings composite",
+    url: "https://www.compareschoolrankings.org/",
+  },
+  transit: {
+    source: "TransLink Open API",
+    metric: "Transit stops within neighbourhood boundary",
+    url: "https://www.translink.ca/about-us/doing-business-with-translink/app-developer-resources/gtfs",
+  },
+  parks: {
+    source: "City of Vancouver Open Data",
+    metric: "Total park hectares per neighbourhood",
+    url: "https://opendata.vancouver.ca/explore/dataset/parks/",
+  },
+  development: {
+    source: "VanCity Lens Intelligence",
+    metric: "Active rezoning + permit signals (365-day lookback)",
+  },
+  air_quality: {
+    source: "Metro Vancouver / BC AQHI",
+    metric: "Avg. Air Quality Health Index reading (inverted)",
+    url: "https://www.env.gov.bc.ca/epd/bcairquality/data/aqhi.html",
+  },
+  affordability: {
+    source: "BC Assessment / CoV Property Tax",
+    metric: "Avg. assessed property value per sq ft (lower = better)",
+    url: "https://opendata.vancouver.ca/explore/dataset/property-tax-report/",
+  },
+  walkability: {
+    source: "Walk Score",
+    metric: "Walk Score rating (0-100 normalized to 0-10)",
+    url: "https://www.walkscore.com/CA-BC/Vancouver",
+  },
+};
+
+const CATEGORY_WEIGHTS: Record<MetricCategory, number> = {
+  safety: 15,
+  schools: 15,
+  transit: 15,
+  parks: 10,
+  development: 15,
+  air_quality: 5,
+  affordability: 15,
+  walkability: 10,
 };
 
 function getScoreColor(score: number): string {
@@ -134,66 +188,104 @@ function ScoreRing({
 
 // ── Category Bar Component ───────────────────────────────
 
-function CategoryBar({ item }: { item: CategoryScore }) {
+function CategoryBar({ item, showSource = false }: { item: CategoryScore; showSource?: boolean }) {
   const color = getScoreColor(item.score);
   const pct = (item.score / 10) * 100;
+  const src = CATEGORY_SOURCES[item.category];
+  const weight = CATEGORY_WEIGHTS[item.category];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "8px 0",
-      }}
-    >
-      <div style={{ width: "28px", textAlign: "center", fontSize: "16px" }}>
-        {CATEGORY_ICONS[item.category]}
-      </div>
-      <div style={{ width: "100px", fontSize: "13px", color: "#d1d5db" }}>
-        {CATEGORY_LABELS[item.category]}
-      </div>
+    <div style={{ padding: "6px 0" }}>
       <div
         style={{
-          flex: 1,
-          height: "8px",
-          background: "rgba(255,255,255,0.06)",
-          borderRadius: "4px",
-          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
         }}
+        title={`${src.metric}\nSource: ${src.source}\nWeight: ${weight}%`}
       >
+        <div style={{ width: "28px", textAlign: "center", fontSize: "16px" }}>
+          {CATEGORY_ICONS[item.category]}
+        </div>
+        <div style={{ width: "100px", fontSize: "13px", color: "#d1d5db" }}>
+          {CATEGORY_LABELS[item.category]}
+        </div>
         <div
           style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: color,
+            flex: 1,
+            height: "8px",
+            background: "rgba(255,255,255,0.06)",
             borderRadius: "4px",
-            transition: "width 0.6s ease",
+            overflow: "hidden",
           }}
-        />
+        >
+          <div
+            style={{
+              width: `${pct}%`,
+              height: "100%",
+              background: color,
+              borderRadius: "4px",
+              transition: "width 0.6s ease",
+            }}
+          />
+        </div>
+        <div
+          style={{
+            width: "40px",
+            textAlign: "right",
+            fontSize: "14px",
+            fontWeight: 600,
+            color,
+          }}
+        >
+          {item.score.toFixed(1)}
+        </div>
+        <div
+          style={{
+            width: "36px",
+            textAlign: "center",
+            fontSize: "10px",
+            color: "#4b5563",
+            fontWeight: 500,
+          }}
+        >
+          {weight}%
+        </div>
+        <div
+          style={{
+            width: "20px",
+            textAlign: "center",
+            fontSize: "14px",
+            color: TREND_COLORS[item.trend],
+          }}
+          title={`${item.trend} (${item.trend_delta >= 0 ? "+" : ""}${item.trend_delta.toFixed(1)})`}
+        >
+          {TREND_ICONS[item.trend]}
+        </div>
       </div>
-      <div
-        style={{
-          width: "40px",
-          textAlign: "right",
-          fontSize: "14px",
-          fontWeight: 600,
-          color,
-        }}
-      >
-        {item.score.toFixed(1)}
-      </div>
-      <div
-        style={{
-          width: "20px",
-          textAlign: "center",
-          fontSize: "14px",
-          color: TREND_COLORS[item.trend],
-        }}
-        title={`${item.trend} (${item.trend_delta >= 0 ? "+" : ""}${item.trend_delta.toFixed(1)})`}
-      >
-        {TREND_ICONS[item.trend]}
-      </div>
+      {showSource && (
+        <div
+          style={{
+            marginLeft: "40px",
+            fontSize: "10px",
+            color: "#4b5563",
+            marginTop: "2px",
+          }}
+        >
+          {src.url ? (
+            <a
+              href={src.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#475569", textDecoration: "none" }}
+            >
+              {src.source} — {src.metric}
+            </a>
+          ) : (
+            <span>{src.source} — {src.metric}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -379,20 +471,32 @@ function ScorecardDetail({
 
       {/* Category Breakdown */}
       <div style={{ marginBottom: "24px" }}>
-        <h3
+        <div
           style={{
-            fontSize: "13px",
-            fontWeight: 600,
-            color: "#9ca3af",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             marginBottom: "12px",
           }}
         >
-          Category Breakdown
-        </h3>
+          <h3
+            style={{
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#9ca3af",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              margin: 0,
+            }}
+          >
+            Category Breakdown
+          </h3>
+          <span style={{ fontSize: "10px", color: "#4b5563" }}>
+            Weight
+          </span>
+        </div>
         {scorecard.category_scores.map((cs) => (
-          <CategoryBar key={cs.category} item={cs} />
+          <CategoryBar key={cs.category} item={cs} showSource />
         ))}
       </div>
 
@@ -402,6 +506,7 @@ function ScorecardDetail({
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "12px",
+          marginBottom: "24px",
         }}
       >
         <div
@@ -434,6 +539,65 @@ function ScorecardDetail({
           </div>
           <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
             Recent Permits
+          </div>
+        </div>
+      </div>
+
+      {/* Methodology */}
+      <div
+        style={{
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: "10px",
+          padding: "16px",
+        }}
+      >
+        <h3
+          style={{
+            fontSize: "12px",
+            fontWeight: 600,
+            color: "#6b7280",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            marginBottom: "10px",
+          }}
+        >
+          Scoring Methodology
+        </h3>
+        <div style={{ fontSize: "11px", color: "#6b7280", lineHeight: 1.6 }}>
+          <p style={{ margin: "0 0 8px" }}>
+            Scores are computed using a <strong style={{ color: "#9ca3af" }}>weighted composite</strong> of
+            8 quality-of-life categories, each normalized to a 0-10 scale using min-max normalization
+            across all 22 Vancouver neighbourhoods. Categories where lower values indicate better
+            outcomes (safety, affordability) are inverted before scoring.
+          </p>
+          <p style={{ margin: "0 0 8px" }}>
+            <strong style={{ color: "#9ca3af" }}>Overall score</strong> = weighted average of all category
+            scores, with weights reflecting investment-relevance: Safety, Schools, Transit, Development,
+            and Affordability each at 15%; Parks and Walkability at 10%; Air Quality at 5%.
+          </p>
+          <p style={{ margin: "0 0 10px" }}>
+            <strong style={{ color: "#9ca3af" }}>Trends</strong> compare current period vs. prior period.
+            Changes above +0.3 are marked improving; below -0.3 declining; otherwise stable.
+          </p>
+          <div
+            style={{
+              fontSize: "10px",
+              color: "#4b5563",
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              paddingTop: "8px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px 16px",
+            }}
+          >
+            <span style={{ fontWeight: 600, color: "#6b7280" }}>Data sources:</span>
+            <a href="https://geodash.vpd.ca/opendata/" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>VPD Crime Data</a>
+            <a href="https://opendata.vancouver.ca/" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>CoV Open Data</a>
+            <a href="https://www.translink.ca/about-us/doing-business-with-translink/app-developer-resources/gtfs" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>TransLink GTFS</a>
+            <a href="https://www.walkscore.com/CA-BC/Vancouver" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>Walk Score</a>
+            <a href="https://www.env.gov.bc.ca/epd/bcairquality/data/aqhi.html" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>BC AQHI</a>
+            <a href="https://www.compareschoolrankings.org/" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>Fraser Institute</a>
           </div>
         </div>
       </div>
@@ -755,30 +919,33 @@ export default function NeighborhoodPage() {
               Quality-of-life ratings across 22 Vancouver neighborhoods
             </p>
           </div>
-          {view.type === "list" && compareSet.size >= 2 && (
-            <button
-              onClick={handleCompare}
-              style={{
-                background: "#3b82f6",
-                border: "none",
-                borderRadius: "8px",
-                color: "#fff",
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#2563eb";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#3b82f6";
-              }}
-            >
-              Compare ({compareSet.size})
-            </button>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {view.type === "list" && compareSet.size >= 2 && (
+              <button
+                onClick={handleCompare}
+                style={{
+                  background: "#3b82f6",
+                  border: "none",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  padding: "8px 16px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#2563eb";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#3b82f6";
+                }}
+              >
+                Compare ({compareSet.size})
+              </button>
+            )}
+            <ExportButton exportType="neighborhoods" label="Export CSV" />
+          </div>
         </div>
       </div>
 

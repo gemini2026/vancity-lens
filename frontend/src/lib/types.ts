@@ -26,6 +26,8 @@ export interface ValueEstimate {
   asking_price: number | null;
   value_delta: number;
   price_per_sqft_assumption: string;
+  estimated_units: number | null;
+  nla_sqft: number | null;
 }
 
 export interface DataSource {

@@ -8,10 +8,8 @@ Provides:
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 
 from .financing import FinancingCalculator, FinancingRequest, FinancingResult
 

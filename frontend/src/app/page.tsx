@@ -4,10 +4,18 @@ import { useState } from "react";
 import MapView from "@/components/MapView";
 import IntelPage from "@/components/IntelPage";
 import NeighborhoodPage from "@/components/NeighborhoodPage";
+import IngestPage from "@/components/IngestPage";
+import PricingPage from "@/components/PricingPage";
 import ThemeToggle from "@/components/ThemeToggle";
+import AlertsFeed from "@/components/AlertsFeed";
+import Disclaimer from "@/components/Disclaimer";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<"map" | "intel" | "hoods">("map");
+type Tab = "map" | "intel" | "hoods" | "pricing" | "ingest";
+
+function AppContent() {
+  const { token } = useAuth();
+  const [activeTab, setActiveTab] = useState<Tab>("map");
 
   const tabStyle = (tab: string) => ({
     padding: "14px 20px",
@@ -30,6 +38,14 @@ export default function Home() {
       e.currentTarget.style.color = entering ? "#d1d5db" : "#9ca3af";
     }
   };
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "map", label: "Map" },
+    { key: "intel", label: "Intelligence" },
+    { key: "hoods", label: "Neighborhoods" },
+    { key: "pricing", label: "Pricing" },
+    { key: "ingest", label: "Ingest" },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -78,82 +94,88 @@ export default function Home() {
 
         {/* Tab Navigation */}
         <div style={{ display: "flex", gap: "0" }}>
-          <button
-            onClick={() => setActiveTab("map")}
-            style={tabStyle("map")}
-            onMouseEnter={handleHover("map", true)}
-            onMouseLeave={handleHover("map", false)}
-          >
-            Map
-          </button>
-          <button
-            onClick={() => setActiveTab("intel")}
-            style={tabStyle("intel")}
-            onMouseEnter={handleHover("intel", true)}
-            onMouseLeave={handleHover("intel", false)}
-          >
-            Intelligence
-          </button>
-          <button
-            onClick={() => setActiveTab("hoods")}
-            style={tabStyle("hoods")}
-            onMouseEnter={handleHover("hoods", true)}
-            onMouseLeave={handleHover("hoods", false)}
-          >
-            Neighborhoods
-          </button>
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              style={tabStyle(t.key)}
+              onMouseEnter={handleHover(t.key, true)}
+              onMouseLeave={handleHover(t.key, false)}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {/* Theme Toggle */}
-        <div style={{ marginLeft: "auto", paddingRight: "16px" }}>
+        {/* Right side: Theme Toggle */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px", paddingRight: "16px" }}>
+          <AlertsFeed token={token} />
           <ThemeToggle />
         </div>
       </nav>
 
       {/* Content Area */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        {/* Map Tab */}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: activeTab === "map" ? "block" : "none",
           }}
         >
           <MapView />
         </div>
 
-        {/* Intelligence Tab */}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: activeTab === "intel" ? "block" : "none",
           }}
         >
           <IntelPage />
         </div>
 
-        {/* Neighborhoods Tab */}
         <div
           style={{
             position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            top: 0, left: 0, right: 0, bottom: 0,
             display: activeTab === "hoods" ? "block" : "none",
           }}
         >
           <NeighborhoodPage />
         </div>
+
+        <div
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            display: activeTab === "pricing" ? "block" : "none",
+          }}
+        >
+          <PricingPage />
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            display: activeTab === "ingest" ? "block" : "none",
+          }}
+        >
+          <IngestPage />
+        </div>
       </div>
+
+      <Disclaimer />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

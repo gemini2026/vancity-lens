@@ -153,8 +153,11 @@ hr,
     box-shadow var(--transition-speed);
 }
 
-/* Reduce transitions for performance on some elements */
+/* Disable transitions on all mapbox-gl internals — the * transition rule
+   interferes with WebGL canvas rendering in mapbox-gl v3 */
+.mapboxgl-map,
+.mapboxgl-map *,
 .mapboxgl-canvas,
 .mapboxgl-canvas-container {
-  transition: none;
+  transition: none !important;
 }

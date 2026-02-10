@@ -509,7 +509,6 @@ async def check_building_age(
             detail="Modern structure or undeveloped",
         )
 
-    current_year = datetime.datetime.now().year
 
     if year_built < 1940:
         return RiskFlag(

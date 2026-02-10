@@ -7,6 +7,12 @@ import { fetchTOAGeoJSON, fetchEntitlement, fetchNearestParcel, fetchOpportuniti
 import { getSignalsForParcel, getSignalsGeoJSON } from "@/lib/intel-api";
 import type { ParcelEntitlement, EntitlementSignal } from "@/lib/types";
 import type { IntelSignal } from "@/lib/intel-types";
+import ParcelDetailPanel from "./ParcelDetailPanel";
+import AddressSearchBar from "./AddressSearchBar";
+import FinancingCalculator from "./FinancingCalculator";
+import type { GeocodingResult } from "@/lib/geocoding";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const TIER_COLORS: Record<number, string> = {
   1: "rgba(220, 38, 38, 0.18)",
@@ -64,6 +70,18 @@ function fmt(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
+/** Detect WebGL availability without triggering an error overlay. */
+function isWebGLAvailable(): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    const gl =
+      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    return gl instanceof WebGLRenderingContext;
+  } catch {
+    return false;
+  }
+}
+
 export default function MapView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -72,6 +90,39 @@ export default function MapView() {
   const signalMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSignals, setShowSignals] = useState(true);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [selectedParcel, setSelectedParcel] = useState<ParcelEntitlement | null>(null);
+  const [selectedSignals, setSelectedSignals] = useState<IntelSignal[]>([]);
+  const [showFinancing, setShowFinancing] = useState(false);
+  const [financingPid, setFinancingPid] = useState<string>("");
+
+  const openDetailPanel = useCallback((data: ParcelEntitlement, nearbySignals?: IntelSignal[]) => {
+    popupRef.current?.remove();
+    setSelectedParcel(data);
+    setSelectedSignals(nearbySignals || []);
+  }, []);
+
+  const handleAddressSelect = useCallback((result: GeocodingResult) => {
+    if (!map.current) return;
+    map.current.flyTo({ center: [result.lng, result.lat], zoom: 16, duration: 1500 });
+    // Trigger parcel analysis at the location
+    setTimeout(async () => {
+      setLoading(true);
+      try {
+        const nearest = await fetchNearestParcel(result.lng, result.lat, 150);
+        if (!nearest) { setLoading(false); return; }
+        const [data, signals] = await Promise.all([
+          fetchEntitlement(nearest.pid),
+          getSignalsForParcel(nearest.pid, 500).catch(() => [] as IntelSignal[]),
+        ]);
+        openDetailPanel(data, signals);
+      } catch (err) {
+        console.error("Address lookup failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    }, 1600);
+  }, [openDetailPanel]);
 
   const showPopup = useCallback((data: ParcelEntitlement, lngLat: mapboxgl.LngLat, nearbySignals?: IntelSignal[]) => {
     popupRef.current?.remove();
@@ -379,7 +430,7 @@ export default function MapView() {
                       ${sig.event_date ? `<span>${sig.event_date}</span>` : ''}
                     </div>
                   </div>
-                  ${sig.source_url ? `<a href="${sig.source_url}" target="_blank" rel="noopener" style="color:#60a5fa;font-size:9px;flex-shrink:0">source↗</a>` : ''}
+                  ${sig.id ? `<a href="${API_BASE}/api/v1/intel/documents/${sig.id}/page" target="_blank" rel="noopener" style="color:#60a5fa;font-size:9px;flex-shrink:0">source↗</a>` : ''}
                 </div>
               `).join('')}
               ${nearbySignals.length > 5 ? `<div style="font-size:9px;color:#6b7280;margin-top:4px;text-align:center">+ ${nearbySignals.length - 5} more signals</div>` : ''}
@@ -408,27 +459,42 @@ export default function MapView() {
         fetchEntitlement(nearest.pid),
         getSignalsForParcel(nearest.pid, 500).catch(() => [] as IntelSignal[]),
       ]);
-      showPopup(data, e.lngLat, signals);
+      openDetailPanel(data, signals);
     } catch (err) {
       console.error("Click lookup failed:", err);
     } finally {
       setLoading(false);
     }
-  }, [showPopup]);
+  }, [openDetailPanel]);
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!token) { console.error("NEXT_PUBLIC_MAPBOX_TOKEN not set"); return; }
-    mapboxgl.accessToken = token;
+    if (!token) {
+      setMapError("Mapbox token not configured");
+      return;
+    }
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: [-123.1148, 49.2632],
-      zoom: 13,
-    });
-    const m = map.current;
+    if (!isWebGLAvailable()) {
+      setMapError("WebGL is not available in this browser");
+      return;
+    }
+
+    let m: mapboxgl.Map;
+    try {
+      mapboxgl.accessToken = token;
+      m = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: "mapbox://styles/mapbox/dark-v11",
+        center: [-123.1148, 49.2632],
+        zoom: 13,
+      });
+      map.current = m;
+    } catch (err) {
+      console.error("Failed to initialize map:", err);
+      setMapError("Map failed to initialize");
+      return;
+    }
     m.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     m.on("load", async () => {
@@ -474,7 +540,7 @@ export default function MapView() {
                 fetchEntitlement(opp.pid),
                 getSignalsForParcel(opp.pid, 500).catch(() => [] as IntelSignal[]),
               ]);
-              showPopup(data, new mapboxgl.LngLat(opp.lng, opp.lat), signals);
+              openDetailPanel(data, signals);
             } catch {} finally { setLoading(false); }
           });
         });
@@ -512,7 +578,7 @@ export default function MapView() {
                     <span>${props.event_date || ''}</span>
                   </div>
                   ${props.decision ? `<div style="font-size:9px;margin-top:4px;color:${props.decision === 'approved' ? '#86efac' : props.decision === 'denied' ? '#f87171' : '#fbbf24'};font-weight:600">Decision: ${props.decision}</div>` : ''}
-                  ${props.source_url ? `<a href="${props.source_url}" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:9px;color:#60a5fa;text-decoration:underline">View source ↗</a>` : ''}
+                  ${props.id ? `<a href="${API_BASE}/api/v1/intel/documents/${props.id}/page" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:9px;color:#60a5fa;text-decoration:underline">View source ↗</a>` : ''}
                 </div>
               `);
 
@@ -537,7 +603,7 @@ export default function MapView() {
       m.remove();
       map.current = null;
     };
-  }, [handleMapClick, showPopup]);
+  }, [handleMapClick, openDetailPanel]);
 
   // Toggle signal markers visibility
   useEffect(() => {
@@ -549,11 +615,39 @@ export default function MapView() {
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
-      {/* Title */}
-      <div style={{ position:"absolute",top:16,left:16,zIndex:10,background:"rgba(17,24,39,0.92)",borderRadius:8,padding:"12px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)" }}>
-        <div style={{ color:"#f3f4f6",fontWeight:700,fontSize:18,fontFamily:"system-ui" }}>VanCity Lens</div>
-        <div style={{ color:"#9ca3af",fontSize:11,marginTop:2 }}>Bill 47 Entitlement Engine · 92K parcels</div>
+      <div ref={mapContainer} style={{ width: "100%", height: "100%", background: "#0a0a0a" }} />
+      {/* Fallback when map cannot initialize */}
+      {mapError && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#0a0a0a",
+            fontFamily: "system-ui, sans-serif",
+            color: "#6b7280",
+            fontSize: 14,
+            zIndex: 5,
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
+            <div style={{ color: "#9ca3af", marginBottom: 4 }}>Map unavailable</div>
+            <div style={{ fontSize: 12 }}>{mapError}</div>
+          </div>
+        </div>
+      )}
+      {/* Address Search */}
+      <div style={{ position:"absolute",top:16,left:16,zIndex:10,display:"flex",flexDirection:"column",gap:"8px" }}>
+        <div style={{ background:"rgba(17,24,39,0.92)",borderRadius:8,padding:"12px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ color:"#f3f4f6",fontWeight:700,fontSize:18,fontFamily:"system-ui" }}>VanCity Lens</div>
+          <div style={{ color:"#9ca3af",fontSize:11,marginTop:2 }}>Bill 47 Entitlement Engine · 92K parcels</div>
+        </div>
+        <div style={{ width:"320px" }}>
+          <AddressSearchBar onSelect={handleAddressSelect} placeholder="Search address in Vancouver" />
+        </div>
       </div>
       {/* Legend */}
       <div style={{ position:"absolute",bottom:32,left:16,zIndex:10,background:"rgba(17,24,39,0.92)",borderRadius:8,padding:"12px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)",fontFamily:"system-ui",fontSize:11,color:"#d1d5db" }}>
@@ -605,6 +699,29 @@ export default function MapView() {
         <div style={{ position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"rgba(17,24,39,0.95)",borderRadius:8,padding:"16px 24px",color:"#f3f4f6",fontFamily:"system-ui",fontSize:14,zIndex:20 }}>
           Analyzing parcel…
         </div>
+      )}
+      {/* Parcel Detail Panel */}
+      {selectedParcel && (
+        <ParcelDetailPanel
+          data={selectedParcel}
+          nearbySignals={selectedSignals}
+          onClose={() => { setSelectedParcel(null); setSelectedSignals([]); }}
+          onRunDealModel={(pid) => { setFinancingPid(pid); setShowFinancing(true); }}
+        />
+      )}
+      {/* Financing Calculator Modal */}
+      {showFinancing && (
+        <FinancingCalculator
+          parcelData={selectedParcel ? {
+            pid: financingPid,
+            acquisition_cost: selectedParcel.value_estimate?.asking_price || selectedParcel.value_estimate?.current_assessed || undefined,
+            buildable_sqft: selectedParcel.value_estimate ? parseFloat(String(selectedParcel.value_estimate.buildable_sqft)) : undefined,
+            asking_price: selectedParcel.value_estimate?.asking_price || undefined,
+            construction_type: selectedParcel.validation?.pro_forma?.construction_type,
+            gross_revenue: selectedParcel.validation?.three_scenario_proforma?.base?.gross_revenue || selectedParcel.validation?.pro_forma?.gross_revenue || undefined,
+          } : undefined}
+          onClose={() => setShowFinancing(false)}
+        />
       )}
     </div>
   );

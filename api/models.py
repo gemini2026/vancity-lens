@@ -96,6 +96,9 @@ class ValueEstimate(BaseModel):
         default=Decimal("800"),
         description="$/sqft of buildable area used in estimate"
     )
+    # NLA / Unit Count (Phase 2.5)
+    estimated_units: Optional[int] = Field(None, description="Estimated unit count based on avg unit size")
+    nla_sqft: Optional[int] = Field(None, description="Net leasable area after efficiency ratio")
 
 
 class ParcelEntitlementResponse(BaseModel):

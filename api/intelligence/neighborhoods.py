@@ -10,6 +10,7 @@ Handles:
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Optional
 
@@ -224,7 +225,8 @@ async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
 
         summaries = []
         for i, row in enumerate(rows):
-            cat_scores = row.get("category_scores") or {}
+            raw = row.get("category_scores")
+            cat_scores = json.loads(raw) if isinstance(raw, str) else (raw or {})
             top, bottom = get_top_and_bottom(cat_scores) if cat_scores else ("", "")
 
             summaries.append({

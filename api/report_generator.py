@@ -642,6 +642,114 @@ class ReportGenerator:
             align="C",
         )
 
+    def _generate_investor_memo(self, parcel_data: ParcelReport) -> FPDF:
+        """Generate an investor memo PDF with executive summary + investment thesis."""
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_margins(self.left_margin, self.top_margin, self.right_margin)
+
+        # Title
+        pdf.set_font("Helvetica", "B", 22)
+        pdf.cell(0, 12, "Investment Memo", ln=True, align="C")
+        pdf.set_font("Helvetica", "", 12)
+        pdf.cell(0, 7, "VanCity Lens — Confidential", ln=True, align="C")
+        pdf.set_draw_color(59, 130, 246)
+        pdf.set_line_width(0.5)
+        pdf.line(self.left_margin, pdf.get_y() + 2, self.page_width - self.right_margin, pdf.get_y() + 2)
+        pdf.ln(8)
+
+        # Executive Summary
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 8, "1. Executive Summary", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        addr = parcel_data.civic_address or parcel_data.pid
+        pdf.multi_cell(0, 5,
+            f"Subject property at {addr} (PID: {parcel_data.pid}) is located in Vancouver, BC. "
+            f"The property is zoned {parcel_data.current_zoning or 'N/A'} with a lot area of "
+            f"{parcel_data.lot_area_sqm:.0f} sqm ({parcel_data.lot_area_sqft:.0f} sqft). "
+            f"Buildable area under current entitlements is {parcel_data.buildable_sqft:,.0f} sqft."
+        )
+        pdf.ln(4)
+
+        # Investment Thesis
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 8, "2. Investment Thesis", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        if parcel_data.entitled_storeys and parcel_data.current_storeys:
+            uplift = parcel_data.entitled_storeys - parcel_data.current_storeys
+            pdf.multi_cell(0, 5,
+                f"Bill 47 Transit-Oriented Areas legislation enables density uplift of "
+                f"+{max(0, uplift)} storeys (from {parcel_data.current_storeys} to {parcel_data.entitled_storeys}). "
+                f"This creates significant development potential in a supply-constrained market."
+            )
+        else:
+            pdf.multi_cell(0, 5,
+                "This property is positioned within a Transit-Oriented Area under Bill 47, "
+                "creating potential for density uplift subject to entitlement confirmation."
+            )
+        pdf.ln(4)
+
+        # Site Analysis
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 8, "3. Site Analysis", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        self._build_parcel_overview(pdf, parcel_data)
+
+        # Entitlement
+        self._build_entitlement_analysis(pdf, parcel_data)
+
+        # Financials
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 8, "4. Financial Analysis", ln=True)
+        self._build_pro_forma(pdf, parcel_data)
+
+        # Value metrics
+        pdf.set_font("Helvetica", "", 10)
+        if parcel_data.estimated_land_value:
+            pdf.cell(50, 6, "Estimated Land Value:")
+            pdf.cell(0, 6, f"${parcel_data.estimated_land_value:,}", ln=True)
+        if parcel_data.assessed_value:
+            pdf.cell(50, 6, "Assessed Value:")
+            pdf.cell(0, 6, f"${parcel_data.assessed_value:,}", ln=True)
+        if parcel_data.asking_price:
+            pdf.cell(50, 6, "Asking Price:")
+            pdf.cell(0, 6, f"${parcel_data.asking_price:,}", ln=True)
+        if parcel_data.value_delta:
+            pdf.cell(50, 6, "Value Delta:")
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(0, 6, f"${parcel_data.value_delta:,}", ln=True)
+            pdf.set_font("Helvetica", "", 10)
+        pdf.ln(4)
+
+        # Risk Assessment
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 8, "5. Risk Assessment", ln=True)
+        self._build_risk_assessment(pdf, parcel_data)
+
+        # Due Diligence
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 8, "6. Due Diligence Checklist", ln=True)
+        self._build_due_diligence(pdf)
+
+        # Comparable Sales
+        if parcel_data.comparables:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.cell(0, 8, "7. Comparable Sales", ln=True)
+            self._build_comparable_sales(pdf, parcel_data)
+
+        # Sources
+        if parcel_data.sources:
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.cell(0, 8, "8. Sources & Citations", ln=True)
+            self._build_sources(pdf, parcel_data)
+
+        # Footer
+        self._build_footer(pdf, parcel_data)
+
+        return pdf
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # Report Generator Instance

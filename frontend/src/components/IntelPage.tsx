@@ -4,17 +4,20 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   chatWithIntel,
   getSignalFeed,
+  getSignalDocument,
   getIntelStats,
   getNeighborhoods,
 } from "@/lib/intel-api";
 import type {
   ChatMessage,
   IntelSignal,
+  SignalDocument,
   SourceCitation,
   IntelStats,
   SignalType,
   Severity,
 } from "@/lib/intel-types";
+import ExportButton from "./ExportButton";
 
 const SIGNAL_TYPE_LABELS: Record<SignalType, string> = {
   rezoning_decision: "REZONING DECISION",
@@ -87,6 +90,33 @@ export default function IntelPage() {
 
   // Stats state
   const [stats, setStats] = useState<IntelStats | null>(null);
+
+  // Expanded signal document state
+  const [expandedSignalId, setExpandedSignalId] = useState<string | null>(null);
+  const [expandedDoc, setExpandedDoc] = useState<SignalDocument | null>(null);
+  const [expandedLoading, setExpandedLoading] = useState(false);
+
+  const handleToggleExpand = useCallback(
+    async (signalId: string) => {
+      if (expandedSignalId === signalId) {
+        setExpandedSignalId(null);
+        setExpandedDoc(null);
+        return;
+      }
+      setExpandedSignalId(signalId);
+      setExpandedDoc(null);
+      setExpandedLoading(true);
+      try {
+        const doc = await getSignalDocument(signalId);
+        setExpandedDoc(doc);
+      } catch (err) {
+        console.error("Failed to load document:", err);
+      } finally {
+        setExpandedLoading(false);
+      }
+    },
+    [expandedSignalId]
+  );
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -369,33 +399,38 @@ export default function IntelPage() {
                           gap: "6px",
                         }}
                       >
-                        {msg.citations.map((citation, idx) => (
-                          <a
-                            key={idx}
-                            href={citation.document_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: "inline-block",
-                              padding: "4px 8px",
-                              background:
-                                msg.role === "user"
-                                  ? "rgba(255,255,255,0.15)"
-                                  : "#374151",
-                              borderRadius: "4px",
-                              fontSize: "11px",
-                              color:
-                                msg.role === "user"
-                                  ? "#f3f4f6"
-                                  : "#60a5fa",
-                              textDecoration: "none",
-                              whiteSpace: "nowrap",
-                            }}
-                            title={`${citation.document_title} (${citation.published_date})`}
-                          >
-                            📄 {citation.document_title.slice(0, 20)}…
-                          </a>
-                        ))}
+                        {msg.citations.map((citation, idx) => {
+                          const citationHref = citation.document_id
+                            ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${citation.document_id}/page`
+                            : citation.document_url;
+                          return (
+                            <a
+                              key={idx}
+                              href={citationHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-block",
+                                padding: "4px 8px",
+                                background:
+                                  msg.role === "user"
+                                    ? "rgba(255,255,255,0.15)"
+                                    : "#374151",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                                color:
+                                  msg.role === "user"
+                                    ? "#f3f4f6"
+                                    : "#60a5fa",
+                                textDecoration: "none",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={`${citation.document_title}${citation.published_date ? ` (${citation.published_date})` : ""}`}
+                            >
+                              {citation.document_title.slice(0, 25)}…
+                            </a>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -609,6 +644,11 @@ export default function IntelPage() {
               <option value="all">All time</option>
             </select>
           </div>
+          <ExportButton exportType="signals" filters={{
+            ...(selectedNeighborhood ? { neighborhood: selectedNeighborhood } : {}),
+            ...(selectedSignalType ? { signal_type: selectedSignalType } : {}),
+            date_range: selectedDateRange,
+          }} label="Export CSV" />
         </div>
 
         {/* Signals List */}
@@ -642,11 +682,20 @@ export default function IntelPage() {
                   key={signal.id}
                   style={{
                     padding: "12px",
-                    background: "#1e293b",
+                    background:
+                      expandedSignalId === signal.id
+                        ? "#1a2744"
+                        : "#1e293b",
                     borderRadius: "6px",
-                    border: "1px solid #374151",
+                    border:
+                      expandedSignalId === signal.id
+                        ? "1px solid #3b82f6"
+                        : "1px solid #374151",
                     fontSize: "12px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
                   }}
+                  onClick={() => handleToggleExpand(signal.id)}
                 >
                   {/* Top row: Severity + Type */}
                   <div
@@ -692,6 +741,15 @@ export default function IntelPage() {
                         {signal.decision.toUpperCase()}
                       </span>
                     )}
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: "10px",
+                        color: "#6b7280",
+                      }}
+                    >
+                      {expandedSignalId === signal.id ? "▲" : "▼"}
+                    </span>
                   </div>
 
                   {/* Headline */}
@@ -713,10 +771,14 @@ export default function IntelPage() {
                       fontSize: "11px",
                       marginBottom: "6px",
                       lineHeight: "1.4",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
+                      ...(expandedSignalId === signal.id
+                        ? {}
+                        : {
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical" as const,
+                            overflow: "hidden",
+                          }),
                     }}
                   >
                     {signal.summary}
@@ -774,17 +836,171 @@ export default function IntelPage() {
                   >
                     <span>{formatDate(signal.event_date)}</span>
                     <a
-                      href={signal.source_url}
+                      href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${signal.document_id}/page`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       style={{
                         color: "#60a5fa",
+                        cursor: "pointer",
                         textDecoration: "none",
                       }}
                     >
                       {signal.source_title} ↗
                     </a>
                   </div>
+
+                  {/* Expanded Document View */}
+                  {expandedSignalId === signal.id && (
+                    <div
+                      style={{
+                        marginTop: "10px",
+                        paddingTop: "10px",
+                        borderTop: "1px solid #374151",
+                      }}
+                    >
+                      {expandedLoading ? (
+                        <div
+                          style={{
+                            color: "#6b7280",
+                            fontSize: "11px",
+                            padding: "8px 0",
+                          }}
+                        >
+                          Loading document...
+                        </div>
+                      ) : expandedDoc ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {/* Document header */}
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              color: "#93c5fd",
+                            }}
+                          >
+                            <span>📄</span>
+                            <span>Source Document</span>
+                          </div>
+
+                          {/* Document title */}
+                          <div style={{ fontSize: "11px", color: "#e5e7eb", fontWeight: "500" }}>
+                            {expandedDoc.document.title}
+                          </div>
+
+                          {/* Document metadata row */}
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "12px",
+                              fontSize: "10px",
+                              color: "#6b7280",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span>
+                              Type: {expandedDoc.document.source_type.replace(/_/g, " ")}
+                            </span>
+                            {expandedDoc.document.published_date && (
+                              <span>Published: {expandedDoc.document.published_date}</span>
+                            )}
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${expandedDoc.document.id}/page`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#60a5fa", textDecoration: "none" }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              View full document {expandedDoc.document.url_status === "dead" ? "(cached)" : ""}
+                            </a>
+                          </div>
+
+                          {/* Extracted details */}
+                          {(expandedDoc.signal.zoning_from || expandedDoc.signal.zoning_to || expandedDoc.signal.unit_count) && (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: "6px",
+                                fontSize: "10px",
+                              }}
+                            >
+                              {expandedDoc.signal.zoning_from && expandedDoc.signal.zoning_to && (
+                                <span
+                                  style={{
+                                    background: "#374151",
+                                    color: "#d1d5db",
+                                    padding: "2px 6px",
+                                    borderRadius: "3px",
+                                  }}
+                                >
+                                  Zoning: {expandedDoc.signal.zoning_from} → {expandedDoc.signal.zoning_to}
+                                </span>
+                              )}
+                              {expandedDoc.signal.unit_count && (
+                                <span
+                                  style={{
+                                    background: "#374151",
+                                    color: "#d1d5db",
+                                    padding: "2px 6px",
+                                    borderRadius: "3px",
+                                  }}
+                                >
+                                  {expandedDoc.signal.unit_count} units
+                                </span>
+                              )}
+                              {expandedDoc.signal.vote_for != null && expandedDoc.signal.vote_against != null && (
+                                <span
+                                  style={{
+                                    background: "#374151",
+                                    color: "#d1d5db",
+                                    padding: "2px 6px",
+                                    borderRadius: "3px",
+                                  }}
+                                >
+                                  Vote: {expandedDoc.signal.vote_for}-{expandedDoc.signal.vote_against}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Document raw text */}
+                          {expandedDoc.document.raw_text && (
+                            <div
+                              style={{
+                                background: "#0f172a",
+                                border: "1px solid #374151",
+                                borderRadius: "4px",
+                                padding: "8px",
+                                fontSize: "11px",
+                                color: "#9ca3af",
+                                lineHeight: "1.5",
+                                maxHeight: "200px",
+                                overflowY: "auto",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {expandedDoc.document.raw_text}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            color: "#6b7280",
+                            fontSize: "11px",
+                            padding: "8px 0",
+                          }}
+                        >
+                          Document not available
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
 
