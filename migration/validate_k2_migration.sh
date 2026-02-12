@@ -4,6 +4,7 @@ set -euo pipefail
 API_URL="${API_URL:-http://localhost:8080}"
 BACKEND="local"
 SKIP_E2E=0
+SKIP_PYTEST=0
 RESTART_API=0
 
 usage() {
@@ -14,6 +15,7 @@ Options:
   --backend   Which RAG backend mode to validate. Default: local
   --api-url   Base API URL. Default: http://localhost:8080
   --skip-e2e  Skip Playwright E2E checks (faster)
+  --skip-pytest Skip local pytest suite (useful for validating a remote/staging API)
   --restart-api  Restart Docker Compose `api` service for each backend mode (recommended for local validation)
 
 Environment:
@@ -47,6 +49,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-e2e)
       SKIP_E2E=1
+      shift
+      ;;
+    --skip-pytest)
+      SKIP_PYTEST=1
       shift
       ;;
     --restart-api)
@@ -149,6 +155,10 @@ print("chat_contract_ok")
 
 run_pytest_suite() {
   local backend_mode="$1"
+  if [[ "$SKIP_PYTEST" -eq 1 ]]; then
+    log "Skipping pytest suite (--skip-pytest)"
+    return 0
+  fi
   log "Pytest migration parity suite (backend=${backend_mode})"
   RAG_BACKEND="$backend_mode" \
   python3 -m pytest \
