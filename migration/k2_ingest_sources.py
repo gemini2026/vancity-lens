@@ -23,6 +23,7 @@ import argparse
 import asyncio
 import logging
 import os
+import re
 import sys
 import time
 import ssl
@@ -235,6 +236,17 @@ def _k2_url_item(doc: DiscoveredDoc) -> dict[str, Any]:
     }
 
 
+_DOCX_TITLE_RE = re.compile(r"\(\s*docx\s*\)\s*$", re.IGNORECASE)
+
+
+def _looks_like_docx(doc: DiscoveredDoc) -> bool:
+    # ShapeYourCity download URLs don't include an extension, so we rely on the
+    # title suffix emitted by their document library widgets (e.g. "(docx)").
+    if not doc.title:
+        return False
+    return bool(_DOCX_TITLE_RE.search(doc.title))
+
+
 def _wait_for_jobs(client: Knowledge2, job_ids: list[str], *, poll_s: int, timeout_s: float | None) -> None:
     start = time.monotonic()
     pending = set(job_ids)
@@ -282,6 +294,12 @@ async def main() -> int:
             "Default: true unless --build-indexes is set."
         ),
     )
+    parser.add_argument(
+        "--skip-docx",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip documents that look like .docx (default: true). Use --no-skip-docx to include.",
+    )
     parser.add_argument("--batch-size", type=int, default=25, help="Number of URLs per K2 ingest_urls call")
     parser.add_argument("--wait", action="store_true", help="Wait for ingestion jobs to complete")
     parser.add_argument("--poll-s", type=int, default=3, help="Polling interval when --wait")
@@ -317,7 +335,11 @@ async def main() -> int:
 
     items: list[dict[str, Any]] = []
     skipped = 0
+    skipped_docx = 0
     for d in discovered:
+        if args.skip_docx and _looks_like_docx(d):
+            skipped_docx += 1
+            continue
         if args.skip_existing and _normalize_url(d.url) in existing_urls:
             skipped += 1
             continue
@@ -329,6 +351,8 @@ async def main() -> int:
         skipped,
         len(items),
     )
+    if skipped_docx:
+        logger.info("Skipped docx: %s (use --no-skip-docx to ingest anyway)", skipped_docx)
     batches = _chunked(items, max(args.batch_size, 1))
 
     # Default behavior:
