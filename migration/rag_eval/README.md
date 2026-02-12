@@ -1,54 +1,96 @@
 # RAG Evaluation (Local vs K2)
 
-This folder contains a pragmatic retrieval evaluation harness to compare Bill47's
-current local Postgres hybrid/sparse retrieval against K2-backed retrieval.
+This folder contains side-by-side evaluation tooling for Bill47 migration quality:
 
-## What It Measures
+- Retrieval-only (URL-level baseline): `run_retrieval_eval.py`
+- Retrieval-only with golden chunks: `generate_golden_chunks.py` + `run_golden_retrieval_eval.py`
+- End-to-end answer quality with RAGAS: `run_ragas_e2e_eval.py`
 
-- Recall@K for an eval set derived from either:
-  - `documents` (default): query = `documents.title` (or URL fallback)
-  - `intelligence_signals` (optional): query = `headline`/`summary`
-- MRR (Mean Reciprocal Rank) over the same set.
-- Overlap@K between local and K2 retrieved document URLs.
-- Retrieval latency (local vs K2).
+All evaluators are designed to compare `local` and `k2` on the same query set.
 
-Notes:
-- This is a *retrieval* evaluation (not full answer quality). You can layer
-  LLM-as-judge later if needed.
-- We filter the eval set to the URL intersection between local DB and K2 corpus
-  to avoid penalizing either backend for missing documents.
+## Prerequisites
 
-## Shadow Validation Logs
+- Local Postgres running (default `postgresql://vancity:vancity_dev@localhost:5432/vancity_lens`)
+- Env vars:
+  - `K2_API_HOST`, `K2_API_KEY`, `K2_CORPUS_ID`
+  - `ANTHROPIC_API_KEY`, `COHERE_API_KEY` (required for RAGAS E2E)
+- Python deps in `.venv` include `ragas`, `langchain-anthropic`, `langchain-cohere`
 
-If you enable runtime shadow validation (`K2_SHADOW_VALIDATE=true`), the API will
-emit JSON log lines with message `k2_shadow_validate`. You can summarize those
-logs with:
-
-```bash
-python3 migration/rag_eval/parse_shadow_validate_logs.py path/to/api.jsonl --out shadow-summary.md
-```
-
-## Run
-
-The script needs:
-- local Postgres running (default `postgresql://vancity:vancity_dev@localhost:5432/vancity_lens`)
-- K2 credentials (env): `K2_API_HOST`, `K2_API_KEY`, `K2_CORPUS_ID`
-
-Example (recommended): source `.env` for Cohere/Anthropic (optional), then set K2 vars:
+Example:
 
 ```bash
 set -a && source .env && set +a
 export K2_API_HOST="https://api-dev.knowledge2.ai/"
-export K2_API_KEY="***"
-export K2_CORPUS_ID="vancity"   # name or UUID
+export K2_CORPUS_ID="vancity"
+```
 
+## 1) Generate Golden Chunk Dataset
+
+Creates shared `(query, expected_url, golden_anchor/chunk)` rows filtered to local∩K2 URL overlap.
+
+```bash
+python3 migration/rag_eval/generate_golden_chunks.py --n-queries 150
+```
+
+Output:
+- `migration/rag_eval/output/<ts>/golden_chunks.jsonl`
+- `migration/rag_eval/output/<ts>/golden_chunks_summary.md`
+
+## 2) Retrieval-Only Eval with Golden Chunks
+
+Measures both:
+- URL metrics: recall@K + MRR@K
+- Golden chunk metrics: expected URL + chunk content match
+
+```bash
+python3 migration/rag_eval/run_golden_retrieval_eval.py \
+  --golden-jsonl migration/rag_eval/output/<ts>/golden_chunks.jsonl \
+  --top-k 10 \
+  --n-queries 120 \
+  --local-mode sparse
+```
+
+Output:
+- `golden_retrieval_results.jsonl`
+- `golden_retrieval_summary.md`
+
+## 3) RAGAS End-to-End Eval (Fair Local vs K2)
+
+Runs full chat generation for each backend and scores with RAGAS:
+- `faithfulness`
+- `answer_relevancy`
+- `llm_context_precision_without_reference`
+- `context_recall`
+
+Fairness controls:
+- same golden query set
+- same runtime generation path (`handle_chat`)
+- same RAGAS evaluator LLM/embeddings
+- only paired-success rows scored
+
+```bash
+python3 migration/rag_eval/run_ragas_e2e_eval.py \
+  --golden-jsonl migration/rag_eval/output/<ts>/golden_chunks.jsonl \
+  --n-queries 25 \
+  --ragas-model claude-3-5-haiku-20241022
+```
+
+Output:
+- `ragas_e2e_raw_results.jsonl`
+- `ragas_local_scores.jsonl`
+- `ragas_k2_scores.jsonl`
+- `ragas_e2e_summary.md`
+
+## Optional: Baseline URL-Level Retrieval Eval
+
+```bash
 python3 migration/rag_eval/run_retrieval_eval.py --top-k 10 --n-queries 100
 ```
 
-Outputs are written under `migration/rag_eval/output/<timestamp>/`.
+## Shadow Validation Logs
 
-If you want the more realistic signals-based eval set:
+If runtime shadow validation is enabled (`K2_SHADOW_VALIDATE=true`), summarize logs with:
 
 ```bash
-python3 migration/rag_eval/run_retrieval_eval.py --eval-set signals --top-k 10 --n-queries 100
+python3 migration/rag_eval/parse_shadow_validate_logs.py path/to/api.jsonl --out shadow-summary.md
 ```
