@@ -28,7 +28,7 @@ test.describe('VanCity Lens — Full E2E Flow', () => {
     await page.waitForTimeout(2000);
 
     // Step 5: Find and interact with chat input
-    const chatInput = page.locator('input[type="text"]').first();
+    const chatInput = page.getByPlaceholder(/ask about developments/i);
     await expect(chatInput).toBeVisible({ timeout: 10_000 });
 
     await chatInput.fill('What development changes are happening downtown?');

@@ -182,7 +182,7 @@ class TestGeocodeAddress:
         # Mock parcel data
         mock_row = {
             "pid": "123456789",
-            "address": "1234 Main Street",
+            "civic_address": "1234 Main Street",
             "geom": MagicMock(x=-123.1, y=49.3)
         }
         conn.fetch.return_value = [mock_row]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ParcelEntitlement, DataSource } from "@/lib/types";
 import type { IntelSignal } from "@/lib/intel-types";
 import ProFormaSection from "./ProFormaSection";
@@ -144,12 +144,55 @@ export default function ParcelDetailPanel({
   onRunDealModel,
 }: ParcelDetailPanelProps) {
   const [showSources, setShowSources] = useState(false);
+  const [dueDiligenceEvidence, setDueDiligenceEvidence] = useState<any>(null);
+  const [dueDiligenceEvidenceLoading, setDueDiligenceEvidenceLoading] =
+    useState<boolean>(false);
+  const [dueDiligenceEvidenceError, setDueDiligenceEvidenceError] = useState<
+    string | null
+  >(null);
   const color = SIGNAL_COLORS[data.signal] || "#6b7280";
   const ve = data.value_estimate;
   const be = data.best_entitlement;
   const v = data.validation;
   const src = data.sources;
   const gradeColor = v ? GRADE_COLORS[v.deal_grade] || "#6b7280" : "#6b7280";
+
+  useEffect(() => {
+    if (!data?.pid) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    setDueDiligenceEvidenceLoading(true);
+    setDueDiligenceEvidenceError(null);
+
+    fetch(`${API_BASE}/api/v1/parcels/${data.pid}/due-diligence/evidence`, {
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((json) => {
+        if (!cancelled) setDueDiligenceEvidence(json);
+      })
+      .catch((err: any) => {
+        if (err?.name === "AbortError") return;
+        if (!cancelled) {
+          setDueDiligenceEvidenceError(err?.message || "Failed to load evidence");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDueDiligenceEvidenceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [data?.pid]);
 
   const handleDownloadReport = () => {
     const url = `${API_BASE}/api/v1/parcels/${data.pid}/report.pdf`;
@@ -584,6 +627,159 @@ export default function ParcelDetailPanel({
           <CollapsibleSection
             title={`Due Diligence (${v.due_diligence_checklist.length} items)`}
           >
+            {/* Evidence */}
+            <div
+              style={{
+                fontSize: "10px",
+                color: "#9ca3af",
+                lineHeight: 1.4,
+                background: "#0b1220",
+                border: "1px solid #1f2937",
+                borderRadius: "6px",
+                padding: "10px",
+                marginBottom: "10px",
+              }}
+            >
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#d1d5db" }}>
+                Evidence (Auto-Collected)
+              </div>
+              {dueDiligenceEvidenceLoading ? (
+                <div style={{ marginTop: "6px" }}>Loading evidence...</div>
+              ) : dueDiligenceEvidenceError ? (
+                <div style={{ marginTop: "6px", color: "#f59e0b" }}>
+                  Evidence unavailable: {dueDiligenceEvidenceError}
+                </div>
+              ) : dueDiligenceEvidence ? (
+                <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {/* Utilities */}
+                  <div>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#d1d5db" }}>
+                      Utilities (proximity)
+                    </div>
+                    {(["water", "sewer"] as const).map((t) => {
+                      const u = dueDiligenceEvidence?.utilities?.[t];
+                      const label = t === "water" ? "Water" : "Sewer";
+                      if (!u) return null;
+                      return (
+                        <div key={t} style={{ marginTop: "2px" }}>
+                          <span style={{ color: "#e5e7eb" }}>{label}:</span>{" "}
+                          {u.status === "ok" && u.nearest_distance_m != null ? (
+                            <>
+                              nearest line ~{u.nearest_distance_m}m
+                              {u.source?.url ? (
+                                <>
+                                  {" "}
+                                  <a
+                                    href={u.source.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: "#60a5fa" }}
+                                  >
+                                    source
+                                  </a>
+                                </>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              {u.status}
+                              {u.note ? `: ${u.note}` : ""}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Encumbrances */}
+                  <div>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#d1d5db" }}>
+                      Encumbrances proxy (easements)
+                    </div>
+                    {(() => {
+                      const e = dueDiligenceEvidence?.encumbrances_proxy;
+                      if (!e) return null;
+                      return (
+                        <div style={{ marginTop: "2px" }}>
+                          {e.status === "ok" ? (
+                            <>
+                              {e.easement_count ?? 0} easement(s) intersect this parcel{" "}
+                              {e.source?.url ? (
+                                <a
+                                  href={e.source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: "#60a5fa" }}
+                                >
+                                  source
+                                </a>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              {e.status}
+                              {e.note ? `: ${e.note}` : ""}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Policy excerpts */}
+                  <div>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#d1d5db" }}>
+                      OCP / policy excerpts
+                    </div>
+                    {(() => {
+                      const p = dueDiligenceEvidence?.ocp_policy_excerpts;
+                      if (!p) return null;
+                      if (p.status !== "ok") {
+                        return (
+                          <div style={{ marginTop: "2px" }}>
+                            {p.status}
+                            {p.note ? `: ${p.note}` : ""}
+                          </div>
+                        );
+                      }
+                      const excerpts = (p.excerpts || []).slice(0, 2);
+                      return (
+                        <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {excerpts.length ? (
+                            excerpts.map((ex: any, idx: number) => (
+                              <div key={idx} style={{ borderTop: "1px solid #111827", paddingTop: "6px" }}>
+                                <div style={{ color: "#e5e7eb", fontSize: "10px", fontWeight: 600 }}>
+                                  {ex.title || ex.source_type || "Source"}
+                                  {ex.section_header ? ` - ${ex.section_header}` : ""}
+                                </div>
+                                <div style={{ marginTop: "2px" }}>
+                                  {ex.excerpt ? `${String(ex.excerpt).slice(0, 180)}${String(ex.excerpt).length > 180 ? "..." : ""}` : ""}
+                                </div>
+                                {ex.source_url ? (
+                                  <a
+                                    href={ex.source_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: "#60a5fa" }}
+                                  >
+                                    source
+                                  </a>
+                                ) : null}
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ marginTop: "2px" }}>No excerpts found for: {p.query}</div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: "6px" }}>No evidence available.</div>
+              )}
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {v.due_diligence_checklist.map((dd: any, i: number) => (
                 <div

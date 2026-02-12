@@ -16,6 +16,8 @@ from fpdf import FPDF
 from pydantic import BaseModel, Field
 import asyncpg
 
+from .due_diligence_evidence import DueDiligenceEvidenceResponse, build_due_diligence_evidence
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,6 +81,7 @@ class ParcelReport(BaseModel):
     risk_flags: List[RiskFlag] = Field(default_factory=list)
     comparables: List[ComparableSale] = Field(default_factory=list)
     sources: List[str] = Field(default_factory=list)
+    due_diligence_evidence: Optional[DueDiligenceEvidenceResponse] = None
     generated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -133,7 +136,7 @@ class ReportGenerator:
         self._build_entitlement_analysis(pdf, parcel_data)
         self._build_pro_forma(pdf, parcel_data)
         self._build_risk_assessment(pdf, parcel_data)
-        self._build_due_diligence(pdf)
+        self._build_due_diligence(pdf, parcel_data)
         if parcel_data.comparables:
             self._build_comparable_sales(pdf, parcel_data)
         self._build_sources(pdf, parcel_data)
@@ -142,7 +145,9 @@ class ReportGenerator:
         # Return PDF as bytes
         pdf_bytes = pdf.output()
         if isinstance(pdf_bytes, str):
-            return pdf_bytes.encode('utf-8')
+            return pdf_bytes.encode("utf-8")
+        if isinstance(pdf_bytes, bytearray):
+            return bytes(pdf_bytes)
         return pdf_bytes
 
     async def _fetch_parcel_data(
@@ -156,7 +161,7 @@ class ReportGenerator:
                 """
                 SELECT
                     pid, civic_address, current_zoning,
-                    lot_area_sqm, created_at
+                    lot_area_sqm, geo_local_area, created_at
                 FROM parcels
                 WHERE pid = $1
                 LIMIT 1
@@ -250,21 +255,25 @@ class ReportGenerator:
             )
 
             # Fetch pro forma scenarios
-            scenarios = await conn.fetch(
-                """
-                SELECT scenario, gross_revenue, net_revenue, hard_costs,
-                       soft_costs, hidden_costs, developer_profit, total_cost,
-                       noi, cap_rate, roi
-                FROM parcel_pro_forma
-                WHERE pid = $1
-                ORDER BY CASE scenario
-                    WHEN 'conservative' THEN 1
-                    WHEN 'moderate' THEN 2
-                    WHEN 'aggressive' THEN 3
-                END
-                """,
-                pid,
-            )
+            try:
+                scenarios = await conn.fetch(
+                    """
+                    SELECT scenario, gross_revenue, net_revenue, hard_costs,
+                           soft_costs, hidden_costs, developer_profit, total_cost,
+                           noi, cap_rate, roi
+                    FROM parcel_pro_forma
+                    WHERE pid = $1
+                    ORDER BY CASE scenario
+                        WHEN 'conservative' THEN 1
+                        WHEN 'moderate' THEN 2
+                        WHEN 'aggressive' THEN 3
+                    END
+                    """,
+                    pid,
+                )
+            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+                # Optional table in some local/dev schemas.
+                scenarios = []
             data.pro_forma_scenarios = [
                 ProFormaScenario(
                     scenario=s["scenario"],
@@ -283,15 +292,18 @@ class ReportGenerator:
             ]
 
             # Fetch risk flags
-            risks = await conn.fetch(
-                """
-                SELECT category, description, severity, mitigation
-                FROM risk_assessments
-                WHERE pid = $1
-                ORDER BY severity DESC, category
-                """,
-                pid,
-            )
+            try:
+                risks = await conn.fetch(
+                    """
+                    SELECT category, description, severity, mitigation
+                    FROM risk_assessments
+                    WHERE pid = $1
+                    ORDER BY severity DESC, category
+                    """,
+                    pid,
+                )
+            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+                risks = []
             data.risk_flags = [
                 RiskFlag(
                     category=r["category"],
@@ -303,17 +315,20 @@ class ReportGenerator:
             ]
 
             # Fetch comparable sales
-            comps = await conn.fetch(
-                """
-                SELECT address, sale_price, price_per_sqft, sale_date,
-                       distance_m, zoning
-                FROM comparable_sales
-                WHERE pid = $1
-                ORDER BY distance_m ASC
-                LIMIT 5
-                """,
-                pid,
-            )
+            try:
+                comps = await conn.fetch(
+                    """
+                    SELECT address, sale_price, price_per_sqft, sale_date,
+                           distance_m, zoning
+                    FROM comparable_sales
+                    WHERE pid = $1
+                    ORDER BY distance_m ASC
+                    LIMIT 5
+                    """,
+                    pid,
+                )
+            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+                comps = []
             data.comparables = [
                 ComparableSale(
                     address=c["address"],
@@ -327,16 +342,26 @@ class ReportGenerator:
             ]
 
             # Fetch sources
-            sources = await conn.fetch(
-                """
-                SELECT DISTINCT source_url, source_type
-                FROM intelligence_signals
-                WHERE pid = $1
-                LIMIT 10
-                """,
-                pid,
-            )
-            data.sources = [s["source_url"] for s in sources if s["source_url"]]
+            try:
+                sources = await conn.fetch(
+                    """
+                    SELECT DISTINCT source_url, source_type
+                    FROM intelligence_signals
+                    WHERE pid = $1
+                    LIMIT 10
+                    """,
+                    pid,
+                )
+            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+                sources = []
+            data.sources = [s["source_url"] for s in sources if s.get("source_url")]
+
+            # Due diligence evidence (optional; must not break report generation)
+            try:
+                data.due_diligence_evidence = await build_due_diligence_evidence(conn, pid)
+            except Exception as e:
+                logger.warning("Failed to build due diligence evidence for %s: %s", pid, str(e)[:200])
+                data.due_diligence_evidence = None
 
             return data
 
@@ -562,8 +587,8 @@ class ReportGenerator:
 
         pdf.ln(3)
 
-    def _build_due_diligence(self, pdf: FPDF):
-        """Build due diligence checklist section."""
+    def _build_due_diligence(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Build due diligence checklist section (plus evidence with source links when available)."""
         # Section header
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Due Diligence Checklist", ln=True)
@@ -589,6 +614,120 @@ class ReportGenerator:
         for i, item in enumerate(checklist_items, 1):
             pdf.cell(4, 5, "[ ]")  # Checkbox (ASCII compatible)
             pdf.cell(0, 5, item, ln=True)
+
+        pdf.ln(4)
+
+        evidence = parcel_data.due_diligence_evidence
+        if not evidence:
+            return
+
+        # fpdf2's multi_cell uses the "remaining width" from the current X position when w=0.
+        # If X is at (or past) the right margin, it can throw:
+        #   FPDFException: Not enough horizontal space to render a single character
+        # Reset X defensively before we start emitting multi_cell content.
+        pdf.set_x(self.left_margin)
+
+        def _trunc(s: str, max_len: int = 160) -> str:
+            s = (s or "").strip()
+            return s if len(s) <= max_len else s[: max_len - 3].rstrip() + "..."
+
+        def _wrap_url(url: str) -> str:
+            # Insert soft break opportunities for long, unbroken URLs.
+            u = (url or "").strip()
+            if not u:
+                return u
+            return (
+                u.replace("://", ":// ")
+                .replace("/", "/ ")
+                .replace("?", "? ")
+                .replace("&", "& ")
+                .replace("=", "= ")
+            )
+
+        def _pdf_safe(text: str) -> str:
+            # Core fonts are Latin-1. Normalize common Unicode punctuation and replace the rest.
+            t = (text or "").replace("\u00a0", " ")  # nbsp
+            t = (
+                t.replace("\u2014", "-")  # em dash
+                .replace("\u2013", "-")  # en dash
+                .replace("\u2212", "-")  # minus sign
+                .replace("\u2018", "'")  # left single quote
+                .replace("\u2019", "'")  # right single quote
+                .replace("\u201c", '"')  # left double quote
+                .replace("\u201d", '"')  # right double quote
+                .replace("\u2026", "...")  # ellipsis
+                .replace("\u2022", "-")  # bullet
+                .replace("\u200b", "")  # zero-width space
+            )
+            # Prevent fpdf2 from raising when encountering an unbreakable "word" longer than the line width
+            # (common with long URLs or tokens). Insert spaces periodically in long non-whitespace runs.
+            out: list[str] = []
+            run = 0
+            for ch in t:
+                out.append(ch)
+                if ch.isspace():
+                    run = 0
+                    continue
+                run += 1
+                if run >= 60:
+                    out.append(" ")
+                    run = 0
+            t = "".join(out)
+            return t.encode("latin-1", "replace").decode("latin-1")
+
+        def _mc(text: str) -> None:
+            # Always start multi_cell lines at the left margin to avoid zero-width edge cases.
+            pdf.set_x(self.left_margin)
+            pdf.multi_cell(0, 5, _pdf_safe(text))
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 6, "Evidence (Auto-Collected)", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+
+        # Utilities (water/sewer)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, "Utilities (proximity evidence):", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        for label, ue in [("Water", evidence.utilities.water), ("Sewer", evidence.utilities.sewer)]:
+            if ue.status == "ok" and ue.nearest_distance_m is not None:
+                src = _wrap_url(ue.source.url) if ue.source else ""
+                _mc(f"- {label}: nearest line ~{ue.nearest_distance_m}m. Source: {src}")
+            else:
+                _mc(f"- {label}: {ue.status}. {_trunc(ue.note or '')}")
+
+        pdf.ln(2)
+
+        # Encumbrances proxy (easements)
+        enc = evidence.encumbrances_proxy
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, "Encumbrances proxy (open-data easements):", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        if enc.status == "ok":
+            src = _wrap_url(enc.source.url) if enc.source else ""
+            _mc(f"- Easements intersecting parcel: {enc.easement_count}. Source: {src}")
+            if enc.easements:
+                sample = ", ".join(_trunc(e.easement_type, 40) for e in enc.easements[:3])
+                _mc(f"- Sample easements: {sample}")
+            if enc.note:
+                _mc(f"- Note: {_trunc(enc.note)}")
+        else:
+            _mc(f"- Easements: {enc.status}. {_trunc(enc.note or '')}")
+
+        pdf.ln(2)
+
+        # Policy excerpts
+        pol = evidence.ocp_policy_excerpts
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, "OCP / policy excerpts (from ingested documents):", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        if pol.status == "ok" and pol.excerpts:
+            for ex in pol.excerpts[:3]:
+                title = ex.title or ex.source_type or "Source"
+                header = f" ({ex.section_header})" if ex.section_header else ""
+                src = _wrap_url(ex.source_url)
+                _mc(f"- {title}{header}: {_trunc(ex.excerpt)} Source: {src}")
+        else:
+            _mc(f"- Policy excerpts: {pol.status}. {_trunc(pol.note or '')}")
 
         pdf.ln(3)
 
@@ -653,7 +792,7 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 22)
         pdf.cell(0, 12, "Investment Memo", ln=True, align="C")
         pdf.set_font("Helvetica", "", 12)
-        pdf.cell(0, 7, "VanCity Lens — Confidential", ln=True, align="C")
+        pdf.cell(0, 7, "VanCity Lens - Confidential", ln=True, align="C")
         pdf.set_draw_color(59, 130, 246)
         pdf.set_line_width(0.5)
         pdf.line(self.left_margin, pdf.get_y() + 2, self.page_width - self.right_margin, pdf.get_y() + 2)
@@ -730,7 +869,7 @@ class ReportGenerator:
         # Due Diligence
         pdf.set_font("Helvetica", "B", 14)
         pdf.cell(0, 8, "6. Due Diligence Checklist", ln=True)
-        self._build_due_diligence(pdf)
+        self._build_due_diligence(pdf, parcel_data)
 
         # Comparable Sales
         if parcel_data.comparables:

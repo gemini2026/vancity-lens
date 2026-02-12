@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:8000';
+// Local docker-compose exposes API at http://localhost:8080 (container listens on :8000).
+const API_BASE = process.env.API_BASE_URL || 'http://localhost:8080';
 const PERFORMANCE_THRESHOLD_API = 2000; // ms
 
 // API-only tests — skip on mobile-chrome since they don't test mobile UI

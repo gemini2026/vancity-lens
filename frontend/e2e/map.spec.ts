@@ -46,7 +46,8 @@ test.describe('VanCity Lens — Map View', () => {
   });
 
   test('map markers count matches expected data', async ({ page, request }) => {
-    const apiBase = process.env.API_BASE_URL || 'http://localhost:8000';
+    // Local docker-compose exposes API at http://localhost:8080 (container listens on :8000).
+    const apiBase = process.env.API_BASE_URL || 'http://localhost:8080';
 
     const signalsResponse = await request.get(`${apiBase}/api/v1/intel/signals`).catch(() => null);
 

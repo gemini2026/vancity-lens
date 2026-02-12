@@ -413,12 +413,90 @@ def test_build_due_diligence_checklist():
     pdf = FPDF()
     pdf.add_page()
 
+    report = ParcelReport(
+        pid="test",
+        lot_area_sqm=Decimal("500"),
+        lot_area_sqft=Decimal("5381.95"),
+        buildable_sqft=Decimal("10763.9"),
+    )
+
     generator = ReportGenerator()
-    generator._build_due_diligence(pdf)
+    generator._build_due_diligence(pdf, report)
 
     output = pdf.output()
     assert len(output) > 0
     # Verify PDF is valid
+    assert output.startswith(b"%PDF")
+
+
+def test_build_due_diligence_with_evidence_does_not_crash():
+    """Evidence-backed due diligence section should not crash PDF generation (unicode + long tokens)."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+
+    long_token = "a" * 500
+    evidence = {
+        "pid": "test",
+        "generated_at": "2026-02-10T00:00:00Z",
+        "utilities": {
+            "status": "partial",
+            "water": {
+                "status": "ok",
+                "nearest_distance_m": 12.3,
+                "nearest_assets": [],
+                "source": {
+                    "label": "Test Water Dataset",
+                    "url": f"https://example.com/water/path?token={long_token}",
+                },
+                "note": None,
+            },
+            "sewer": {
+                "status": "not_loaded",
+                "nearest_distance_m": None,
+                "nearest_assets": [],
+                "source": {"label": "Test Sewer Dataset", "url": "https://example.com/sewer"},
+                "note": long_token,
+            },
+        },
+        "encumbrances_proxy": {
+            "status": "ok",
+            "easement_count": 1,
+            "easements": [{"easement_type": "Statutory right of way", "plan_number": "SRW-123"}],
+            "source": {"label": "Test Easements Dataset", "url": "https://example.com/easements"},
+            "note": "Proxy only — confirm via LTSA title search.",
+        },
+        "ocp_policy_excerpts": {
+            "status": "ok",
+            "query": "test query",
+            "excerpts": [
+                {
+                    "title": "Policy Update — Draft",
+                    "source_url": f"https://example.com/policy?ref={long_token}",
+                    "source_type": "syc_plan_document",
+                    "section_header": "Heights & Density",
+                    # Unicode punctuation + bullet should be sanitized for core PDF fonts.
+                    "excerpt": "Council noted: “increased density” • subject to review — see Appendix A.",
+                }
+            ],
+            "note": None,
+        },
+    }
+
+    report = ParcelReport(
+        pid="test",
+        lot_area_sqm=Decimal("500"),
+        lot_area_sqft=Decimal("5381.95"),
+        buildable_sqft=Decimal("10763.9"),
+        due_diligence_evidence=evidence,
+    )
+
+    generator = ReportGenerator()
+    generator._build_due_diligence(pdf, report)
+
+    output = pdf.output()
+    assert len(output) > 0
     assert output.startswith(b"%PDF")
 
 

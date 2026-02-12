@@ -12,12 +12,13 @@ Search pipeline uses Cohere embeddings + BM25 hybrid search with RRF fusion.
 
 import asyncio
 import logging
+import os
 import uuid
 from datetime import datetime, date, timezone
 from typing import Optional, List
 
 import asyncpg
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, NotFoundError
 
 from .embeddings import hybrid_search, sparse_search
 from .external_clients import ANTHROPIC_CHAT_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
@@ -240,16 +241,49 @@ User query: {query}"""
             ]
 
             try:
-                async with ANTHROPIC_SEMAPHORE:
-                    response = await asyncio.wait_for(
-                        client.messages.create(
-                            model="claude-sonnet-4-5-20250514",
-                            max_tokens=2000,
-                            system=CHAT_SYSTEM_PROMPT,
-                            messages=messages,
-                        ),
-                        timeout=ANTHROPIC_CHAT_TIMEOUT_SECONDS,
-                    )
+                # Prefer configured model, but fall back to known-good Claude model IDs.
+                model_candidates: list[str] = []
+                configured_model = (os.environ.get("ANTHROPIC_MODEL") or "").strip()
+                if configured_model:
+                    model_candidates.append(configured_model)
+                model_candidates.extend(
+                    [
+                        # Prefer broadly-available models; keep fallbacks short to avoid long 404 chains.
+                        "claude-3-5-sonnet-20240620",
+                        "claude-3-5-haiku-20241022",
+                        "claude-3-haiku-20240307",
+                    ]
+                )
+
+                last_exc: Exception | None = None
+                for model in model_candidates:
+                    try:
+                        async with ANTHROPIC_SEMAPHORE:
+                            response = await asyncio.wait_for(
+                                client.messages.create(
+                                    model=model,
+                                    max_tokens=2000,
+                                    system=CHAT_SYSTEM_PROMPT,
+                                    messages=messages,
+                                ),
+                                timeout=ANTHROPIC_CHAT_TIMEOUT_SECONDS,
+                            )
+                        break
+                    except NotFoundError as e:
+                        last_exc = e
+                        logger.warning(f"Anthropic model not found: {model}; trying fallback.")
+                        continue
+                    except Exception as e:
+                        last_exc = e
+                        # If the configured/default model isn't available, try the next candidate.
+                        msg = str(e)
+                        if "Error code: 404" in msg and ("model:" in msg or "not_found_error" in msg):
+                            logger.warning(f"Anthropic model not found: {model}; trying fallback.")
+                            continue
+                        raise
+                else:
+                    assert last_exc is not None
+                    raise last_exc
             finally:
                 await client.close()
 

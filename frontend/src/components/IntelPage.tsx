@@ -401,7 +401,7 @@ export default function IntelPage() {
                       >
                         {msg.citations.map((citation, idx) => {
                           const citationHref = citation.document_id
-                            ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${citation.document_id}/page`
+                            ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/intel/documents/${citation.document_id}/page`
                             : citation.document_url;
                           return (
                             <a

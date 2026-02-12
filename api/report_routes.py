@@ -9,8 +9,7 @@ from typing import Optional
 from datetime import datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Depends, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 import asyncpg
 
 from .db import db
@@ -69,7 +68,7 @@ async def download_parcel_report_pdf(
     pid: str,
     request=None,
     pool: asyncpg.Pool = Depends(lambda: db.pool),
-) -> StreamingResponse:
+) -> Response:
     """
     Generate and download a PDF report for a parcel.
 
@@ -79,7 +78,7 @@ async def download_parcel_report_pdf(
         pool: Database connection pool
 
     Returns:
-        PDF file as streaming response
+        PDF file as response
 
     Raises:
         404: Parcel not found
@@ -92,9 +91,9 @@ async def download_parcel_report_pdf(
         # Generate PDF
         pdf_bytes = await generate_parcel_report(pool, pid, user_id=None)
 
-        # Return as downloadable attachment
-        return StreamingResponse(
-            iter([pdf_bytes]),
+        # Avoid StreamingResponse here: BaseHTTPMiddleware + streaming can be fragile in Starlette.
+        return Response(
+            content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=report_{pid}.pdf"},
         )
@@ -160,7 +159,7 @@ async def download_investor_memo_pdf(
     pid: str,
     request=None,
     pool: asyncpg.Pool = Depends(lambda: db.pool),
-) -> StreamingResponse:
+) -> Response:
     """Generate and download an investor memo PDF for a parcel."""
     if not pool:
         raise HTTPException(status_code=500, detail="Database not connected")
@@ -178,9 +177,12 @@ async def download_investor_memo_pdf(
         pdf_bytes = pdf.output()
         if isinstance(pdf_bytes, str):
             pdf_bytes = pdf_bytes.encode("utf-8")
+        elif isinstance(pdf_bytes, bytearray):
+            pdf_bytes = bytes(pdf_bytes)
 
-        return StreamingResponse(
-            iter([pdf_bytes]),
+        # Avoid StreamingResponse here: BaseHTTPMiddleware + streaming can be fragile in Starlette.
+        return Response(
+            content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=investor_memo_{pid}.pdf"},
         )

@@ -8,6 +8,7 @@ rezoning decisions, permits, and policy changes.
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 from difflib import SequenceMatcher
@@ -20,6 +21,26 @@ from .external_clients import ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS, ANTHROPIC_SE
 from .models import ExtractedSignal
 
 logger = logging.getLogger(__name__)
+
+# Cache the first successful extraction model to avoid repeating 404 fallbacks
+# on every chunk when an account doesn't have access to some model IDs.
+_EXTRACTION_MODEL_HINT: Optional[str] = None
+_EXTRACTION_DEFAULT_MODELS = [
+    "claude-3-5-sonnet-20240620",
+    "claude-3-5-haiku-20241022",
+    "claude-3-haiku-20240307",
+]
+
+
+def _dedupe_ordered(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
 
 # ──────────────────────────────────────────────────────────────────────────
 # SYSTEM PROMPT FOR LLM
@@ -154,84 +175,110 @@ Extract all real estate intelligence signals from this chunk. Return valid JSON 
         created_client = True
 
     try:
-        for attempt in range(max_retries):
-            try:
-                logger.debug(
-                    f"Calling Claude API (attempt {attempt + 1}/{max_retries}) for chunk extraction"
-                )
+        global _EXTRACTION_MODEL_HINT
 
-                async with ANTHROPIC_SEMAPHORE:
-                    response = await asyncio.wait_for(
-                        client.messages.create(
-                            model="claude-sonnet-4-5-20250514",
-                            max_tokens=2000,
-                            system=EXTRACTION_SYSTEM_PROMPT,
-                            messages=[{"role": "user", "content": user_message}],
-                        ),
-                        timeout=ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS,
+        # Prefer configured model, then a cached known-good model, then fallbacks.
+        model_candidates: list[str] = []
+        configured_model = (os.environ.get("ANTHROPIC_MODEL") or "").strip()
+        if configured_model:
+            model_candidates.append(configured_model)
+        if _EXTRACTION_MODEL_HINT:
+            model_candidates.append(_EXTRACTION_MODEL_HINT)
+        model_candidates.extend(_EXTRACTION_DEFAULT_MODELS)
+        model_candidates = _dedupe_ordered(model_candidates)
+
+        response_text = ""
+        for model in model_candidates:
+            for attempt in range(max_retries):
+                try:
+                    logger.debug(
+                        f"Calling Claude API (model={model}, attempt {attempt + 1}/{max_retries}) for chunk extraction"
                     )
 
-                response_text = response.content[0].text.strip()
-                logger.debug(f"Claude API response: {response_text[:200]}...")
-
-                # Parse the JSON response
-                signals_data = json.loads(response_text)
-
-                # Handle case where model returns an empty array
-                if not signals_data:
-                    logger.debug("Claude returned empty signal list for chunk")
-                    return []
-
-                # Ensure it's a list
-                if not isinstance(signals_data, list):
-                    signals_data = [signals_data]
-
-                # Convert to ExtractedSignal objects with validation
-                signals = []
-                for signal_dict in signals_data:
-                    try:
-                        signal = ExtractedSignal(**signal_dict)
-                        signals.append(signal)
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to parse signal object: {e}. Data: {signal_dict}"
+                    async with ANTHROPIC_SEMAPHORE:
+                        response = await asyncio.wait_for(
+                            client.messages.create(
+                                model=model,
+                                max_tokens=2000,
+                                system=EXTRACTION_SYSTEM_PROMPT,
+                                messages=[{"role": "user", "content": user_message}],
+                            ),
+                            timeout=ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS,
                         )
-                        # Skip invalid signals but continue processing
-                        continue
 
-                logger.info(f"Extracted {len(signals)} signals from chunk")
-                return signals
+                    response_text = response.content[0].text.strip()
+                    logger.debug(f"Claude API response: {response_text[:200]}...")
 
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse Claude JSON response (attempt {attempt + 1}): {e}")
-                logger.debug(f"Response text: {response_text}")
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor ** attempt
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error("Max retries exceeded for JSON parsing")
-                    return []
+                    # Parse the JSON response
+                    signals_data = json.loads(response_text)
 
-            except anthropic.APIError as e:
-                logger.error(f"Anthropic API error on attempt {attempt + 1}: {e}")
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor ** attempt
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error("Max retries exceeded for API calls")
-                    return []
+                    # Handle case where model returns an empty array
+                    if not signals_data:
+                        logger.debug("Claude returned empty signal list for chunk")
+                        return []
 
-            except Exception as e:
-                logger.error(f"Unexpected error during extraction (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    wait_time = backoff_factor ** attempt
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error("Max retries exceeded")
-                    return []
+                    # Ensure it's a list
+                    if not isinstance(signals_data, list):
+                        signals_data = [signals_data]
+
+                    # Convert to ExtractedSignal objects with validation
+                    signals: list[ExtractedSignal] = []
+                    for signal_dict in signals_data:
+                        try:
+                            signal = ExtractedSignal(**signal_dict)
+                            signals.append(signal)
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to parse signal object: {e}. Data: {signal_dict}"
+                            )
+                            # Skip invalid signals but continue processing
+                            continue
+
+                    if _EXTRACTION_MODEL_HINT != model:
+                        _EXTRACTION_MODEL_HINT = model
+                        logger.info("Extraction model selected: %s", model)
+
+                    logger.info(f"Extracted {len(signals)} signals from chunk")
+                    return signals
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse Claude JSON response (attempt {attempt + 1}): {e}")
+                    logger.debug(f"Response text: {response_text}")
+                    if attempt < max_retries - 1:
+                        wait_time = backoff_factor ** attempt
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error("Max retries exceeded for JSON parsing")
+                        break
+
+                except anthropic.APIError as e:
+                    msg = str(e)
+                    # If the model isn't available for this key/org, try the next candidate.
+                    if "Error code: 404" in msg and ("model:" in msg or "not_found_error" in msg):
+                        if _EXTRACTION_MODEL_HINT == model and not configured_model:
+                            _EXTRACTION_MODEL_HINT = None
+                        logger.warning(f"Anthropic model not found: {model}; trying fallback.")
+                        break
+
+                    logger.error(f"Anthropic API error on attempt {attempt + 1}: {e}")
+                    if attempt < max_retries - 1:
+                        wait_time = backoff_factor ** attempt
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error("Max retries exceeded for API calls")
+                        break
+
+                except Exception as e:
+                    logger.error(f"Unexpected error during extraction (attempt {attempt + 1}): {e}")
+                    if attempt < max_retries - 1:
+                        wait_time = backoff_factor ** attempt
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error("Max retries exceeded")
+                        break
 
         return []
     finally:
@@ -268,7 +315,7 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
         async with db_pool.acquire() as conn:
             # Get all addresses from parcels table
             rows = await conn.fetch(
-                "SELECT pid, address, geom FROM parcels LIMIT 10000"  # reasonable limit
+                "SELECT pid, civic_address, geom FROM parcels LIMIT 10000"  # reasonable limit
             )
 
         if rows:
@@ -277,7 +324,7 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
             best_score = 0.0
 
             for row in rows:
-                parcel_address = row["address"]
+                parcel_address = row["civic_address"]
                 if not parcel_address:
                     continue
 
@@ -508,7 +555,7 @@ async def process_document(
                             signal.confidence,
                             signal.event_date,
                             geom if geom else "SRID=4326;POINT(0 0)",  # default point if geocoding failed
-                            "claude-sonnet-4-5-20250514",
+                            (os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-20240620"),
                             datetime.now(timezone.utc),
                         )
 

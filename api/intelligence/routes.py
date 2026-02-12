@@ -86,6 +86,22 @@ router.include_router(scraper_schools_routes.router)
 # ── Utility: Get API keys from environment ────────────────────────────
 
 
+def _normalize_api_key(raw: Optional[str]) -> Optional[str]:
+    """
+    Treat common docker-compose placeholder values as "not configured".
+
+    This keeps local dev in DEMO mode unless real keys are provided.
+    """
+    if raw is None:
+        return None
+    key = raw.strip()
+    if not key:
+        return None
+    if key in {"sk-placeholder", "placeholder"}:
+        return None
+    return key
+
+
 def get_anthropic_api_key() -> str:
     """Get Anthropic API key from environment. Raises 500 if missing."""
     key = os.environ.get("ANTHROPIC_API_KEY")
@@ -112,12 +128,12 @@ def get_cohere_api_key() -> str:
 
 def get_anthropic_api_key_optional() -> Optional[str]:
     """Get Anthropic API key from environment, or None if not set."""
-    return os.environ.get("ANTHROPIC_API_KEY") or None
+    return _normalize_api_key(os.environ.get("ANTHROPIC_API_KEY"))
 
 
 def get_cohere_api_key_optional() -> Optional[str]:
     """Get Cohere API key from environment, or None if not set."""
-    return os.environ.get("COHERE_API_KEY") or None
+    return _normalize_api_key(os.environ.get("COHERE_API_KEY"))
 
 
 def get_db_pool(request: Request) -> asyncpg.Pool:

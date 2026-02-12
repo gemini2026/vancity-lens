@@ -17,7 +17,7 @@ test.describe('VanCity Lens — Intelligence Tab', () => {
   });
 
   test('chat input is present and functional', async ({ page }) => {
-    const chatInput = page.locator('input[type="text"]').first();
+    const chatInput = page.getByPlaceholder(/ask about developments/i);
     await expect(chatInput).toBeVisible({ timeout: 10_000 });
 
     // Verify placeholder
@@ -71,7 +71,7 @@ test.describe('VanCity Lens — Intelligence Tab', () => {
   });
 
   test('chat input accepts text input', async ({ page }) => {
-    const chatInput = page.locator('input[type="text"]').first();
+    const chatInput = page.getByPlaceholder(/ask about developments/i);
     await expect(chatInput).toBeVisible({ timeout: 10_000 });
 
     const testText = 'Test query for chat';
@@ -81,7 +81,7 @@ test.describe('VanCity Lens — Intelligence Tab', () => {
   });
 
   test('performance: chat input responds within threshold', async ({ page }) => {
-    const chatInput = page.locator('input[type="text"]').first();
+    const chatInput = page.getByPlaceholder(/ask about developments/i);
     await expect(chatInput).toBeVisible({ timeout: 10_000 });
 
     const startTime = Date.now();
