@@ -273,6 +273,15 @@ async def main() -> int:
         default=True,
         help="Skip URLs already present in the K2 corpus (default: true). Use --no-skip-existing to re-ingest.",
     )
+    parser.add_argument(
+        "--auto-index",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Whether K2 should auto-index after URL ingestion. "
+            "Default: true unless --build-indexes is set."
+        ),
+    )
     parser.add_argument("--batch-size", type=int, default=25, help="Number of URLs per K2 ingest_urls call")
     parser.add_argument("--wait", action="store_true", help="Wait for ingestion jobs to complete")
     parser.add_argument("--poll-s", type=int, default=3, help="Polling interval when --wait")
@@ -322,6 +331,16 @@ async def main() -> int:
     )
     batches = _chunked(items, max(args.batch_size, 1))
 
+    # Default behavior:
+    # - For initial bulk loads, prefer --build-indexes (which implies auto_index=false) to avoid
+    #   triggering indexing repeatedly per batch.
+    # - For incremental sync runs, default to auto_index=true so newly ingested docs are searchable
+    #   without a full corpus re-index.
+    if args.auto_index is None:
+        auto_index = not args.build_indexes
+    else:
+        auto_index = bool(args.auto_index)
+
     job_ids: list[str] = []
     submitted_total = 0
     for batch in batches:
@@ -331,7 +350,7 @@ async def main() -> int:
             resp = client.ingest_urls(
                 corpus_id,
                 batch,
-                auto_index=False,  # we build indexes explicitly at the end
+                auto_index=auto_index,
                 wait=False,
             )
         except Knowledge2Error as exc:

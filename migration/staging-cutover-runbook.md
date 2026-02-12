@@ -35,7 +35,10 @@ Shadow validation runs a background local retrieval compare and emits structured
 2. Run validation against staging in `local` mode:
    - `API_URL=https://<staging-host> bash migration/validate_k2_migration.sh --backend local --skip-pytest`
 3. Switch staging env to `RAG_BACKEND=k2` (leave `K2_FALLBACK_TO_LOCAL=true` for first soak).
-4. Deploy.
+   - GKE/kubectl example:
+     - `kubectl -n vancity-lens patch configmap vancity-lens-config --type merge -p '{"data":{"rag-backend":"k2"}}'`
+     - `kubectl -n vancity-lens rollout restart deployment/vancity-lens-api`
+4. Deploy (or wait for rollout to complete).
 5. Run validation against staging in `k2` mode:
    - `API_URL=https://<staging-host> K2_API_HOST=... K2_API_KEY=... K2_CORPUS_ID=... bash migration/validate_k2_migration.sh --backend k2 --skip-pytest`
 
@@ -67,4 +70,3 @@ python3 migration/rag_eval/parse_shadow_validate_logs.py path/to/api.jsonl --out
 - K2 timeout rate is within acceptable bounds.
 - Rollback verified in staging.
 - Monitoring dashboards/alerts are in place (errors, latency, timeouts).
-

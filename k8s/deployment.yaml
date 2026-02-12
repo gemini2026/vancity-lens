@@ -56,6 +56,11 @@ spec:
         
         # Environment variables from ConfigMap and Secrets
         env:
+        - name: RAG_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: rag-backend
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -71,6 +76,71 @@ spec:
             secretKeyRef:
               name: vancity-lens-secrets
               key: cohere-api-key
+        - name: K2_API_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-api-host
+        - name: K2_CORPUS_ID
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-corpus-id
+        - name: K2_TOP_K
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-top-k
+        - name: K2_TIMEOUT_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-timeout-seconds
+        - name: K2_FALLBACK_TO_LOCAL
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-fallback-to-local
+        - name: K2_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: k2-api-key
+        - name: K2_SHADOW_VALIDATE
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-shadow-validate
+        - name: K2_SHADOW_VALIDATE_SAMPLE_RATE
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-shadow-validate-sample-rate
+        - name: K2_SHADOW_VALIDATE_LOCAL_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-shadow-validate-local-mode
+        - name: K2_SHADOW_VALIDATE_TOP_N
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-shadow-validate-top-n
+        - name: K2_SHADOW_VALIDATE_MAX_CONCURRENCY
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-shadow-validate-max-concurrency
+        - name: K2_SHADOW_VALIDATE_TIMEOUT_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: k2-shadow-validate-timeout-seconds
+        - name: BRAVE_SEARCH_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: brave-search-api-key
         - name: CORS_ORIGINS
           valueFrom:
             configMapKeyRef:

@@ -51,6 +51,11 @@ spec:
             
             # Environment variables from ConfigMap and Secrets
             env:
+            - name: RAG_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: vancity-lens-config
+                  key: rag-backend
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -66,6 +71,11 @@ spec:
                 secretKeyRef:
                   name: vancity-lens-secrets
                   key: cohere-api-key
+            - name: BRAVE_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: brave-search-api-key
             - name: CORS_ORIGINS
               valueFrom:
                 configMapKeyRef:

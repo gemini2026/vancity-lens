@@ -7,3 +7,21 @@ metadata:
     app: vancity-lens-api
 data:
   cors-origins: "https://vancity-lens.pages.dev"
+
+  # RAG backend switch
+  rag-backend: "local" # local|k2
+
+  # K2 (Knowledge2) runtime config (non-secret)
+  k2-api-host: "https://api-dev.knowledge2.ai"
+  k2-corpus-id: "vancity"
+  k2-top-k: "10"
+  k2-timeout-seconds: "20"
+  k2-fallback-to-local: "true"
+
+  # Optional: Shadow validation logs during rollout (does NOT affect responses)
+  k2-shadow-validate: "false"
+  k2-shadow-validate-sample-rate: "0.05"
+  k2-shadow-validate-local-mode: "sparse" # sparse|hybrid|equivalent
+  k2-shadow-validate-top-n: "5"
+  k2-shadow-validate-max-concurrency: "2"
+  k2-shadow-validate-timeout-seconds: "8"
