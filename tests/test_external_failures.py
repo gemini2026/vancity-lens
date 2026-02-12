@@ -55,7 +55,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -87,7 +87,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -119,7 +119,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -150,7 +150,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -183,7 +183,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -215,7 +215,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -304,7 +304,7 @@ class TestAnthropicAPIFailures:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -680,8 +680,8 @@ class TestCombinedFailureScenarios:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search") as mock_search:
-            # hybrid_search fails due to Cohere error
+        with patch("api.intelligence.chat.retrieve_document_chunks") as mock_search:
+            # Retrieval fails due to upstream search error (e.g., Cohere embeddings)
             mock_search.side_effect = Exception("Cohere embedding failed")
 
             with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
@@ -715,7 +715,7 @@ class TestCombinedFailureScenarios:
             side_effect=Exception("Database insert failed")
         )
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
                     mock_client = MagicMock()
@@ -754,8 +754,8 @@ class TestCombinedFailureScenarios:
             side_effect=asyncio.TimeoutError("Database timeout")
         )
 
-        with patch("api.intelligence.chat.hybrid_search") as mock_search:
-            # Cohere times out
+        with patch("api.intelligence.chat.retrieve_document_chunks") as mock_search:
+            # Retrieval times out (e.g., upstream embedding/search timeout)
             mock_search.side_effect = asyncio.TimeoutError("Cohere timeout")
 
             with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:

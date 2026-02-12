@@ -55,7 +55,7 @@ class TestHandleChat:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session") as mock_create:
                     # Mock session creation
@@ -100,7 +100,7 @@ class TestHandleChat:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.get_session_history", return_value=None):
                     with patch("api.intelligence.chat.build_context_window", return_value=""):
@@ -148,7 +148,7 @@ class TestHandleChat:
             }
         ]
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=mock_chunks):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=mock_chunks):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session") as mock_create:
                     from api.intelligence.models import ChatSession
@@ -191,7 +191,7 @@ class TestHandleChat:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]) as mock_search:
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]) as mock_search:
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session") as mock_create:
                     from api.intelligence.models import ChatSession
@@ -235,7 +235,7 @@ class TestHandleChat:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session") as mock_create:
                     from api.intelligence.models import ChatSession
@@ -365,7 +365,7 @@ class TestChatIntegration:
             }
         ]
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=mock_chunks):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=mock_chunks):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session") as mock_create:
                     from api.intelligence.models import ChatSession

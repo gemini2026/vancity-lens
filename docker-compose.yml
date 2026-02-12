@@ -97,11 +97,20 @@ services:
       ADMIN_API_KEY: "${ADMIN_API_KEY:-vcl-admin-dev-key-2026}"
       RATE_LIMIT_GENERAL: "${RATE_LIMIT_GENERAL:-1000}"
       RATE_LIMIT_LLM: "${RATE_LIMIT_LLM:-30}"
+      # RAG backend selection (local vs K2)
+      RAG_BACKEND: "${RAG_BACKEND:-local}"
+      K2_API_HOST: "${K2_API_HOST:-}"
+      K2_API_KEY: "${K2_API_KEY:-}"
+      K2_CORPUS_ID: "${K2_CORPUS_ID:-}"
+      K2_TOP_K: "${K2_TOP_K:-10}"
+      K2_TIMEOUT_SECONDS: "${K2_TIMEOUT_SECONDS:-20}"
+      K2_FALLBACK_TO_LOCAL: "${K2_FALLBACK_TO_LOCAL:-true}"
     volumes:
       - ./api:/app/api
       - ./scripts:/app/scripts
       - ./db:/app/db
       - ./pipeline:/app/pipeline
+      - ./sdk:/app/sdk
     depends_on:
       pgbouncer:
         condition: service_healthy

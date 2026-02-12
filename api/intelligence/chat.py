@@ -20,11 +20,10 @@ from typing import Optional, List
 import asyncpg
 from anthropic import AsyncAnthropic, NotFoundError
 
-from .embeddings import hybrid_search, sparse_search
 from .external_clients import ANTHROPIC_CHAT_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
 from .models import ChatResponse, SourceCitation, SignalResponse
 from .prepared_queries import QueryBuilder
-from .query_planner import is_multi_hop, multi_hop_search
+from .retrieval_backend import retrieve_document_chunks
 from .chat_sessions import (
     create_session,
     get_session_history,
@@ -128,38 +127,15 @@ async def handle_chat(
     try:
         # Step 1: Retrieve relevant document chunks
         logger.info(f"Retrieving document chunks for query: {query[:100]}...")
-
-        if search_mode == "full":
-            # Full hybrid search with Cohere embeddings + BM25 + reranking
-            if is_multi_hop(query):
-                logger.info("Multi-hop query detected, using decomposed retrieval")
-                chunks = await multi_hop_search(
-                    db_pool,
-                    query,
-                    cohere_api_key,
-                    search_fn=hybrid_search,
-                    limit_per_hop=8,
-                    final_limit=12,
-                    use_rerank=True,
-                )
-            else:
-                chunks = await hybrid_search(
-                    db_pool,
-                    query,
-                    cohere_api_key,
-                    limit=10,
-                    use_rerank=True,
-                )
-        else:
-            # Partial or demo mode: BM25 sparse search only (no API keys)
-            chunks = await sparse_search(
-                db_pool,
-                query,
-                limit=10,
-                neighborhood=neighborhood_filter,
-                date_from=date_from,
-                date_to=date_to,
-            )
+        chunks = await retrieve_document_chunks(
+            db_pool=db_pool,
+            query=query,
+            search_mode=search_mode,
+            cohere_api_key=cohere_api_key,
+            neighborhood_filter=neighborhood_filter,
+            date_from=date_from,
+            date_to=date_to,
+        )
 
         # Step 2: Retrieve matching intelligence signals
         logger.info("Retrieving intelligence signals...")

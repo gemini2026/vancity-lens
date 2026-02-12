@@ -49,6 +49,7 @@ RUN useradd -m -u 1000 -s /sbin/nologin vancity && \
 # Copy application code
 COPY --chown=vancity:vancity api/ ./api/
 COPY --chown=vancity:vancity db/ ./db/
+COPY --chown=vancity:vancity sdk/ ./sdk/
 
 # Health check using Python (no curl/wget needed)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

@@ -91,11 +91,11 @@ test.describe('VanCity Lens — Intelligence Tab', () => {
     expect(fillTime).toBeLessThan(2000);
   });
 
-  test('screenshot: intelligence tab layout', async ({ page }) => {
-    await page.screenshot({ path: 'tests/screenshots/intelligence-layout.png', fullPage: true });
+  test('screenshot: intelligence tab layout', async ({ page }, testInfo) => {
+    await page.screenshot({ path: testInfo.outputPath('intelligence-layout.png'), fullPage: true });
   });
 
-  test('screenshot: signal feed area', async ({ page }) => {
-    await page.screenshot({ path: 'tests/screenshots/signal-feed.png', fullPage: false });
+  test('screenshot: signal feed area', async ({ page }, testInfo) => {
+    await page.screenshot({ path: testInfo.outputPath('signal-feed.png'), fullPage: false });
   });
 });

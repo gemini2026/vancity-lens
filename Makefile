@@ -1,4 +1,4 @@
-.PHONY: help dev up down logs test test-unit test-e2e seed build clean status frontend-logs api-logs db-logs shell-api shell-db lint
+.PHONY: help dev up down logs test test-unit test-e2e seed build clean status frontend-logs api-logs db-logs shell-api shell-db lint validate-k2-migration validate-k2-migration-both
 
 # Local dev API is exposed on the host at this port (see docker-compose.yml).
 API_HOST_PORT ?= 8080
@@ -119,6 +119,13 @@ lint: ## Run linters (Python + TypeScript)
 		echo "Skipping Next.js lint (no ESLint config in frontend/)"; \
 	fi
 	python3 -m flake8 api/ --max-line-length=120 --ignore=E501,W503 2>/dev/null || true
+
+# ─── Migration Validation ────────────────────────────────────────
+validate-k2-migration: ## Run migration parity validations in local backend mode
+	bash migration/validate_k2_migration.sh --backend local --restart-api
+
+validate-k2-migration-both: ## Run migration parity validations for local and K2 backends
+	bash migration/validate_k2_migration.sh --backend both --restart-api
 
 # ─── Database ────────────────────────────────────────────────────
 db-reset: ## Reset database (destroy + recreate)
