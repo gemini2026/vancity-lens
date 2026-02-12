@@ -6,6 +6,7 @@ logic without requiring network access.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from unittest.mock import AsyncMock, patch
 
@@ -194,6 +195,52 @@ class TestRetrievalBackend:
 
         assert result == fallback_chunks
         assert mock_sparse.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_retrieve_document_chunks_shadow_validation_does_not_change_result(self, monkeypatch, caplog):
+        from api.intelligence import retrieval_backend as rb
+
+        caplog.set_level("INFO")
+
+        monkeypatch.setenv("RAG_BACKEND", "k2")
+        monkeypatch.setenv("K2_SHADOW_VALIDATE", "true")
+        monkeypatch.setenv("K2_SHADOW_VALIDATE_SAMPLE_RATE", "1.0")
+        monkeypatch.setenv("K2_SHADOW_VALIDATE_LOCAL_MODE", "sparse")
+        _set_required_k2_env(monkeypatch)
+
+        k2_chunks = [{"chunk_text": "k2", "source_url": "https://k2.example/doc"}]
+        local_chunks = [{"chunk_text": "local", "source_url": "https://local.example/doc"}]
+
+        tasks: list[asyncio.Task] = []
+        real_create_task = asyncio.create_task
+
+        def _capture_task(coro):
+            task = real_create_task(coro)
+            tasks.append(task)
+            return task
+
+        monkeypatch.setattr(rb.asyncio, "create_task", _capture_task)
+
+        with patch("api.intelligence.retrieval_backend.asyncio.to_thread", new=AsyncMock(return_value=k2_chunks)):
+            with patch(
+                "api.intelligence.retrieval_backend.sparse_search",
+                new=AsyncMock(return_value=local_chunks),
+            ) as mock_sparse:
+                result = await rb.retrieve_document_chunks(
+                    db_pool=AsyncMock(),
+                    query="q",
+                    search_mode="demo",
+                    cohere_api_key=None,
+                )
+
+                assert result == k2_chunks
+
+                # Ensure the shadow task ran (and was responsible for local retrieval).
+                assert tasks
+                await asyncio.gather(*tasks)
+                assert mock_sparse.await_count == 1
+
+        assert any(r.message == "k2_shadow_validate" for r in caplog.records)
 
     @pytest.mark.asyncio
     async def test_retrieve_document_chunks_raises_when_fallback_disabled(self, monkeypatch):

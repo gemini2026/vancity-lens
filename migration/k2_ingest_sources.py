@@ -193,6 +193,31 @@ def _chunked(items: list[Any], size: int) -> list[list[Any]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
+def _normalize_url(url: str) -> str:
+    return (url or "").strip().rstrip("/")
+
+
+def _list_k2_document_urls(client: Knowledge2, corpus_id: str) -> set[str]:
+    """Best-effort list of document URLs already present in the corpus."""
+
+    urls: set[str] = set()
+    limit = 200
+    offset = 0
+    while True:
+        resp = client.list_documents(corpus_id, limit=limit, offset=offset)
+        docs = resp.get("documents") or []
+        if not docs:
+            break
+        for d in docs:
+            meta = d.get("metadata") or {}
+            u = meta.get("source_url") or meta.get("url") or d.get("source_uri") or meta.get("source_uri") or ""
+            u = _normalize_url(str(u))
+            if u:
+                urls.add(u)
+        offset += len(docs)
+    return urls
+
+
 def _k2_url_item(doc: DiscoveredDoc) -> dict[str, Any]:
     meta: dict[str, Any] = {
         # Keep consistent with Bill47 citation mapping (api/intelligence/k2_client.py)
@@ -242,6 +267,12 @@ async def main() -> int:
     parser.add_argument("--max-projects", type=int, default=None, help="Override max projects for syc_projectfinder")
     parser.add_argument("--days-back", type=int, default=None, help="Override days_back for syc_projectfinder")
     parser.add_argument("--dry-run", action="store_true", help="Only print discovered URLs (no ingest)")
+    parser.add_argument(
+        "--skip-existing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip URLs already present in the K2 corpus (default: true). Use --no-skip-existing to re-ingest.",
+    )
     parser.add_argument("--batch-size", type=int, default=25, help="Number of URLs per K2 ingest_urls call")
     parser.add_argument("--wait", action="store_true", help="Wait for ingestion jobs to complete")
     parser.add_argument("--poll-s", type=int, default=3, help="Polling interval when --wait")
@@ -269,12 +300,33 @@ async def main() -> int:
     corpus_ref = _require_env("K2_CORPUS_ID")
     corpus_id = _resolve_corpus_id(client, corpus_ref)
 
-    items = [_k2_url_item(d) for d in discovered]
+    existing_urls: set[str] = set()
+    if args.skip_existing:
+        logger.info("Listing existing K2 corpus documents to skip already-ingested URLs...")
+        existing_urls = _list_k2_document_urls(client, corpus_id)
+        logger.info("Existing K2 URLs: %s", len(existing_urls))
+
+    items: list[dict[str, Any]] = []
+    skipped = 0
+    for d in discovered:
+        if args.skip_existing and _normalize_url(d.url) in existing_urls:
+            skipped += 1
+            continue
+        items.append(_k2_url_item(d))
+
+    logger.info(
+        "K2 ingest plan: discovered=%s skipped_existing=%s to_ingest=%s",
+        len(discovered),
+        skipped,
+        len(items),
+    )
     batches = _chunked(items, max(args.batch_size, 1))
 
     job_ids: list[str] = []
     submitted_total = 0
     for batch in batches:
+        if not batch:
+            continue
         try:
             resp = client.ingest_urls(
                 corpus_id,
@@ -294,7 +346,12 @@ async def main() -> int:
 
         logger.info("Submitted batch: submitted=%s job_id=%s", submitted, job_id)
 
-    logger.info("All batches submitted: total_urls=%s total_submitted=%s jobs=%s", len(items), submitted_total, len(job_ids))
+    logger.info(
+        "All batches submitted: total_urls=%s total_submitted=%s jobs=%s",
+        len(items),
+        submitted_total,
+        len(job_ids),
+    )
 
     if args.wait and job_ids:
         _wait_for_jobs(client, job_ids, poll_s=max(args.poll_s, 1), timeout_s=args.timeout_s)

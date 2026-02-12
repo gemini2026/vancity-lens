@@ -18,6 +18,16 @@ Notes:
 - We filter the eval set to the URL intersection between local DB and K2 corpus
   to avoid penalizing either backend for missing documents.
 
+## Shadow Validation Logs
+
+If you enable runtime shadow validation (`K2_SHADOW_VALIDATE=true`), the API will
+emit JSON log lines with message `k2_shadow_validate`. You can summarize those
+logs with:
+
+```bash
+python3 migration/rag_eval/parse_shadow_validate_logs.py path/to/api.jsonl --out shadow-summary.md
+```
+
 ## Run
 
 The script needs:
