@@ -301,8 +301,8 @@ User query: {query}"""
                     excerpt=chunk['chunk_text'][:300],
                     document_id=doc_id,
                     chunk_id=chunk.get('chunk_id'),
-                    url_status=health.get('url_status'),
-                    archive_url=health.get('archive_url'),
+                    url_status=health.get('url_status') or chunk.get("url_status"),
+                    archive_url=health.get('archive_url') or chunk.get("archive_url"),
                 )
             )
 

@@ -53,6 +53,9 @@ pgdata/
 # ── Data (too large for git, download separately) ────
 data/
 
+# ── Migration Eval Outputs ───────────────────────────
+migration/rag_eval/output/
+
 # ── Misc ─────────────────────────────────────────────
 *.log
 *.zip

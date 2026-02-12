@@ -34,6 +34,7 @@ class K2Config:
 
 _CLIENT: Knowledge2 | None = None
 _CLIENT_CFG: K2Config | None = None
+_CORPUS_ID_CACHE: dict[str, str] = {}
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -119,20 +120,54 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
 
     # Always request text + provenance so we can build citations even when generation
     # happens in Bill47 (Anthropic).
+    return_config = {
+        "include_text": True,
+        "include_scores": True,
+        "include_provenance": True,
+    }
+
+    # Some users/configs may provide a corpus *name* instead of an ID. The K2 API
+    # expects the corpus ID in the URL path, so we attempt a one-time name -> id
+    # resolution only when we see "Corpus not found".
+    corpus_id = _CORPUS_ID_CACHE.get(cfg.corpus_id, cfg.corpus_id)
     try:
         response = client.search(
-            corpus_id=cfg.corpus_id,
+            corpus_id=corpus_id,
             query=query,
             top_k=effective_top_k,
-            return_config={
-                "include_text": True,
-                "include_scores": True,
-                "include_provenance": True,
-            },
+            return_config=return_config,
         )
     except Knowledge2Error as exc:
-        logger.warning("K2 search failed: %s", exc)
-        raise
+        msg = str(exc)
+        if "Corpus not found" in msg and cfg.corpus_id not in _CORPUS_ID_CACHE:
+            try:
+                corpora = (client.list_corpora(limit=100, offset=0) or {}).get("corpora") or []
+                matches = [c for c in corpora if c.get("name") == cfg.corpus_id and c.get("id")]
+                if len(matches) == 1:
+                    resolved_id = matches[0]["id"]
+                    _CORPUS_ID_CACHE[cfg.corpus_id] = resolved_id
+                    logger.info("Resolved K2 corpus name '%s' -> '%s'", cfg.corpus_id, resolved_id)
+                    response = client.search(
+                        corpus_id=resolved_id,
+                        query=query,
+                        top_k=effective_top_k,
+                        return_config=return_config,
+                    )
+                elif len(matches) > 1:
+                    raise RuntimeError(
+                        f"Ambiguous K2 corpus name '{cfg.corpus_id}'. "
+                        "Set K2_CORPUS_ID to the corpus id."
+                    )
+                else:
+                    logger.warning("K2 corpus name '%s' not found in list_corpora()", cfg.corpus_id)
+                    raise
+            except Exception:
+                # Keep the original "Corpus not found" context.
+                logger.warning("K2 search failed (corpus resolution attempt failed): %s", exc)
+                raise
+        else:
+            logger.warning("K2 search failed: %s", exc)
+            raise
 
     results = response.get("results") or []
     normalized: list[dict[str, Any]] = []
@@ -154,6 +189,14 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
             or ""
         )
         source_type = meta.get("source_type") or meta.get("type") or "unknown"
+        archive_url = (
+            meta.get("archive_url")
+            or meta.get("archive_uri")
+            or meta.get("storage_url")
+            or meta.get("storage_uri")
+            or ""
+        )
+        url_status = meta.get("url_status")
         published_date = _parse_date(meta.get("published_date") or meta.get("published_at"))
 
         score = r.get("score")
@@ -173,10 +216,11 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
                 "source_url": source_url,
                 "source_type": source_type,
                 "published_date": published_date,
+                "archive_url": archive_url,
+                "url_status": url_status,
                 # Debug-only provenance (not part of current response contract)
                 "k2_chunk_id": r.get("chunk_id"),
             }
         )
 
     return normalized
-

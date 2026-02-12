@@ -72,6 +72,8 @@ class TestK2SearchNormalization:
                                 "source_url": "https://example.com/doc",
                                 "source_type": "pdf",
                                 "published_date": "2024-01-02T12:00:00Z",
+                                "archive_url": "https://archive.example.com/doc",
+                                "url_status": "ok",
                                 "section_header": "Section A",
                                 "chunk_index": 5,
                             },
@@ -94,8 +96,56 @@ class TestK2SearchNormalization:
         assert c0["source_url"] == "https://example.com/doc"
         assert c0["source_type"] == "pdf"
         assert c0["published_date"] == date(2024, 1, 2)
+        assert c0["archive_url"] == "https://archive.example.com/doc"
+        assert c0["url_status"] == "ok"
         assert c0["section_header"] == "Section A"
         assert c0["chunk_index"] == 5
+
+    def test_k2_search_chunks_resolves_corpus_name_on_not_found(self, monkeypatch):
+        from api.intelligence.k2_client import k2_search_chunks
+        from sdk.errors import Knowledge2Error
+
+        _set_required_k2_env(monkeypatch, corpus_id="vancity")
+
+        # Ensure test isolation in case other tests populated the cache.
+        from api.intelligence import k2_client as k2_mod
+        k2_mod._CORPUS_ID_CACHE.clear()
+
+        class StubClient:
+            def __init__(self):
+                self.search_calls = []
+                self.list_calls = 0
+
+            def search(self, *, corpus_id, query, top_k, return_config):
+                self.search_calls.append(corpus_id)
+                if corpus_id == "vancity":
+                    raise Knowledge2Error("Corpus not found", status_code=404, request_id="req-1")
+                assert corpus_id == "resolved-id"
+                return {
+                    "results": [
+                        {
+                            "chunk_id": "k2-chunk-1",
+                            "text": "Resolved corpus result",
+                            "score": 0.9,
+                            "metadata": {"title": "Resolved Doc"},
+                        }
+                    ]
+                }
+
+            def list_corpora(self, limit: int = 100, offset: int = 0):
+                self.list_calls += 1
+                assert limit == 100
+                assert offset == 0
+                return {"corpora": [{"id": "resolved-id", "name": "vancity", "project_id": "p1"}]}
+
+        stub = StubClient()
+        with patch("api.intelligence.k2_client.get_k2_client", return_value=stub):
+            chunks = k2_search_chunks("hello", top_k=1)
+
+        assert stub.search_calls == ["vancity", "resolved-id"]
+        assert stub.list_calls == 1
+        assert len(chunks) == 1
+        assert chunks[0]["document_title"] == "Resolved Doc"
 
 
 class TestRetrievalBackend:
@@ -166,4 +216,3 @@ class TestRetrievalBackend:
                         cohere_api_key=None,
                     )
         assert mock_sparse.await_count == 0
-
