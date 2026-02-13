@@ -15,11 +15,4 @@ remote_state {
   }
 }
 
-# Inputs available to all environments
-inputs = {
-  labels = {
-    managed_by  = "terragrunt"
-    project     = "vancity-lens"
-    environment = local.environment
-  }
-}
+# Root config only defines remote state and backend generation.

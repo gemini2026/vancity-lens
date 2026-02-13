@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 
 // Local docker-compose exposes API at http://localhost:8080 (container listens on :8000).
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:8080';
+const FRONTEND_ORIGIN = process.env.PLAYWRIGHT_BASE_URL
+  ? new URL(process.env.PLAYWRIGHT_BASE_URL).origin
+  : 'http://localhost:3000';
 const PERFORMANCE_THRESHOLD_API = 2000; // ms
 
 // API-only tests — skip on mobile-chrome since they don't test mobile UI
@@ -26,7 +29,7 @@ test.describe('VanCity Lens — API Health', () => {
   test('CORS headers present for frontend origin', async ({ request }) => {
     const response = await request.get(`${API_BASE}/health`, {
       headers: {
-        Origin: 'http://localhost:3000',
+        Origin: FRONTEND_ORIGIN,
       },
     });
 

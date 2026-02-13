@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vancity-lens-ingress
+  namespace: vancity-lens
+spec:
+  rules:
+    - host: "api.vancitylense.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80

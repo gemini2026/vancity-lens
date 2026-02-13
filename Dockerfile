@@ -18,7 +18,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    # Preinstall CPU-only torch wheels so downstream deps do not pull CUDA packages.
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+      torch==2.5.1 && \
+    pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 
 
 # ─── Stage 2: Runtime ──────────────────────────────────────────────────────

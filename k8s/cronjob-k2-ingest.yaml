@@ -8,17 +8,23 @@ metadata:
 spec:
   # Schedule: every 6 hours (tune as needed)
   schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   suspend: false
   jobTemplate:
     spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 2400
+      ttlSecondsAfterFinished: 86400
       template:
         metadata:
           labels:
             app: vancity-lens-k2-ingest
         spec:
           serviceAccountName: default
+          terminationGracePeriodSeconds: 30
           restartPolicy: OnFailure
           containers:
           - name: k2-ingest
@@ -60,4 +66,3 @@ spec:
                 secretKeyRef:
                   name: vancity-lens-secrets
                   key: brave-search-api-key
-

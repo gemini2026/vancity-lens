@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../namespace.yaml
+  - ../../configmap.yaml
+  - ../../deployment.yaml
+  - ../../service.yaml
+  - ../../frontend-deployment.yaml
+  - ../../frontend-service.yaml
+  - ../../ingress.yaml
+  - managedcertificate.yaml
+  - ../../cronjob.yaml
+  - ../../cronjob-k2-ingest.yaml
+  - secretstore.yaml
+  - externalsecret.yaml
+  - hpa.yaml
+  - pdb.yaml
+
+patches:
+  - path: patch-configmap.yaml
+  - path: patch-deployment.yaml
+  - path: patch-ingress.yaml

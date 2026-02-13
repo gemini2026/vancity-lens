@@ -1,6 +1,7 @@
 import type { ParcelEntitlement } from "./types";
+import { getApiBase } from "./api-base";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 export async function fetchEntitlement(pid: string): Promise<ParcelEntitlement> {
   const res = await fetch(`${API_BASE}/api/v1/parcels/${pid}/entitlement`);

@@ -6,8 +6,9 @@ import type { IntelSignal } from "@/lib/intel-types";
 import ProFormaSection from "./ProFormaSection";
 import RiskFlagsSection from "./RiskFlagsSection";
 import ShareButton from "./ShareButton";
+import { getApiBase } from "@/lib/api-base";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 function fmt(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;

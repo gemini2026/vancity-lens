@@ -14,9 +14,9 @@ import type {
   DocumentView,
   DocumentStatus,
 } from "./intel-types";
+import { getApiBase } from "./api-base";
 
-// Default to docker-compose host port (see docker-compose.yml / Makefile).
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_BASE = getApiBase();
 
 export interface ChatOptions {
   session_id?: string;

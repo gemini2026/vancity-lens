@@ -38,6 +38,7 @@ CREATE TABLE parcels (
     lot_area_sqm    NUMERIC(12,2),
     assessed_value  BIGINT,                -- BC Assessment land value (dollars)
     asking_price    BIGINT,                -- current listing price if any (dollars)
+    geo_local_area  TEXT,                  -- neighborhood / local area label
     rew_url         TEXT,                  -- direct REW.ca listing URL for price verification
     geom            GEOMETRY(Geometry, 4326) NOT NULL,
     created_at      TIMESTAMPTZ DEFAULT now(),

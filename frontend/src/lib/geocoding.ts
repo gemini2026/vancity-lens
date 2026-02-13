@@ -1,3 +1,5 @@
+import { getApiBase } from "./api-base";
+
 export interface GeocodingResult {
   address: string;
   lat: number;
@@ -7,7 +9,7 @@ export interface GeocodingResult {
   confidence: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 const CACHE_TTL = 60 * 60 * 1000;
 const VANCOUVER_BOUNDS = {
   minLat: 49.0,

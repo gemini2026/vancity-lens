@@ -84,19 +84,19 @@ test.describe('VanCity Lens — App Shell', () => {
     expect(bg).toBe('rgb(10, 10, 10)');
   });
 
-  test('screenshot: homepage layout', async ({ page }) => {
+  test('screenshot: homepage layout', async ({ page }, testInfo) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.screenshot({ path: 'tests/screenshots/homepage-layout.png', fullPage: false });
+    await page.screenshot({ path: testInfo.outputPath('homepage-layout.png'), fullPage: false });
   });
 
-  test('screenshot: tabs view', async ({ page }) => {
+  test('screenshot: tabs view', async ({ page }, testInfo) => {
     await page.goto('/');
     const nav = page.getByRole('navigation');
     const navBox = await nav.boundingBox();
     if (navBox) {
       await page.screenshot({
-        path: 'tests/screenshots/navigation-tabs.png',
+        path: testInfo.outputPath('navigation-tabs.png'),
         clip: navBox
       });
     }

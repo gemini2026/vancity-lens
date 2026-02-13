@@ -10,14 +10,17 @@ resources:
 - secret.yaml
 - deployment.yaml
 - service.yaml
+- frontend-deployment.yaml
+- frontend-service.yaml
 - ingress.yaml
 - cronjob.yaml
 - cronjob-k2-ingest.yaml
 
 # Common labels applied to all resources
-commonLabels:
-  app: vancity-lens
-  managed-by: kustomize
+labels:
+  - pairs:
+      app: vancity-lens
+      managed-by: kustomize
 
 # Common annotations applied to all resources
 commonAnnotations:
@@ -29,5 +32,5 @@ commonAnnotations:
 # Or use imageTag/imageName in images section
 images:
 - name: REGISTRY/vancity-lens-api
-  newName: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens/vancity-lens-api
+  newName: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api
   newTag: "latest"

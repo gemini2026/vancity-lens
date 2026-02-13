@@ -8,6 +8,11 @@ metadata:
 data:
   cors-origins: "https://vancity-lens.pages.dev"
 
+  # Rate limiting (requests per minute, per client IP).
+  # Override in overlays as needed.
+  rate-limit-general: "1000"
+  rate-limit-llm: "30"
+
   # RAG backend switch
   rag-backend: "local" # local|k2
 

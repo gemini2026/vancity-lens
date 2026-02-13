@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens/vancity-lens-api:latest
+        image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
@@ -141,8 +141,23 @@ spec:
             secretKeyRef:
               name: vancity-lens-secrets
               key: brave-search-api-key
+        - name: ADMIN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: admin-api-key
         - name: CORS_ORIGINS
           valueFrom:
             configMapKeyRef:
               name: vancity-lens-config
               key: cors-origins
+        - name: RATE_LIMIT_GENERAL
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: rate-limit-general
+        - name: RATE_LIMIT_LLM
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: rate-limit-llm

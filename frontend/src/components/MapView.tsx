@@ -11,8 +11,9 @@ import ParcelDetailPanel from "./ParcelDetailPanel";
 import AddressSearchBar from "./AddressSearchBar";
 import FinancingCalculator from "./FinancingCalculator";
 import type { GeocodingResult } from "@/lib/geocoding";
+import { getApiBase } from "@/lib/api-base";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 const TIER_COLORS: Record<number, string> = {
   1: "rgba(220, 38, 38, 0.18)",
