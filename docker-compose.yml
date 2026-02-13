@@ -135,7 +135,9 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: "http://localhost:8080"
-      NEXT_PUBLIC_MAPBOX_TOKEN: "${MAPBOX_TOKEN:-}"
+      # Prefer NEXT_PUBLIC_MAPBOX_TOKEN (matches frontend/.env.local + .env.example),
+      # but keep MAPBOX_TOKEN as a backwards-compatible fallback.
+      NEXT_PUBLIC_MAPBOX_TOKEN: "${NEXT_PUBLIC_MAPBOX_TOKEN:-${MAPBOX_TOKEN:-}}"
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
