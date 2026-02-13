@@ -24,6 +24,7 @@ frontend/.env.local
 # ── Terraform ────────────────────────────────────────
 terraform/.terraform/
 terraform/**/.terraform/
+**/.terragrunt-cache/
 *.tfstate
 *.tfstate.*
 *.tfplan
