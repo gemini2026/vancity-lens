@@ -19,11 +19,14 @@ resource "google_container_cluster" "primary" {
     master_ipv4_cidr_block  = "172.16.0.0/28"
   }
 
-  # Master authorized networks - allow access from specific IPs
+  # Master authorized networks - restrict to known IPs
   master_authorized_networks_config {
-    cidr_blocks {
-      cidr_block   = "0.0.0.0/0"
-      display_name = "All networks"
+    dynamic "cidr_blocks" {
+      for_each = var.master_authorized_cidr_blocks
+      content {
+        cidr_block   = cidr_blocks.value.cidr_block
+        display_name = cidr_blocks.value.display_name
+      }
     }
   }
 

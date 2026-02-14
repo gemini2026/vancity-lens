@@ -24,3 +24,17 @@ variable "cluster_name" {
   type        = string
   default     = "vancity-lens-gke"
 }
+
+variable "master_authorized_cidr_blocks" {
+  description = "CIDR blocks allowed to access the GKE master API. Must not be 0.0.0.0/0 in production."
+  type = list(object({
+    cidr_block   = string
+    display_name = string
+  }))
+  default = [
+    {
+      cidr_block   = "10.0.0.0/8"
+      display_name = "Private networks"
+    }
+  ]
+}
