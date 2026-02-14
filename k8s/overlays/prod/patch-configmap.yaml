@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vancity-lens-config
+  namespace: vancity-lens
+data:
+  cors-origins: "https://app.vancitylense.com"
+  rag-backend: "k2"
+  k2-fallback-to-local: "false"
+  k2-shadow-validate: "true"
+  k2-shadow-validate-sample-rate: "0.05"

@@ -249,10 +249,7 @@ async def get_signals_for_parcel(
                 d.published_date AS source_date,
                 ROUND(ST_Distance(
                     ST_Transform(p.geom, 3005),
-                    ST_Transform(ST_SetSRID(ST_MakePoint(
-                        CAST(sig_geom ->> 'coordinates' ->> 0 AS FLOAT),
-                        CAST(sig_geom ->> 'coordinates' ->> 1 AS FLOAT)
-                    ), 4326), 3005)
+                    ST_Transform(isig.geom, 3005)
                 )::numeric, 1) AS distance_m
             FROM intelligence_signals isig
             JOIN documents d ON isig.document_id = d.id

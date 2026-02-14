@@ -1,13 +1,15 @@
-# GKE Autopilot Cluster
+# GKE Cluster
 resource "google_container_cluster" "primary" {
   name       = var.cluster_name
   project    = var.project_id
   location   = var.region
   network    = var.network_id
   subnetwork = var.subnet_id
+  # Required by GKE API when using separately managed node pools.
+  initial_node_count       = 1
+  remove_default_node_pool = true
 
-  # GKE Autopilot settings
-  enable_autopilot = true
+  # Standard cluster settings
   enable_shielded_nodes = true
 
   # Private cluster configuration
@@ -58,15 +60,13 @@ resource "google_container_cluster" "primary" {
     environment = "poc"
   }
 
-  depends_on = [google_compute_subnetwork.primary]
 }
-
-# Node pool configuration (Autopilot manages this, but we can define preferences)
+# Node pool configuration
 resource "google_container_node_pool" "primary_nodes" {
-  name           = "primary-node-pool"
-  cluster        = google_container_cluster.primary.id
-  node_count     = 1
-  project        = var.project_id
+  name       = "primary-node-pool"
+  cluster    = google_container_cluster.primary.id
+  node_count = 1
+  project    = var.project_id
 
   autoscaling {
     min_node_count = 1
@@ -111,9 +111,9 @@ resource "google_container_node_pool" "primary_nodes" {
 
 # Separately Managed Node Pool for workloads
 resource "google_container_node_pool" "backend" {
-  name           = "backend-node-pool"
-  cluster        = google_container_cluster.primary.id
-  project        = var.project_id
+  name    = "backend-node-pool"
+  cluster = google_container_cluster.primary.id
+  project = var.project_id
 
   autoscaling {
     min_node_count = 1
@@ -152,31 +152,13 @@ resource "google_container_node_pool" "backend" {
       enable_secure_boot          = true
       enable_integrity_monitoring = true
     }
-  }
 
-  taint {
-    key    = "workload"
-    value  = "backend"
-    effect = "NO_SCHEDULE"
+    taint {
+      key    = "workload"
+      value  = "backend"
+      effect = "NO_SCHEDULE"
+    }
   }
 
   depends_on = [google_container_cluster.primary]
-}
-
-# Dummy data source to reference the subnetwork
-data "google_compute_subnetwork" "private" {
-  name   = var.subnet_id
-  region = var.region
-  project = var.project_id
-}
-
-# Use the subnetwork reference
-resource "google_compute_subnetwork" "primary" {
-  name          = data.google_compute_subnetwork.private.name
-  project       = var.project_id
-  region        = var.region
-  network       = var.network_id
-  ip_cidr_range = data.google_compute_subnetwork.private.ip_cidr_range
-
-  depends_on = [data.google_compute_subnetwork.private]
 }

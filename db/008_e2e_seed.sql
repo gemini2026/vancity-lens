@@ -114,6 +114,25 @@ ON CONFLICT (id) DO NOTHING;
 
 SELECT setval('intelligence_signals_id_seq', GREATEST(nextval('intelligence_signals_id_seq'), 10100));
 
+-- Seed canonical parcel fixture used by live API E2E contract tests.
+INSERT INTO parcels (
+  pid, civic_address, current_zoning, current_fsr, current_height,
+  lot_area_sqm, assessed_value, asking_price, geo_local_area, geom
+)
+VALUES (
+  '100-001-009',
+  '2220 Cambie Street',
+  'I-1',
+  0.60,
+  2,
+  557.4,
+  1890000,
+  2195000,
+  'Mount Pleasant',
+  ST_SetSRID(ST_MakePoint(-123.1148, 49.2633), 4326)
+)
+ON CONFLICT (pid) DO NOTHING;
+
 -- Verify seed data
 DO $$
 DECLARE

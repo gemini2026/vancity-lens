@@ -657,10 +657,7 @@ class TestPipelineChatQuery:
     @pytest.mark.e2e_pipeline
     async def test_chat_query_retrieves_context(self, mock_db_pool):
         """Integration: Chat query retrieves relevant document chunks."""
-        conn = AsyncMock()
-        mock_db_pool.acquire.return_value.__aenter__.return_value = conn
-
-        # Mock hybrid search retrieval
+        # Mock hybrid search retrieval (local backend path)
         mock_chunks = [
             {
                 'chunk_id': 101,
@@ -684,18 +681,20 @@ class TestPipelineChatQuery:
             },
         ]
 
-        with patch('api.intelligence.chat.hybrid_search') as mock_search:
-            mock_search.return_value = mock_chunks
+        from api.intelligence.retrieval_backend import retrieve_document_chunks
 
-            chunks = await chat.hybrid_search(
-                mock_db_pool,
-                "What rezoning happened in Downtown?",
-                api_key="test-key"
+        with patch("api.intelligence.retrieval_backend.hybrid_search", return_value=mock_chunks) as mock_search:
+            chunks = await retrieve_document_chunks(
+                db_pool=mock_db_pool,
+                query="What rezoning happened in Downtown?",
+                search_mode="full",
+                cohere_api_key="test-key",
             )
 
-            assert len(chunks) > 0
-            assert 'chunk_text' in chunks[0]
-            assert 'document_title' in chunks[0]
+        mock_search.assert_called_once()
+        assert len(chunks) > 0
+        assert 'chunk_text' in chunks[0]
+        assert 'document_title' in chunks[0]
 
     @pytest.mark.e2e_pipeline
     async def test_chat_generates_answer(self, mock_db_pool):
@@ -714,7 +713,7 @@ class TestPipelineChatQuery:
 
             with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.hybrid_search', return_value=[]):
+                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=[]):
                         with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
                             result = await chat.handle_chat(
                                 mock_db_pool,
@@ -755,7 +754,7 @@ class TestPipelineChatQuery:
 
             with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.hybrid_search', return_value=mock_chunks):
+                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=mock_chunks):
                         with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
                             result = await chat.handle_chat(
                                 mock_db_pool,
@@ -804,7 +803,7 @@ class TestPipelineChatQuery:
 
             with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.hybrid_search', return_value=[]):
+                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=[]):
                         with patch('api.intelligence.chat.get_relevant_signals', return_value=[mock_signal]):
                             result = await chat.handle_chat(
                                 mock_db_pool,
@@ -845,7 +844,7 @@ class TestPipelineChatQuery:
 
             with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.hybrid_search', return_value=mock_chunks):
+                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=mock_chunks):
                         with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
                             result = await chat.handle_chat(
                                 mock_db_pool,
@@ -917,7 +916,7 @@ class TestPipelineEndToEnd:
         assert len(chunk_ids) == len(chunks)
 
         # Step 7: Query with chat
-        with patch('api.intelligence.chat.hybrid_search') as mock_search:
+        with patch('api.intelligence.chat.retrieve_document_chunks') as mock_search:
             with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
                 with patch('api.intelligence.chat.AsyncAnthropic') as mock_anthropic:
                     mock_client = AsyncMock()

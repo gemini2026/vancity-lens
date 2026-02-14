@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: vancity-lens-cert
+  namespace: vancity-lens
+spec:
+  domains:
+    - staging.vancitylense.com

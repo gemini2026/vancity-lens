@@ -14,8 +14,9 @@ import type {
   DocumentView,
   DocumentStatus,
 } from "./intel-types";
+import { getApiBase } from "./api-base";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 export interface ChatOptions {
   session_id?: string;

@@ -8,6 +8,8 @@ metadata:
 spec:
   # Schedule: 6 AM UTC daily
   schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
   
   # Keep last 3 successful and 1 failed job for debugging
   successfulJobsHistoryLimit: 3
@@ -18,12 +20,16 @@ spec:
   
   jobTemplate:
     spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      ttlSecondsAfterFinished: 86400
       template:
         metadata:
           labels:
             app: vancity-lens-scraper
         spec:
           serviceAccountName: default
+          terminationGracePeriodSeconds: 30
           restartPolicy: OnFailure
           
           containers:
@@ -51,6 +57,11 @@ spec:
             
             # Environment variables from ConfigMap and Secrets
             env:
+            - name: RAG_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: vancity-lens-config
+                  key: rag-backend
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -66,6 +77,11 @@ spec:
                 secretKeyRef:
                   name: vancity-lens-secrets
                   key: cohere-api-key
+            - name: BRAVE_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: brave-search-api-key
             - name: CORS_ORIGINS
               valueFrom:
                 configMapKeyRef:

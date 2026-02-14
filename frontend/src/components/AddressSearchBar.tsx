@@ -227,13 +227,13 @@ export default function AddressSearchBar({
               }`}
             >
               <div className="font-medium">{result.address}</div>
-              {(result.neighborhood || result.postalCode) && (
+              {(result.neighborhood || result.postal_code) && (
                 <div className="text-xs text-slate-400 mt-1">
                   {result.neighborhood && <span>{result.neighborhood}</span>}
-                  {result.neighborhood && result.postalCode && (
+                  {result.neighborhood && result.postal_code && (
                     <span> · </span>
                   )}
-                  {result.postalCode && <span>{result.postalCode}</span>}
+                  {result.postal_code && <span>{result.postal_code}</span>}
                 </div>
               )}
               {result.confidence && (

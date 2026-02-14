@@ -53,23 +53,34 @@ def _get_chunker():
 
 def _count_tokens(text: str) -> int:
     """Count tokens using tiktoken, with a fast fallback."""
+    if not text:
+        return 0
+
+    # tiktoken may be installed but unable to load its encoding data in
+    # restricted/offline environments (it can attempt a network fetch).
+    # In that case we fall back to a cheap approximation to keep the pipeline
+    # functional (and tests deterministic).
     try:
-        import tiktoken
+        import tiktoken  # type: ignore
+
+        if tiktoken is None:  # pragma: no cover (guard for sys.modules hacks)
+            raise ImportError("tiktoken is unavailable")
+
         enc = tiktoken.encoding_for_model(TOKENIZER_MODEL)
         return len(enc.encode(text))
-    except ImportError:
-        # Approximate: ~4 chars per token for English
+    except Exception:
+        # Approximate: ~4 chars per token for English.
         return len(text) // 4
 
 
 # ── Fallback simple chunker ──────────────────────────────────
 
-def _simple_chunker(text: str) -> List[str]:
+def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
     """
     Simple paragraph-based chunker as fallback when semchunk is unavailable.
 
     Splits on double newlines (paragraphs), then merges small paragraphs
-    until the chunk reaches ~CHUNK_SIZE tokens.
+    until the chunk reaches ~chunk_size tokens.
     """
     paragraphs = re.split(r'\n\s*\n', text)
     chunks = []
@@ -83,7 +94,7 @@ def _simple_chunker(text: str) -> List[str]:
 
         para_tokens = _count_tokens(para)
 
-        if current_tokens + para_tokens > CHUNK_SIZE and current_parts:
+        if current_tokens + para_tokens > chunk_size and current_parts:
             chunks.append('\n\n'.join(current_parts))
             current_parts = []
             current_tokens = 0
@@ -190,7 +201,10 @@ def chunk_document(
         except Exception:
             raw_chunks = chunker(text)
     else:
-        raw_chunks = chunker(text)
+        if _use_semchunk:
+            raw_chunks = chunker(text)
+        else:
+            raw_chunks = _simple_chunker(text, chunk_size=chunk_size)
 
     if not raw_chunks:
         logger.warning("Chunker produced no chunks")

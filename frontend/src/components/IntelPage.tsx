@@ -18,6 +18,9 @@ import type {
   Severity,
 } from "@/lib/intel-types";
 import ExportButton from "./ExportButton";
+import { getApiBase } from "@/lib/api-base";
+
+const API_BASE = getApiBase();
 
 const SIGNAL_TYPE_LABELS: Record<SignalType, string> = {
   rezoning_decision: "REZONING DECISION",
@@ -86,7 +89,7 @@ export default function IntelPage() {
   >("");
   const [selectedDateRange, setSelectedDateRange] = useState<
     "7d" | "30d" | "90d" | "all"
-  >("7d");
+  >("90d");
 
   // Stats state
   const [stats, setStats] = useState<IntelStats | null>(null);
@@ -137,7 +140,7 @@ export default function IntelPage() {
         // Load initial signals
         const feedData = await getSignalFeed({
           limit: 20,
-          date_range: "7d",
+          date_range: "90d",
         });
         setSignals(feedData.signals);
         setSignalsHasMore(feedData.has_more);
@@ -401,7 +404,7 @@ export default function IntelPage() {
                       >
                         {msg.citations.map((citation, idx) => {
                           const citationHref = citation.document_id
-                            ? `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${citation.document_id}/page`
+                            ? `${API_BASE}/api/v1/intel/documents/${citation.document_id}/page`
                             : citation.document_url;
                           return (
                             <a
@@ -836,7 +839,7 @@ export default function IntelPage() {
                   >
                     <span>{formatDate(signal.event_date)}</span>
                     <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${signal.document_id}/page`}
+                      href={`${API_BASE}/api/v1/intel/documents/${signal.document_id}/page`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
@@ -909,7 +912,7 @@ export default function IntelPage() {
                               <span>Published: {expandedDoc.document.published_date}</span>
                             )}
                             <a
-                              href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/intel/documents/${expandedDoc.document.id}/page`}
+                              href={`${API_BASE}/api/v1/intel/documents/${expandedDoc.document.id}/page`}
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: "#60a5fa", textDecoration: "none" }}

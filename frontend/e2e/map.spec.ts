@@ -46,7 +46,8 @@ test.describe('VanCity Lens — Map View', () => {
   });
 
   test('map markers count matches expected data', async ({ page, request }) => {
-    const apiBase = process.env.API_BASE_URL || 'http://localhost:8000';
+    // Local docker-compose exposes API at http://localhost:8080 (container listens on :8000).
+    const apiBase = process.env.API_BASE_URL || 'http://localhost:8080';
 
     const signalsResponse = await request.get(`${apiBase}/api/v1/intel/signals`).catch(() => null);
 
@@ -112,16 +113,16 @@ test.describe('VanCity Lens — Map View', () => {
     expect(criticalErrors.length).toBe(0);
   });
 
-  test('screenshot: map view initial state', async ({ page }) => {
+  test('screenshot: map view initial state', async ({ page }, testInfo) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.screenshot({ path: 'tests/screenshots/map-view.png', fullPage: true });
+    await page.screenshot({ path: testInfo.outputPath('map-view.png'), fullPage: true });
   });
 
-  test('screenshot: map with controls', async ({ page }) => {
+  test('screenshot: map with controls', async ({ page }, testInfo) => {
     await page.goto('/');
     await page.waitForTimeout(3000);
-    await page.screenshot({ path: 'tests/screenshots/map-controls.png', fullPage: false });
+    await page.screenshot({ path: testInfo.outputPath('map-controls.png'), fullPage: false });
   });
 
   test('Map tab button is present and correct', async ({ page }) => {

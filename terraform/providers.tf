@@ -10,17 +10,16 @@ terraform {
       source  = "hashicorp/google-beta"
       version = "~> 5.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
   }
 
-  # GCS Backend for remote state storage
-  # Configure via environment variables or -backend-config flag:
-  # terraform init -backend-config="bucket=YOUR_BUCKET" \
-  #   -backend-config="prefix=vancity-lens/terraform"
-  backend "gcs" {
-    # bucket - GCS bucket for state (pass via init flags or env var TF_BACKEND_BUCKET)
-    # prefix - state file path (default: vancity-lens/terraform)
-    # encryption_key - (optional) customer-managed encryption key for at-rest encryption
-  }
+}
+
+locals {
+  cloudflare_provider_api_token = var.enable_cloudflare ? var.cloudflare_api_token : "0000000000000000000000000000000000000000"
 }
 
 provider "google" {
@@ -31,4 +30,8 @@ provider "google" {
 provider "google-beta" {
   project = var.project_id
   region  = var.region
+}
+
+provider "cloudflare" {
+  api_token = local.cloudflare_provider_api_token
 }

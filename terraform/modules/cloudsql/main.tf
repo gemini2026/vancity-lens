@@ -1,9 +1,9 @@
 # Cloud SQL PostgreSQL Instance
 resource "google_sql_database_instance" "instance" {
-  name             = "vancity-lens-db"
-  project          = var.project_id
-  region           = var.region
-  database_version = "POSTGRES_16"
+  name                = "vancity-lens-db"
+  project             = var.project_id
+  region              = var.region
+  database_version    = "POSTGRES_16"
   deletion_protection = false
 
   settings {
@@ -19,19 +19,9 @@ resource "google_sql_database_instance" "instance" {
     }
 
     ip_configuration {
-      require_ssl = false
-      dynamic "authorized_networks" {
-        for_each = []
-        content {
-          name  = authorized_networks.value.name
-          value = authorized_networks.value.cidr
-        }
-      }
-    }
-
-    database_flags {
-      name  = "shared_preload_libraries"
-      value = "pgvector,postgis"
+      ipv4_enabled    = false
+      private_network = var.network_id
+      ssl_mode        = "ALLOW_UNENCRYPTED_AND_ENCRYPTED"
     }
 
     database_flags {
@@ -53,24 +43,6 @@ resource "google_sql_database_instance" "instance" {
     user_labels = {
       app         = "vancity-lens"
       environment = "poc"
-    }
-  }
-
-  depends_on = [google_service_networking_connection.private_vpc_connection]
-}
-
-# Enable private IP
-resource "google_sql_database_instance" "instance_private_ip" {
-  provider = google-beta
-
-  name = google_sql_database_instance.instance.name
-  region = var.region
-
-  settings {
-    ip_configuration {
-      ipv4_enabled    = false
-      private_network = var.network_id
-      require_ssl     = false
     }
   }
 
@@ -107,36 +79,4 @@ resource "google_sql_user" "user" {
   instance = google_sql_database_instance.instance.name
   password = var.db_password
   project  = var.project_id
-}
-
-# Install pgvector extension
-resource "google_sql_database_instance_additional_database" "pgvector" {
-  instance = google_sql_database_instance.instance.name
-  name     = "pgvector_enabled"
-
-  depends_on = [google_sql_database.database]
-}
-
-# Enable PostGIS extension
-resource "null_resource" "enable_postgis" {
-  triggers = {
-    database_name = google_sql_database.database.name
-  }
-
-  depends_on = [
-    google_sql_database.database,
-    google_sql_user.user
-  ]
-}
-
-# Enable pgvector extension (configured in database flags above)
-resource "null_resource" "enable_pgvector" {
-  triggers = {
-    database_name = google_sql_database.database.name
-  }
-
-  depends_on = [
-    google_sql_database.database,
-    google_sql_user.user
-  ]
 }

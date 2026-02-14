@@ -36,10 +36,10 @@ HEADERS = {
 
 # ── Helpers ───────────────────────────────────────────────────
 
-def _fetch_json(url: str, headers: dict | None = None) -> dict:
+def _fetch_json(url: str, headers: dict | None = None, *, timeout_s: int = 15) -> dict:
     """Blocking JSON fetch (run via asyncio.to_thread)."""
     req = urllib.request.Request(url, headers=headers or HEADERS)
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
         return json.loads(resp.read().decode())
 
 
@@ -465,82 +465,76 @@ async def load_floodplain(
 
 @router.post("/load-easements")
 async def load_easements(
-    batch_size: int = Query(default=100, le=100),
+    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
     max_records: int = Query(default=50000, le=300000),
 ):
     """
     Load property easements from Vancouver Open Data.
-    Fetches via the ODSQL API and stores in property_easements table.
+    Uses the dataset GeoJSON export so we can ingest >10k records (offset+limit is capped).
     """
-    base_url = (
+    export_url = (
         "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets"
-        "/property-easements/records"
+        "/property-easements/exports/geojson?select=label"
     )
 
     loaded = 0
     errors: list[str] = []
-    offset = 0
 
     async with db.acquire() as conn:
         # Clean reload: truncate existing data
         await conn.execute("TRUNCATE property_easements CASCADE")
 
-        while loaded < max_records:
-            url = (
-                f"{base_url}?select=label,geom,geo_point_2d"
-                f"&limit={batch_size}&offset={offset}"
-            )
-            try:
-                data = await asyncio.to_thread(_fetch_json, url, {
+        try:
+            data = await asyncio.to_thread(
+                _fetch_json,
+                export_url,
+                {
                     "User-Agent": HEADERS["User-Agent"],
                     "Accept": "application/json",
-                })
-            except Exception as e:
-                errors.append(f"offset {offset}: {e}")
+                },
+                timeout_s=120,
+            )
+        except Exception as e:
+            errors.append(f"fetch error: {e}")
+            return {"loaded": 0, "total_easements": 0, "errors": errors[:20]}
+
+        features = data.get("features", []) if isinstance(data, dict) else []
+
+        insert_sql = (
+            "INSERT INTO property_easements (easement_type, plan_number, geom) "
+            "VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326))"
+        )
+        pending: list[tuple[str, str, str]] = []
+
+        for feature in features:
+            if loaded >= max_records:
                 break
 
-            results = data.get("results", [])
-            if not results:
-                break
+            if not isinstance(feature, dict):
+                continue
+            props = feature.get("properties") or {}
+            geom = feature.get("geometry")
+            if not isinstance(geom, dict):
+                continue
 
-            for record in results:
-                easement_label = record.get("label", "")
-                geom_feature = record.get("geom")
-                geo_point = record.get("geo_point_2d")
+            label = (props.get("label") or "").strip()
+            geom_json = json.dumps(geom)
+            pending.append((label, "", geom_json))
 
-                geom_json = None
-                if geom_feature and isinstance(geom_feature, dict):
-                    # geom is a GeoJSON Feature — extract .geometry
-                    if "geometry" in geom_feature:
-                        geom_json = json.dumps(geom_feature["geometry"])
-                    else:
-                        geom_json = json.dumps(geom_feature)
-                elif geo_point and isinstance(geo_point, dict):
-                    lat = geo_point.get("lat")
-                    lon = geo_point.get("lon")
-                    if lat is not None and lon is not None:
-                        geom_json = json.dumps({
-                            "type": "Point",
-                            "coordinates": [lon, lat]
-                        })
-
-                if not geom_json:
-                    continue
-
+            if len(pending) >= batch_size:
                 try:
-                    await conn.execute(
-                        "INSERT INTO property_easements (easement_type, plan_number, geom) "
-                        "VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326))",
-                        easement_label, "", geom_json,
-                    )
-                    loaded += 1
+                    await conn.executemany(insert_sql, pending)
+                    loaded += len(pending)
                 except Exception as e:
-                    errors.append(f"insert error: {e}")
+                    errors.append(f"batch insert error: {e}")
+                pending = []
 
-            offset += batch_size
-
-            # Polite delay
-            await asyncio.sleep(0.5)
+        if pending:
+            try:
+                await conn.executemany(insert_sql, pending)
+                loaded += len(pending)
+            except Exception as e:
+                errors.append(f"batch insert error: {e}")
 
         total_easements = await conn.fetchval(
             "SELECT count(*) FROM property_easements"
@@ -551,6 +545,231 @@ async def load_easements(
         "total_easements": total_easements,
         "errors": errors[:20],
     }
+
+
+# ── Utility Infrastructure Loader (Water/Sewer Mains) ────────────
+
+def _extract_geojson_geometry(record: dict) -> str | None:
+    """
+    Extract GeoJSON geometry from common Opendatasoft fields.
+
+    Opendatasoft often returns geometry as:
+      - {"type": "...", "coordinates": ...} or
+      - {"type":"Feature","geometry":{...},"properties":{...}}
+    """
+    for key in ("geom", "geo_shape", "geometry", "the_geom"):
+        val = record.get(key)
+        if not val:
+            continue
+        if isinstance(val, dict):
+            if isinstance(val.get("geometry"), dict):
+                return json.dumps(val["geometry"])
+            if "type" in val and "coordinates" in val:
+                return json.dumps(val)
+        if isinstance(val, str):
+            # Some datasets may return a raw GeoJSON string.
+            return val
+    return None
+
+
+def _as_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _pick_first(record: dict, keys: list[str]) -> str | None:
+    for k in keys:
+        v = record.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            return s
+    return None
+
+
+async def _load_utility_lines_from_opendata(
+    *,
+    dataset_id: str,
+    utility_type: str,
+    source_url: str,
+    batch_size: int,
+    max_records: int,
+) -> dict:
+    # Use GeoJSON export so we can ingest datasets with >10k records (offset+limit is capped).
+    export_url = (
+        "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets"
+        f"/{dataset_id}/exports/geojson?select=recordid,*"
+    )
+
+    loaded = 0
+    errors: list[str] = []
+
+    async with db.acquire() as conn:
+        # Delete only rows from this dataset so multiple datasets can coexist.
+        await conn.execute("DELETE FROM utility_lines WHERE source_dataset = $1", dataset_id)
+
+        try:
+            data = await asyncio.to_thread(
+                _fetch_json,
+                export_url,
+                {
+                    "User-Agent": HEADERS["User-Agent"],
+                    "Accept": "application/json",
+                },
+                timeout_s=240,
+            )
+        except Exception as e:
+            errors.append(f"fetch error: {e}")
+            total = await conn.fetchval(
+                "SELECT count(*) FROM utility_lines WHERE source_dataset = $1",
+                dataset_id,
+            )
+            return {
+                "dataset_id": dataset_id,
+                "utility_type": utility_type,
+                "loaded": loaded,
+                "total_rows_for_dataset": total,
+                "errors": errors[:20],
+                "source_url": source_url,
+            }
+
+        features = data.get("features", []) if isinstance(data, dict) else []
+
+        insert_sql = (
+            """
+            INSERT INTO utility_lines (
+                utility_type, asset_id, line_type, diameter_mm, material,
+                source_dataset, source_url, geom, metadata
+            )
+            VALUES (
+                $1, $2, $3, $4, $5,
+                $6, $7, ST_SetSRID(ST_GeomFromGeoJSON($8), 4326), $9::jsonb
+            )
+            """
+        )
+
+        pending: list[tuple] = []
+        for feature in features:
+            if loaded >= max_records:
+                break
+            if not isinstance(feature, dict):
+                continue
+
+            props = feature.get("properties") or {}
+            geom = feature.get("geometry")
+            if not isinstance(props, dict) or not isinstance(geom, dict):
+                continue
+
+            # Build a record dict compatible with _extract_geojson_geometry().
+            record = {**props, "geometry": geom}
+            geom_json = _extract_geojson_geometry(record)
+            if not geom_json:
+                continue
+
+            asset_id = _pick_first(props, ["asset_id", "assetid", "id", "objectid", "fid", "recordid"])
+            diameter_mm = (
+                _as_float(props.get("diameter_mm"))
+                or _as_float(props.get("diameter"))
+                or _as_float(props.get("pipe_diameter"))
+            )
+            material = _pick_first(props, ["material", "pipe_material", "construction_material"])
+            line_type = _pick_first(props, ["line_type", "sewer_type", "effluent_type", "system", "type"])
+
+            pending.append(
+                (
+                    utility_type,
+                    asset_id,
+                    line_type,
+                    diameter_mm,
+                    material,
+                    dataset_id,
+                    source_url,
+                    geom_json,
+                    json.dumps(props),
+                )
+            )
+
+            if len(pending) >= batch_size:
+                try:
+                    await conn.executemany(insert_sql, pending)
+                    loaded += len(pending)
+                except Exception as e:
+                    errors.append(f"batch insert error: {e}")
+                pending = []
+
+        if pending:
+            try:
+                await conn.executemany(insert_sql, pending)
+                loaded += len(pending)
+            except Exception as e:
+                errors.append(f"batch insert error: {e}")
+
+        total = await conn.fetchval(
+            "SELECT count(*) FROM utility_lines WHERE source_dataset = $1",
+            dataset_id,
+        )
+
+    return {
+        "dataset_id": dataset_id,
+        "utility_type": utility_type,
+        "loaded": loaded,
+        "total_rows_for_dataset": total,
+        "errors": errors[:20],
+        "source_url": source_url,
+    }
+
+
+@router.post("/load-utility-lines")
+async def load_utility_lines(
+    dataset_id: str = Query(..., description="Open Data dataset id, e.g. 'water-distribution-mains'"),
+    utility_type: str = Query(..., description="Logical type stored in DB, e.g. 'water' or 'sewer'"),
+    source_url: str = Query(..., description="Human-friendly dataset page URL"),
+    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    max_records: int = Query(default=200000, le=500000),
+):
+    """Load a utility line dataset from City of Vancouver Open Data into `utility_lines`."""
+    return await _load_utility_lines_from_opendata(
+        dataset_id=dataset_id,
+        utility_type=utility_type,
+        source_url=source_url,
+        batch_size=batch_size,
+        max_records=max_records,
+    )
+
+
+@router.post("/load-utilities-water")
+async def load_utilities_water(
+    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    max_records: int = Query(default=200000, le=500000),
+):
+    """Convenience loader for water mains (dataset id may be updated if CoV changes naming)."""
+    return await _load_utility_lines_from_opendata(
+        dataset_id="water-distribution-mains",
+        utility_type="water",
+        source_url="https://opendata.vancouver.ca/explore/dataset/water-distribution-mains/",
+        batch_size=batch_size,
+        max_records=max_records,
+    )
+
+
+@router.post("/load-utilities-sewer")
+async def load_utilities_sewer(
+    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    max_records: int = Query(default=200000, le=500000),
+):
+    """Convenience loader for sewer mains (dataset id may be updated if CoV changes naming)."""
+    return await _load_utility_lines_from_opendata(
+        dataset_id="sewer-mains",
+        utility_type="sewer",
+        source_url="https://opendata.vancouver.ca/explore/dataset/sewer-mains/",
+        batch_size=batch_size,
+        max_records=max_records,
+    )
 
 
 # ── Manual Listing Loader ─────────────────────────────────────
@@ -1015,7 +1234,7 @@ async def debug_rew():
 
 @router.post("/run-migrations")
 async def run_migrations():
-    """Run pending database migrations (003, 004, 005, 006) for risk layers, V2 and V3."""
+    """Run pending database migrations for local/dev DBs with existing volumes."""
     results = []
     async with db.acquire() as conn:
         # Migration 003: Add rew_url column
@@ -1122,6 +1341,34 @@ async def run_migrations():
                 break
         else:
             results.append({"migration": "006_v3_execution_risk", "status": "ok"})
+
+        # Migration 030: Utility infrastructure lines (for due diligence evidence)
+        migration_030_stmts = [
+            """CREATE TABLE IF NOT EXISTS utility_lines (
+                id SERIAL PRIMARY KEY,
+                utility_type TEXT NOT NULL,
+                asset_id TEXT,
+                line_type TEXT,
+                diameter_mm NUMERIC,
+                material TEXT,
+                source_dataset TEXT NOT NULL,
+                source_url TEXT,
+                geom GEOMETRY(Geometry, 4326) NOT NULL,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_utility_lines_geom ON utility_lines USING GIST (geom)",
+            "CREATE INDEX IF NOT EXISTS idx_utility_lines_type ON utility_lines (utility_type)",
+            "CREATE INDEX IF NOT EXISTS idx_utility_lines_dataset ON utility_lines (source_dataset)",
+        ]
+        for stmt in migration_030_stmts:
+            try:
+                await conn.execute(stmt)
+            except Exception as e:
+                results.append({"migration": "030_utility_lines", "status": "error", "detail": str(e), "stmt": stmt[:80]})
+                break
+        else:
+            results.append({"migration": "030_utility_lines", "status": "ok"})
 
     return {"migrations": results}
 

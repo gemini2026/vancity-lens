@@ -103,7 +103,7 @@ class TestAutocompleteDropdown:
         content = (COMPONENTS_DIR / "AddressSearchBar.tsx").read_text()
         assert "result.address" in content
         assert "result.neighborhood" in content
-        assert "result.postalCode" in content
+        assert "result.postal_code" in content
 
 
 class TestKeyboardNavigation:
@@ -336,7 +336,7 @@ class TestGeocodingResultType:
             / "lib"
             / "geocoding.ts"
         ).read_text()
-        assert "postalCode" in content
+        assert "postal_code" in content
 
     def test_result_type_has_confidence(self):
         content = (
@@ -554,7 +554,9 @@ class TestFallbackGeocoder:
 
     def test_mapbox_token_check(self):
         content = (API_DIR / "geocoding.py").read_text()
+        assert "_get_mapbox_token" in content
         assert "MAPBOX_TOKEN" in content
+        assert "NEXT_PUBLIC_MAPBOX_TOKEN" in content
         assert "os.getenv" in content
 
     def test_error_handling_returns_empty(self):

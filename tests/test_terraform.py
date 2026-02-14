@@ -47,10 +47,10 @@ class TestTerraformFiles:
         providers_tf = TERRAFORM_DIR / "providers.tf"
         assert providers_tf.exists(), f"providers.tf not found at {providers_tf}"
 
-    def test_terragrunt_hcl_exists(self):
-        """Terragrunt configuration file exists."""
-        terragrunt_hcl = TERRAFORM_DIR / "terragrunt.hcl"
-        assert terragrunt_hcl.exists(), f"terragrunt.hcl not found at {terragrunt_hcl}"
+    def test_root_hcl_exists(self):
+        """Terragrunt root configuration file exists."""
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        assert root_hcl.exists(), f"root.hcl not found at {root_hcl}"
 
     def test_terraform_tfvars_example_exists(self):
         """Example terraform variables file exists."""
@@ -154,17 +154,11 @@ class TestTerraformVariables:
         content = self._read_variables_file()
         assert 'variable "cohere_api_key"' in content, "cohere_api_key variable not defined"
 
-    def test_cloudrun_min_instances_variable_defined(self):
-        """cloudrun_min_instances variable is defined."""
+    def test_enable_cloudrun_variable_defined(self):
+        """enable_cloudrun variable is defined."""
         content = self._read_variables_file()
-        assert 'variable "cloudrun_min_instances"' in content, \
-            "cloudrun_min_instances variable not defined"
-
-    def test_cloudrun_max_instances_variable_defined(self):
-        """cloudrun_max_instances variable is defined."""
-        content = self._read_variables_file()
-        assert 'variable "cloudrun_max_instances"' in content, \
-            "cloudrun_max_instances variable not defined"
+        assert 'variable "enable_cloudrun"' in content, \
+            "enable_cloudrun variable not defined"
 
     def test_sensitive_variables_marked(self):
         """Sensitive variables are marked as sensitive."""
@@ -317,6 +311,28 @@ class TestTerraformModules:
         assert secrets_module.exists(), f"secrets module directory not found at {secrets_module}"
         assert secrets_module.is_dir(), f"{secrets_module} is not a directory"
 
+    def test_storage_module_exists(self):
+        """Storage module directory exists."""
+        storage_module = MODULES_DIR / "storage"
+        assert storage_module.exists(), f"storage module directory not found at {storage_module}"
+        assert storage_module.is_dir(), f"{storage_module} is not a directory"
+
+    def test_observability_module_exists(self):
+        """Observability module directory exists."""
+        observability_module = MODULES_DIR / "observability"
+        assert observability_module.exists(), (
+            f"observability module directory not found at {observability_module}"
+        )
+        assert observability_module.is_dir(), f"{observability_module} is not a directory"
+
+    def test_cloudflare_module_exists(self):
+        """Cloudflare module directory exists."""
+        cloudflare_module = MODULES_DIR / "cloudflare"
+        assert cloudflare_module.exists(), (
+            f"cloudflare module directory not found at {cloudflare_module}"
+        )
+        assert cloudflare_module.is_dir(), f"{cloudflare_module} is not a directory"
+
     def test_network_module_has_main_tf(self):
         """Network module has main.tf file."""
         main_tf = MODULES_DIR / "network" / "main.tf"
@@ -378,7 +394,16 @@ class TestTerraformModules:
         main_tf = TERRAFORM_DIR / "main.tf"
         content = main_tf.read_text()
 
-        modules = ["network", "cloudsql", "gke", "registry", "secrets"]
+        modules = [
+            "network",
+            "cloudsql",
+            "gke",
+            "registry",
+            "secrets",
+            "storage",
+            "observability",
+            "cloudflare",
+        ]
         for module in modules:
             assert f'module "{module}"' in content, f"Module {module} not referenced in main.tf"
 
@@ -439,23 +464,21 @@ class TestTerraformSecurity:
 
     def test_gcs_backend_configured(self):
         """GCS backend is configured for state storage."""
-        providers_tf = TERRAFORM_DIR / "providers.tf"
-        content = providers_tf.read_text()
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
-        assert 'backend "gcs"' in content, "GCS backend not configured"
+        assert 'backend = "gcs"' in content, "GCS backend not configured"
 
     def test_gcs_backend_requires_bucket(self):
         """GCS backend configuration includes bucket specification."""
-        providers_tf = TERRAFORM_DIR / "providers.tf"
-        content = providers_tf.read_text()
-
-        # Check that bucket is mentioned (may be passed via init flags)
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
         assert 'bucket' in content, "GCS backend should reference bucket configuration"
 
     def test_gcs_backend_has_prefix(self):
         """GCS backend configuration includes prefix for state organization."""
-        providers_tf = TERRAFORM_DIR / "providers.tf"
-        content = providers_tf.read_text()
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
         assert 'prefix' in content, "GCS backend should specify prefix for state file organization"
 
@@ -492,7 +515,7 @@ class TestTerraformSecurity:
         cloudsql_main = MODULES_DIR / "cloudsql" / "main.tf"
         content = cloudsql_main.read_text()
 
-        assert 'require_ssl' in content, "Cloud SQL should have SSL configuration"
+        assert 'ssl_mode' in content, "Cloud SQL should have SSL/TLS configuration"
 
     def test_cloud_sql_backup_enabled(self):
         """Cloud SQL backup is enabled."""
@@ -598,18 +621,26 @@ class TestCloudSQLConfiguration:
         assert 'POSTGRES_16' in content, "Cloud SQL should use PostgreSQL 16"
 
     def test_cloudsql_pgvector_extension(self):
-        """Cloud SQL has pgvector extension configured."""
+        """pgvector extension enablement is present in provisioning or migrations."""
         cloudsql_main = MODULES_DIR / "cloudsql" / "main.tf"
-        content = cloudsql_main.read_text()
+        terraform_content = cloudsql_main.read_text()
+        deploy_script = Path("scripts/deploy_gcp.sh").read_text()
+        migration_sql = Path("db/007_intelligence_layer.sql").read_text()
 
-        assert 'pgvector' in content, "pgvector extension not configured"
+        has_terraform_flag = "pgvector" in terraform_content
+        has_bootstrap_sql = "CREATE EXTENSION IF NOT EXISTS vector" in deploy_script or "CREATE EXTENSION IF NOT EXISTS vector" in migration_sql
+        assert has_terraform_flag or has_bootstrap_sql, "pgvector extension enablement not configured"
 
     def test_cloudsql_postgis_extension(self):
-        """Cloud SQL has PostGIS extension configured."""
+        """PostGIS extension enablement is present in provisioning or migrations."""
         cloudsql_main = MODULES_DIR / "cloudsql" / "main.tf"
-        content = cloudsql_main.read_text()
+        terraform_content = cloudsql_main.read_text()
+        deploy_script = Path("scripts/deploy_gcp.sh").read_text()
+        migration_sql = Path("db/001_schema.sql").read_text()
 
-        assert 'postgis' in content, "PostGIS extension not configured"
+        has_terraform_flag = "postgis" in terraform_content
+        has_bootstrap_sql = "CREATE EXTENSION IF NOT EXISTS postgis" in deploy_script or "CREATE EXTENSION IF NOT EXISTS postgis" in migration_sql
+        assert has_terraform_flag or has_bootstrap_sql, "PostGIS extension enablement not configured"
 
 
 class TestNetworkConfiguration:
@@ -738,38 +769,38 @@ class TestTerragruntConfiguration:
 
     def test_terragrunt_has_remote_state(self):
         """Terragrunt defines remote state backend."""
-        terragrunt = TERRAFORM_DIR / "terragrunt.hcl"
-        content = terragrunt.read_text()
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
         assert 'remote_state' in content, "Terragrunt remote_state not configured"
 
     def test_terragrunt_uses_gcs_backend(self):
         """Terragrunt is configured to use GCS backend."""
-        terragrunt = TERRAFORM_DIR / "terragrunt.hcl"
-        content = terragrunt.read_text()
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
         assert 'backend = "gcs"' in content, "Terragrunt should use GCS backend"
 
     def test_terragrunt_specifies_bucket(self):
         """Terragrunt specifies GCS bucket for state."""
-        terragrunt = TERRAFORM_DIR / "terragrunt.hcl"
-        content = terragrunt.read_text()
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
         assert 'bucket' in content, "Terragrunt bucket not specified"
 
     def test_terragrunt_specifies_prefix(self):
         """Terragrunt specifies prefix for state organization."""
-        terragrunt = TERRAFORM_DIR / "terragrunt.hcl"
-        content = terragrunt.read_text()
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
         assert 'prefix' in content, "Terragrunt prefix not specified"
 
-    def test_terragrunt_has_inputs(self):
-        """Terragrunt defines inputs for modules."""
-        terragrunt = TERRAFORM_DIR / "terragrunt.hcl"
-        content = terragrunt.read_text()
+    def test_terragrunt_generates_backend_file(self):
+        """Terragrunt root config generates backend.tf for child environments."""
+        root_hcl = TERRAFORM_DIR / "root.hcl"
+        content = root_hcl.read_text()
 
-        assert 'inputs' in content, "Terragrunt inputs not defined"
+        assert 'generate' in content, "Terragrunt backend generate block not defined"
 
     def test_dev_environment_terragrunt_configured(self):
         """Development environment has Terragrunt configuration."""
@@ -779,6 +810,33 @@ class TestTerragruntConfiguration:
         assert 'terraform' in content or 'source' in content, \
             "Dev environment Terragrunt not properly configured"
         assert 'inputs' in content, "Dev environment inputs not defined"
+
+
+class TestDatabaseUrlConfiguration:
+    """Validate Cloud SQL-backed database URL generation."""
+
+    def test_main_tf_derives_database_url_from_cloudsql_when_not_set(self):
+        """Secrets module receives an effective URL with Cloud SQL private IP fallback."""
+        main_tf = TERRAFORM_DIR / "main.tf"
+        content = main_tf.read_text()
+
+        assert "effective_database_url" in content
+        assert "module.cloudsql.private_ip_address" in content
+        assert "database_url         = local.effective_database_url" in content
+
+    def test_staging_terragrunt_explicitly_clears_database_url_override(self):
+        """Staging should not inherit a localhost TF_VAR_database_url."""
+        staging = ENVIRONMENTS_DIR / "staging" / "terragrunt.hcl"
+        content = staging.read_text()
+
+        assert 'database_url     = ""' in content
+
+    def test_prod_terragrunt_explicitly_clears_database_url_override(self):
+        """Prod should not inherit a localhost TF_VAR_database_url."""
+        prod = ENVIRONMENTS_DIR / "prod" / "terragrunt.hcl"
+        content = prod.read_text()
+
+        assert 'database_url     = ""' in content
 
 
 if __name__ == "__main__":

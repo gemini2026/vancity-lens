@@ -17,14 +17,23 @@ async def _clear_cache():
     try:
         from api.cache import CacheManager
         manager = CacheManager()
-        await manager.clear()
+        try:
+            await manager.clear()
+        except RuntimeError:
+            # Ensure cached() decorators in unit tests always have a backend.
+            await manager.initialize()
+            await manager.clear()
     except Exception:
         pass
     yield
     try:
         from api.cache import CacheManager
         manager = CacheManager()
-        await manager.clear()
+        try:
+            await manager.clear()
+        except RuntimeError:
+            await manager.initialize()
+            await manager.clear()
     except Exception:
         pass
 

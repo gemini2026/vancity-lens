@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { Notification, UnreadCountResponse } from "@/lib/notification-types";
+import { getApiBase } from "@/lib/api-base";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBase();
 
 export const NotificationBadge: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);

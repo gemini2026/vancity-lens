@@ -1,0 +1,88 @@
+name: IaC Validate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "k8s/**"
+      - ".github/workflows/iac-validate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "k8s/**"
+      - ".github/workflows/iac-validate.yml"
+
+concurrency:
+  group: iac-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform_static:
+    name: Terraform Fmt + Validate
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Terraform fmt (check)
+        run: terraform -chdir=terraform fmt -recursive -check
+
+      - name: Terraform init (backend disabled)
+        run: terraform -chdir=terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=terraform validate
+
+  kustomize_build:
+    name: Kustomize Build
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.4.3"
+
+      - name: Build base
+        run: kustomize build k8s > /tmp/k8s-base.yaml
+
+      - name: Build staging overlay
+        run: kustomize build --load-restrictor=LoadRestrictionsNone k8s/overlays/staging > /tmp/k8s-staging.yaml
+
+      - name: Build prod overlay
+        run: kustomize build --load-restrictor=LoadRestrictionsNone k8s/overlays/prod > /tmp/k8s-prod.yaml
+
+  terraform_plan_optional:
+    name: Terraform Plan (Optional)
+    if: ${{ vars.ENABLE_TERRAFORM_PLAN == 'true' && vars.TF_STATE_BUCKET != '' }}
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Terraform init (remote backend)
+        run: |
+          terraform -chdir=terraform init -reconfigure \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=${{ vars.TF_STATE_PREFIX || 'terragrunt/prod' }}" \
+            -backend-config="project=${{ vars.GCP_PROJECT_ID || 'openclaw-antonmishel-03460' }}" \
+            -backend-config="location=${{ vars.GCP_REGION || 'us-west1' }}"
+
+      - name: Terraform plan
+        run: |
+          terraform -chdir=terraform plan -input=false -lock=false -refresh=false \
+            -var="project_id=${{ vars.GCP_PROJECT_ID || 'openclaw-antonmishel-03460' }}" \
+            -var="db_password=dummy-password" \
+            -var="anthropic_api_key=dummy-anthropic-key" \
+            -var="cohere_api_key=dummy-cohere-key"

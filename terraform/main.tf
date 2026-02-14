@@ -4,10 +4,11 @@ resource "google_project_service" "required_apis" {
     "compute.googleapis.com",
     "container.googleapis.com",
     "sqladmin.googleapis.com",
+    "storage.googleapis.com",
     "artifactregistry.googleapis.com",
     "secretmanager.googleapis.com",
     "servicenetworking.googleapis.com",
-    "cloudlogging.googleapis.com",
+    "logging.googleapis.com",
     "monitoring.googleapis.com",
     "run.googleapis.com",
     "cloudresourcemanager.googleapis.com",
@@ -19,12 +20,27 @@ resource "google_project_service" "required_apis" {
   disable_on_destroy = true
 }
 
+locals {
+  # Prefer an explicitly provided runtime URL; otherwise use Cloud SQL private IP.
+  effective_database_url = trimspace(var.database_url) != "" ? var.database_url : format(
+    "postgresql://%s:%s@%s:5432/%s",
+    module.cloudsql.database_user,
+    urlencode(var.db_password),
+    module.cloudsql.private_ip_address,
+    module.cloudsql.database_name
+  )
+
+  effective_cloudflare_zone_id = trimspace(var.cloudflare_zone_id) != "" ? var.cloudflare_zone_id : (
+    var.enable_cloudflare ? data.cloudflare_zone.primary[0].id : ""
+  )
+}
+
 # Network Module
 module "network" {
   source = "./modules/network"
 
-  project_id  = var.project_id
-  region      = var.region
+  project_id   = var.project_id
+  region       = var.region
   network_name = var.network_name
 
   depends_on = [google_project_service.required_apis]
@@ -34,9 +50,9 @@ module "network" {
 module "cloudsql" {
   source = "./modules/cloudsql"
 
-  project_id = var.project_id
-  region     = var.region
-  network_id = module.network.vpc_id
+  project_id  = var.project_id
+  region      = var.region
+  network_id  = module.network.vpc_id
   db_password = var.db_password
 
   depends_on = [
@@ -49,10 +65,10 @@ module "cloudsql" {
 module "gke" {
   source = "./modules/gke"
 
-  project_id = var.project_id
-  region     = var.region
-  network_id = module.network.vpc_id
-  subnet_id  = module.network.subnet_name
+  project_id   = var.project_id
+  region       = var.region
+  network_id   = module.network.vpc_id
+  subnet_id    = module.network.subnet_name
   cluster_name = var.cluster_name
 
   depends_on = [
@@ -60,9 +76,6 @@ module "gke" {
     module.network
   ]
 }
-
-# Get GKE default service account
-data "google_client_config" "default" {}
 
 resource "google_service_account" "gke_sa" {
   account_id   = "vancity-lens-gke-sa"
@@ -110,11 +123,16 @@ module "registry" {
 module "secrets" {
   source = "./modules/secrets"
 
-  project_id          = var.project_id
-  anthropic_api_key   = var.anthropic_api_key
-  cohere_api_key      = var.cohere_api_key
-  db_password         = var.db_password
-  gke_service_account = google_service_account.gke_sa.email
+  project_id           = var.project_id
+  anthropic_api_key    = var.anthropic_api_key
+  cohere_api_key       = var.cohere_api_key
+  database_url         = local.effective_database_url
+  k2_api_key           = var.k2_api_key
+  brave_search_api_key = var.brave_search_api_key
+  admin_api_key        = var.admin_api_key
+  db_password          = var.db_password
+  environment_name     = var.environment_name
+  gke_service_account  = google_service_account.gke_sa.email
 
   depends_on = [
     google_project_service.required_apis,
@@ -122,8 +140,61 @@ module "secrets" {
   ]
 }
 
+# GCS buckets for source archive and long-term retention.
+module "storage" {
+  source = "./modules/storage"
+
+  project_id                          = var.project_id
+  region                              = var.region
+  environment_name                    = var.environment_name
+  archive_bucket_name                 = var.document_archive_bucket_name
+  long_term_bucket_name               = var.document_long_term_bucket_name
+  archive_transition_to_nearline_days = var.archive_transition_to_nearline_days
+  archive_transition_to_coldline_days = var.archive_transition_to_coldline_days
+  long_term_retention_days            = var.long_term_retention_days
+
+  depends_on = [google_project_service.required_apis]
+}
+
+# Logging and monitoring baseline.
+module "observability" {
+  source = "./modules/observability"
+
+  project_id              = var.project_id
+  environment_name        = var.environment_name
+  log_archive_bucket_name = module.storage.long_term_bucket_name
+  log_retention_days      = var.log_retention_days
+  enable_uptime_checks    = var.enable_uptime_checks
+  app_uptime_host         = var.monitoring_app_host
+  api_uptime_host         = var.monitoring_api_host
+
+  depends_on = [
+    google_project_service.required_apis,
+    module.storage
+  ]
+}
+
+# Cloudflare edge resources (optional; disabled by default until configured).
+module "cloudflare" {
+  count  = var.enable_cloudflare ? 1 : 0
+  source = "./modules/cloudflare"
+
+  zone_id             = local.effective_cloudflare_zone_id
+  domain              = var.domain_name
+  app_origin          = var.cloudflare_app_origin
+  api_origin          = var.cloudflare_api_origin
+  staging_origin      = var.cloudflare_staging_origin
+  app_record_type     = var.cloudflare_app_record_type
+  api_record_type     = var.cloudflare_api_record_type
+  staging_record_type = var.cloudflare_staging_record_type
+
+  enable_zone_settings = var.cloudflare_enable_zone_settings
+}
+
 # Cloud Run Service Account
 resource "google_service_account" "cloudrun_sa" {
+  count = var.enable_cloudrun ? 1 : 0
+
   account_id   = "vancity-lens-cloudrun-sa"
   display_name = "VanCity Lens Cloud Run Service Account"
   project      = var.project_id
@@ -134,45 +205,55 @@ resource "google_service_account" "cloudrun_sa" {
 
 # Grant Cloud Run service account access to secrets
 resource "google_secret_manager_secret_iam_member" "cloudrun_access_anthropic" {
+  count = var.enable_cloudrun ? 1 : 0
+
   secret_id = module.secrets.anthropic_api_key_secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+  member    = "serviceAccount:${google_service_account.cloudrun_sa[0].email}"
 
   depends_on = [module.secrets]
 }
 
 resource "google_secret_manager_secret_iam_member" "cloudrun_access_cohere" {
+  count = var.enable_cloudrun ? 1 : 0
+
   secret_id = module.secrets.cohere_api_key_secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+  member    = "serviceAccount:${google_service_account.cloudrun_sa[0].email}"
 
   depends_on = [module.secrets]
 }
 
 resource "google_secret_manager_secret_iam_member" "cloudrun_access_db_password" {
+  count = var.enable_cloudrun ? 1 : 0
+
   secret_id = module.secrets.db_password_secret_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+  member    = "serviceAccount:${google_service_account.cloudrun_sa[0].email}"
 
   depends_on = [module.secrets]
 }
 
 # Grant Cloud Run service account Cloud SQL client role
 resource "google_project_iam_member" "cloudrun_sql_client" {
+  count = var.enable_cloudrun ? 1 : 0
+
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.cloudrun_sa.email}"
+  member  = "serviceAccount:${google_service_account.cloudrun_sa[0].email}"
 }
 
 # Cloud Run Service for VanCity Lens API
 resource "google_cloud_run_service" "api" {
+  count = var.enable_cloudrun ? 1 : 0
+
   name     = "vancity-lens-api"
   location = var.region
   project  = var.project_id
 
   template {
     spec {
-      service_account_name = google_service_account.cloudrun_sa.email
+      service_account_name = google_service_account.cloudrun_sa[0].email
 
       containers {
         image = "${var.region}-docker.pkg.dev/${var.project_id}/${module.registry.repository_name}/api:latest"
@@ -230,10 +311,12 @@ resource "google_cloud_run_service" "api" {
 
 # Cloud Run IAM - allow public access to the service
 resource "google_cloud_run_service_iam_member" "cloudrun_invoker" {
-  service       = google_cloud_run_service.api.name
-  location      = google_cloud_run_service.api.location
-  role          = "roles/run.invoker"
-  member        = "allUsers"
+  count = var.enable_cloudrun ? 1 : 0
+
+  service  = google_cloud_run_service.api[0].name
+  location = google_cloud_run_service.api[0].location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
 
   depends_on = [google_cloud_run_service.api]
 }

@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { getApiBase } from "./api-base";
+
+const API_BASE = getApiBase();
 
 export async function createShareLink(pid: string, token?: string, label?: string): Promise<{ token: string; url: string; expires_at: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };

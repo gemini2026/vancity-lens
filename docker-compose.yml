@@ -85,20 +85,34 @@ services:
     container_name: vancity_api
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - "8000:8000"
+      - "8080:8000"
     environment:
       DATABASE_URL: "postgresql://vancity:vancity_dev@pgbouncer:6432/vancity_lens"
       REDIS_URL: "redis://redis:6379/0"
-      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-sk-placeholder}"
-      COHERE_API_KEY: "${COHERE_API_KEY:-placeholder}"
+      # Optional (chat runs in DEMO mode without keys)
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      COHERE_API_KEY: "${COHERE_API_KEY:-}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-}"
       CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
       ADMIN_API_KEY: "${ADMIN_API_KEY:-vcl-admin-dev-key-2026}"
-      RATE_LIMIT_GENERAL: "${RATE_LIMIT_GENERAL:-120}"
+      RATE_LIMIT_GENERAL: "${RATE_LIMIT_GENERAL:-1000}"
       RATE_LIMIT_LLM: "${RATE_LIMIT_LLM:-30}"
+      # RAG backend selection (local vs K2)
+      RAG_BACKEND: "${RAG_BACKEND:-local}"
+      K2_API_HOST: "${K2_API_HOST:-}"
+      K2_API_KEY: "${K2_API_KEY:-}"
+      K2_CORPUS_ID: "${K2_CORPUS_ID:-}"
+      K2_TOP_K: "${K2_TOP_K:-10}"
+      K2_TIMEOUT_SECONDS: "${K2_TIMEOUT_SECONDS:-20}"
+      K2_FALLBACK_TO_LOCAL: "${K2_FALLBACK_TO_LOCAL:-true}"
+      # Used by /api/v1/geocode + /api/v1/reverse-geocode (falls back to NEXT_PUBLIC_MAPBOX_TOKEN)
+      MAPBOX_TOKEN: "${MAPBOX_TOKEN:-${NEXT_PUBLIC_MAPBOX_TOKEN:-}}"
     volumes:
       - ./api:/app/api
       - ./scripts:/app/scripts
       - ./db:/app/db
+      - ./pipeline:/app/pipeline
+      - ./sdk:/app/sdk
     depends_on:
       pgbouncer:
         condition: service_healthy
@@ -122,8 +136,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8000"
-      NEXT_PUBLIC_MAPBOX_TOKEN: "${MAPBOX_TOKEN:-}"
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      # Prefer NEXT_PUBLIC_MAPBOX_TOKEN (matches frontend/.env.local + .env.example),
+      # but keep MAPBOX_TOKEN as a backwards-compatible fallback.
+      NEXT_PUBLIC_MAPBOX_TOKEN: "${NEXT_PUBLIC_MAPBOX_TOKEN:-${MAPBOX_TOKEN:-}}"
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public

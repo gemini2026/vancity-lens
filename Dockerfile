@@ -18,7 +18,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    # Preinstall CPU-only torch wheels so downstream deps do not pull CUDA packages.
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+      torch==2.5.1 && \
+    pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt
 
 
 # ─── Stage 2: Runtime ──────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ RUN useradd -m -u 1000 -s /sbin/nologin vancity && \
 # Copy application code
 COPY --chown=vancity:vancity api/ ./api/
 COPY --chown=vancity:vancity db/ ./db/
+COPY --chown=vancity:vancity sdk/ ./sdk/
 
 # Health check using Python (no curl/wget needed)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

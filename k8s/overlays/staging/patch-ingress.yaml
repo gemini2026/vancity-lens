@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vancity-lens-ingress
+  namespace: vancity-lens
+spec:
+  rules:
+    - host: "staging.vancitylense.com"
+      http:
+        paths:
+          # API routes are already namespaced under /api/* in the backend.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          # Health probes are at root paths.
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          - path: /ready
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          # Everything else is the Next.js app.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-frontend
+                port:
+                  number: 80

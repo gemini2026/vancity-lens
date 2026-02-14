@@ -709,3 +709,28 @@ async def get_current_user_from_request(
             detail="Database not available",
         )
     return await _get_current_user_impl(pool, credentials)
+
+
+async def get_optional_user_from_request(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+) -> Optional[Dict]:
+    """
+    Like get_current_user_from_request, but allows anonymous requests (returns None)
+    when no Authorization header is provided.
+
+    If credentials are present but invalid/expired, this still raises 401.
+    """
+    if not credentials:
+        return None
+
+    from .db import db as _db
+    pool = getattr(request.app.state, "pool", None)
+    if pool is None:
+        pool = _db.pool
+    if pool is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database not available",
+        )
+    return await _get_current_user_impl(pool, credentials)

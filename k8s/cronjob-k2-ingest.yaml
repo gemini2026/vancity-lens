@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vancity-lens-k2-ingest
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+spec:
+  # Schedule: every 6 hours (tune as needed)
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 2400
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: vancity-lens-k2-ingest
+        spec:
+          serviceAccountName: default
+          terminationGracePeriodSeconds: 30
+          restartPolicy: OnFailure
+          containers:
+          - name: k2-ingest
+            image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens/vancity-lens-api:latest
+            imagePullPolicy: Always
+            command:
+            - python3
+            - migration/k2_ingest_sources.py
+            - --include-disabled
+            - --wait
+            # Uses auto-index by default when --build-indexes is not set.
+
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+            env:
+            - name: K2_API_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: vancity-lens-config
+                  key: k2-api-host
+            - name: K2_CORPUS_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: vancity-lens-config
+                  key: k2-corpus-id
+            - name: K2_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: k2-api-key
+            - name: BRAVE_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: brave-search-api-key

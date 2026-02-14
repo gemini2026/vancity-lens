@@ -1,0 +1,206 @@
+version: 1
+
+# VanCity Lens — Intelligence Sources
+#
+# This file is consumed by `scripts/ingest_sources.py`.
+# Each source defines:
+# - how to discover URLs (project finder APIs, document library pages, RSS, static lists)
+# - how to store them into `documents` (`source_type` + optional `title`)
+# - optional cadence/priority notes for humans (not enforced by code)
+#
+# Notes:
+# - Many vancouver.ca domains are behind Cloudflare and may block non-browser clients.
+#   Prefer ShapeYourCity (EngagementHQ) sources where possible.
+# - ShapeYourCity "document library" links are HTML pages; the actual PDF is at the same
+#   URL with `/download` appended.
+#
+# Quick start:
+#   docker compose exec api python scripts/ingest_sources.py --config pipeline/sources.yaml --dry-run
+#   docker compose exec api python scripts/ingest_sources.py --config pipeline/sources.yaml --source syc_development_applications --max-projects 25
+
+defaults:
+  http:
+    user_agent: "VanCityLensBot/0.1"
+    timeout_s: 30
+    max_concurrency: 6
+
+sources:
+  # ──────────────────────────────────────────────────────────────
+  # P0: Development + Rezoning Applications (ShapeYourCity)
+  # ──────────────────────────────────────────────────────────────
+  - id: syc_development_applications
+    enabled: true
+    priority: p0
+    cadence: daily
+    name: "Shape Your City Vancouver — Development applications (Project Finder)"
+    discover:
+      type: syc_projectfinder
+      # This is the "Project Finder" embed used by https://www.shapeyourcity.ca/development/
+      # We fetch it to obtain an anonymous JWT used for /api/v2/* calls.
+      embed_url: "https://www.shapeyourcity.ca/embeds/projectfinder/b5013237-6ca5-45c4-912f-496c0b382528?hostOrigin=https%3A%2F%2Fwww.shapeyourcity.ca%2Fdevelopment%2F"
+      projects_api_template: "https://www.shapeyourcity.ca/api/v2/projects?filterable=true&filters%5Bsort%5D%5Bpublished_at%5D=desc&filters%5Btags%5D%5B%5D=Development&filters%5Bvisibility_mode%5D=public&page={page}&per_page={per_page}"
+      per_page: 200
+      max_pages: 10
+      project_base_url: "https://www.shapeyourcity.ca"
+      # Optional: only ingest projects published in the last N days (0 = no filter)
+      days_back: 365
+      ingest_project_pages: true
+      ingest_project_documents: true
+      store:
+        project_page_source_type: "syc_development_application_page"
+        project_document_source_type: "syc_development_application_document"
+
+  # ──────────────────────────────────────────────────────────────
+  # P1: Planning / Policy Document Libraries (ShapeYourCity)
+  # ──────────────────────────────────────────────────────────────
+  - id: syc_broadway_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Broadway Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/broadway-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_vancouver_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Vancouver Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/vancouver-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_rupert_renfrew_station_area_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Rupert + Renfrew Station Area Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      # Redirects to /widgets/<id>/documents, which contains the document library.
+      page_url: "https://www.shapeyourcity.ca/rupert-renfrew-station-area-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  # ──────────────────────────────────────────────────────────────
+  # P1: Provincial Legislation / Regulations (HTML)
+  # ──────────────────────────────────────────────────────────────
+  - id: bc_toa_regulations
+    enabled: true
+    priority: p1
+    cadence: monthly
+    name: "BC Laws — Transit-Oriented Areas (Bill 47 regs and related)"
+    discover:
+      type: static_urls
+      store:
+        source_type: "provincial_legislation"
+      urls:
+        # Vancouver Transit-Oriented Areas Regulation
+        - "https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/265_2023"
+        # Local Government Transit-Oriented Areas Regulation (province-wide)
+        - "https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/263_2023"
+        # Vancouver Charter
+        - "https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/E4tlc53055"
+        # Bill 47 (previous bills page; still useful for legislative intent text)
+        - "https://www.bclaws.gov.bc.ca/civix/document/id/bills/billsprevious/4th42nd:gov47-3"
+
+  - id: bc_tod_program_page
+    enabled: true
+    priority: p2
+    cadence: monthly
+    name: "BC Gov — Transit-Oriented Development Areas overview"
+    discover:
+      type: static_urls
+      store:
+        source_type: "provincial_policy"
+      urls:
+        - "https://www2.gov.bc.ca/gov/content/housing-tenancy/local-governments-and-housing/housing-initiatives/transit-oriented-development-areas"
+
+  # ──────────────────────────────────────────────────────────────
+  # P2: Infrastructure Updates (HTML)
+  # ──────────────────────────────────────────────────────────────
+  - id: broadway_subway_updates
+    enabled: true
+    priority: p2
+    cadence: weekly
+    name: "Broadway Subway Project — construction updates"
+    discover:
+      type: static_urls
+      store:
+        source_type: "infrastructure_update"
+      urls:
+        - "https://www.broadwaysubway.ca/construction/current-work/"
+
+  # ──────────────────────────────────────────────────────────────
+  # Optional: News feeds (RSS → ingest linked articles)
+  # ──────────────────────────────────────────────────────────────
+  - id: news_storeys
+    enabled: false
+    priority: p2
+    cadence: daily
+    name: "Storeys — Metro Vancouver development news (RSS)"
+    discover:
+      type: rss
+      feed_url: "https://storeys.com/feed/"
+      max_items: 30
+      store:
+        source_type: "news"
+
+  # ──────────────────────────────────────────────────────────────
+  # Blocked/Hard mode: vancouver.ca / council.vancouver.ca sources.
+  # Leave disabled unless you run from an environment that passes Cloudflare.
+  # ──────────────────────────────────────────────────────────────
+  - id: vancouver_council_minutes
+    enabled: false
+    priority: p0
+    cadence: daily
+    name: "Vancouver City Council — agendas/minutes (Cloudflare-protected)"
+    discover:
+      type: note
+      note: "council.vancouver.ca is Cloudflare-protected; enable only if your crawler can pass."
+
+  # ──────────────────────────────────────────────────────────────
+  # Optional: Open-Web Search (API-driven)
+  #
+  # This expands discovery beyond known feeds/pages by querying a search API
+  # (recommended: Brave Search API) and ingesting the resulting URLs.
+  #
+  # IMPORTANT:
+  # - You must use a search API (do not scrape Google results pages).
+  # - Keep allow_domains tight to avoid ingesting low-quality sources.
+  # - Many vancouver.ca pages may still be blocked at fetch time.
+  # ──────────────────────────────────────────────────────────────
+  - id: web_search_vancouver_plans_and_regs
+    enabled: false
+    priority: p2
+    cadence: weekly
+    name: "Open web search (Brave): Vancouver plans + Bill 47 regs"
+    discover:
+      type: web_search
+      provider: brave
+      # Optional: Brave freshness filter ('day' | 'week' | 'month' | 'year')
+      freshness: "year"
+      max_results_per_query: 10
+      allow_domains:
+        - "shapeyourcity.ca"
+        - "bclaws.gov.bc.ca"
+        - "www2.gov.bc.ca"
+        - "broadwaysubway.ca"
+      store:
+        source_type: "web_search"
+      queries:
+        - 'site:shapeyourcity.ca "Vancouver Plan" documents'
+        - 'site:bclaws.gov.bc.ca "Transit-Oriented Areas" regulation vancouver'
+        - 'site:www2.gov.bc.ca "transit-oriented development areas"'
+        - 'site:broadwaysubway.ca construction updates'

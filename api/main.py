@@ -32,6 +32,7 @@ from .comparable_sales_routes import router as comparable_sales_router
 from .csv_export_routes import router as csv_export_router
 from .metrics_routes import router as metrics_router
 from .parcel_search import router as parcel_search_router
+from .due_diligence_routes import router as due_diligence_router
 from .report_routes import router as report_router
 from .stripe_routes import router as stripe_router
 from .subscription_routes import router as subscription_router
@@ -315,6 +316,7 @@ app.include_router(comparable_sales_router)
 app.include_router(csv_export_router)
 app.include_router(metrics_router)
 app.include_router(parcel_search_router)
+app.include_router(due_diligence_router)
 app.include_router(report_router)
 app.include_router(stripe_router)
 app.include_router(subscription_router)

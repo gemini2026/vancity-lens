@@ -100,18 +100,93 @@ output "db_password_secret_id" {
   value       = module.secrets.db_password_secret_id
 }
 
+output "database_url_secret_id" {
+  description = "Secret Manager ID for database URL"
+  value       = module.secrets.database_url_secret_id
+}
+
+output "k2_api_key_secret_id" {
+  description = "Secret Manager ID for K2 API key"
+  value       = module.secrets.k2_api_key_secret_id
+}
+
+output "brave_search_api_key_secret_id" {
+  description = "Secret Manager ID for Brave Search API key"
+  value       = module.secrets.brave_search_api_key_secret_id
+}
+
+output "admin_api_key_secret_id" {
+  description = "Secret Manager ID for admin API key"
+  value       = module.secrets.admin_api_key_secret_id
+}
+
+output "document_archive_bucket_name" {
+  description = "Document archive bucket name"
+  value       = module.storage.archive_bucket_name
+}
+
+output "document_archive_bucket_url" {
+  description = "Document archive bucket URL"
+  value       = module.storage.archive_bucket_url
+}
+
+output "document_long_term_bucket_name" {
+  description = "Document long-term retention bucket name"
+  value       = module.storage.long_term_bucket_name
+}
+
+output "document_long_term_bucket_url" {
+  description = "Document long-term retention bucket URL"
+  value       = module.storage.long_term_bucket_url
+}
+
+output "observability_log_bucket_id" {
+  description = "Cloud Logging bucket id"
+  value       = module.observability.log_bucket_id
+}
+
+output "observability_log_archive_sink_name" {
+  description = "Cloud Logging sink name to GCS archive"
+  value       = module.observability.log_archive_sink_name
+}
+
+output "observability_app_uptime_check_id" {
+  description = "App uptime check id when enabled"
+  value       = module.observability.app_uptime_check_id
+}
+
+output "observability_api_uptime_check_id" {
+  description = "API uptime check id when enabled"
+  value       = module.observability.api_uptime_check_id
+}
+
 output "cloudrun_service_name" {
   description = "Cloud Run service name"
-  value       = google_cloud_run_service.api.name
+  value       = try(google_cloud_run_service.api[0].name, null)
 }
 
 output "cloudrun_service_url" {
   description = "Cloud Run service URL"
-  value       = google_cloud_run_service.api.status[0].url
+  value       = try(google_cloud_run_service.api[0].status[0].url, null)
   sensitive   = true
 }
 
 output "cloudrun_service_account_email" {
   description = "Cloud Run service account email"
-  value       = google_service_account.cloudrun_sa.email
+  value       = try(google_service_account.cloudrun_sa[0].email, null)
+}
+
+output "cloudflare_app_hostname" {
+  description = "Cloudflare app hostname when Cloudflare module is enabled"
+  value       = try(module.cloudflare[0].app_hostname, null)
+}
+
+output "cloudflare_api_hostname" {
+  description = "Cloudflare API hostname when Cloudflare module is enabled"
+  value       = try(module.cloudflare[0].api_hostname, null)
+}
+
+output "cloudflare_staging_hostname" {
+  description = "Cloudflare staging hostname when configured"
+  value       = try(module.cloudflare[0].staging_hostname, null)
 }

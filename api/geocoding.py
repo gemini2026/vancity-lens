@@ -2,12 +2,26 @@ from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from functools import lru_cache
+from urllib.parse import quote
+import logging
 import time
 import os
 
 router = APIRouter(prefix="/api/v1", tags=["geocoding"])
 
-MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN", "")
+logger = logging.getLogger(__name__)
+
+
+def _get_mapbox_token() -> str:
+    """Resolve Mapbox token from env.
+
+    We support both:
+    - MAPBOX_TOKEN (preferred for backend)
+    - NEXT_PUBLIC_MAPBOX_TOKEN (legacy/dev convenience)
+    """
+    return os.getenv("MAPBOX_TOKEN") or os.getenv("NEXT_PUBLIC_MAPBOX_TOKEN") or ""
+
+
 VANCOUVER_BOUNDS = {
     "min_lat": 49.0,
     "max_lat": 49.4,
@@ -52,23 +66,31 @@ rate_limiter = RateLimiter(max_requests=10, window_seconds=1)
 
 
 @lru_cache(maxsize=256)
-def cached_mapbox_geocode(query: str) -> Optional[dict]:
-    if not MAPBOX_TOKEN:
+def cached_mapbox_geocode(query: str, token: str) -> Optional[dict]:
+    if not token:
         return None
 
     try:
         import requests
 
+        encoded_query = quote(query.strip(), safe="")
         url = (
             f"https://api.mapbox.com/geocoding/v5/mapbox.places/"
-            f"{query}.json?access_token={MAPBOX_TOKEN}&proximity="
-            f"-123.1148,49.2632&bbox=-123.3,49.0,-122.9,49.4"
+            f"{encoded_query}.json"
         )
-        response = requests.get(url, timeout=5)
+        response = requests.get(
+            url,
+            params={
+                "access_token": token,
+                "proximity": "-123.1148,49.2632",
+                "bbox": "-123.3,49.0,-122.9,49.4",
+            },
+            timeout=5,
+        )
         if response.status_code == 200:
             return response.json()
     except Exception as e:
-        print(f"Mapbox error: {e}")
+        logger.warning(f"Mapbox error: {e}")
 
     return None
 
@@ -87,7 +109,36 @@ async def geocode(q: str = Query(..., min_length=2), user_id: Optional[str] = No
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
     try:
-        data = cached_mapbox_geocode(q)
+        # Prefer local authoritative parcel matches when available
+        try:
+            from .db import db
+
+            if db.pool is not None:
+                from .parcel_search import ParcelSearchService
+
+                service = ParcelSearchService(db.pool)
+                parcel_results = await service.search_by_address(q, limit=5)
+                results = []
+                for r in parcel_results:
+                    if not validate_bounds(r.lat, r.lng):
+                        continue
+                    results.append(
+                        GeocodingResult(
+                            address=r.civic_address,
+                            lat=r.lat,
+                            lng=r.lng,
+                            neighborhood=r.neighborhood or None,
+                            postal_code=None,
+                            confidence=0.95,
+                        )
+                    )
+                if results:
+                    return results
+        except Exception as e:
+            logger.info(f"Parcel geocode fallback skipped/failed: {e}")
+
+        token = _get_mapbox_token()
+        data = cached_mapbox_geocode(q, token)
         if not data or "features" not in data:
             return []
 
@@ -125,7 +176,7 @@ async def geocode(q: str = Query(..., min_length=2), user_id: Optional[str] = No
 
         return results
     except Exception as e:
-        print(f"Geocode error: {e}")
+        logger.exception(f"Geocode error: {e}")
         raise HTTPException(status_code=500, detail="Geocoding failed")
 
 
@@ -141,7 +192,8 @@ async def reverse_geocode(
         raise HTTPException(status_code=400, detail="Coordinates outside Vancouver")
 
     try:
-        if not MAPBOX_TOKEN:
+        token = _get_mapbox_token()
+        if not token:
             return GeocodingResult(
                 address=f"{lat:.4f}, {lng:.4f}",
                 lat=lat,
@@ -153,9 +205,9 @@ async def reverse_geocode(
 
         url = (
             f"https://api.mapbox.com/geocoding/v5/mapbox.places/"
-            f"{lng},{lat}.json?access_token={MAPBOX_TOKEN}"
+            f"{lng},{lat}.json"
         )
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, params={"access_token": token}, timeout=5)
         if response.status_code == 200:
             data = response.json()
             feature = data.get("features", [{}])[0]
@@ -186,5 +238,5 @@ async def reverse_geocode(
             confidence=0.5,
         )
     except Exception as e:
-        print(f"Reverse geocode error: {e}")
+        logger.exception(f"Reverse geocode error: {e}")
         raise HTTPException(status_code=500, detail="Reverse geocoding failed")
