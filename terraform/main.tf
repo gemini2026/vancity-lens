@@ -130,6 +130,8 @@ module "secrets" {
   k2_api_key           = var.k2_api_key
   brave_search_api_key = var.brave_search_api_key
   admin_api_key        = var.admin_api_key
+  jwt_secret           = var.jwt_secret
+  rapidapi_key         = var.rapidapi_key
   db_password          = var.db_password
   environment_name     = var.environment_name
   gke_service_account  = google_service_account.gke_sa.email

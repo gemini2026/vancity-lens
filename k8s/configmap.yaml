@@ -30,3 +30,6 @@ data:
   k2-shadow-validate-top-n: "5"
   k2-shadow-validate-max-concurrency: "2"
   k2-shadow-validate-timeout-seconds: "8"
+
+  # Scraper scheduler
+  scraper-scheduler-enabled: "true"

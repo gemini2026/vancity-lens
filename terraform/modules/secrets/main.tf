@@ -134,6 +134,44 @@ resource "google_secret_manager_secret_version" "admin_api_key_version" {
   secret_data = var.admin_api_key
 }
 
+# JWT Secret.
+resource "google_secret_manager_secret" "jwt_secret" {
+  secret_id = "jwt-secret"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  labels = merge(local.common_labels, { service = "auth" })
+}
+
+resource "google_secret_manager_secret_version" "jwt_secret_version" {
+  count = trimspace(var.jwt_secret) == "" ? 0 : 1
+
+  secret      = google_secret_manager_secret.jwt_secret.id
+  secret_data = var.jwt_secret
+}
+
+# RapidAPI Key.
+resource "google_secret_manager_secret" "rapidapi_key" {
+  secret_id = "rapidapi-key"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  labels = merge(local.common_labels, { service = "scraper" })
+}
+
+resource "google_secret_manager_secret_version" "rapidapi_key_version" {
+  count = trimspace(var.rapidapi_key) == "" ? 0 : 1
+
+  secret      = google_secret_manager_secret.rapidapi_key.id
+  secret_data = var.rapidapi_key
+}
+
 # IAM binding to allow GKE service account to read secrets
 resource "google_secret_manager_secret_iam_member" "gke_access_anthropic" {
   secret_id = google_secret_manager_secret.anthropic_api_key.id
@@ -189,4 +227,20 @@ resource "google_secret_manager_secret_iam_member" "gke_access_admin_api_key" {
   member    = "serviceAccount:${var.gke_service_account}"
 
   depends_on = [google_secret_manager_secret.admin_api_key]
+}
+
+resource "google_secret_manager_secret_iam_member" "gke_access_jwt_secret" {
+  secret_id = google_secret_manager_secret.jwt_secret.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.gke_service_account}"
+
+  depends_on = [google_secret_manager_secret.jwt_secret]
+}
+
+resource "google_secret_manager_secret_iam_member" "gke_access_rapidapi_key" {
+  secret_id = google_secret_manager_secret.rapidapi_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.gke_service_account}"
+
+  depends_on = [google_secret_manager_secret.rapidapi_key]
 }

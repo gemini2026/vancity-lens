@@ -1,0 +1,122 @@
+name: Deploy Production to GKE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: latest commit on main)"
+        required: false
+        default: ""
+
+env:
+  REGISTRY_HOST: us-west1-docker.pkg.dev
+  IMAGE_REPOSITORY: vancity-lens-docker
+  API_IMAGE_NAME: vancity-lens-api
+  FRONTEND_IMAGE_NAME: vancity-lens-frontend
+  NAMESPACE: vancity-lens
+
+jobs:
+  deploy-prod:
+    name: Build, Deploy, Smoke (Production)
+    runs-on: [self-hosted, linux]
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || 'main' }}
+
+      - name: Determine image tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.image_tag }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            echo "sha=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$GIT_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker Auth for Artifact Registry
+        run: gcloud auth configure-docker "$REGISTRY_HOST" --quiet
+
+      - name: Build and Push Images (API + Frontend)
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+          IMAGE_TAG: ${{ steps.tag.outputs.sha }}
+        run: |
+          API_IMAGE_URL="${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_REPOSITORY}/${API_IMAGE_NAME}"
+          FRONTEND_IMAGE_URL="${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_REPOSITORY}/${FRONTEND_IMAGE_NAME}"
+
+          docker build -t "${API_IMAGE_URL}:${IMAGE_TAG}" -t "${API_IMAGE_URL}:latest" .
+          docker push "${API_IMAGE_URL}:${IMAGE_TAG}"
+          docker push "${API_IMAGE_URL}:latest"
+
+          docker build -t "${FRONTEND_IMAGE_URL}:${IMAGE_TAG}" -t "${FRONTEND_IMAGE_URL}:latest" \
+            -f frontend/Dockerfile \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN="${NEXT_PUBLIC_MAPBOX_TOKEN}" \
+            frontend
+          docker push "${FRONTEND_IMAGE_URL}:${IMAGE_TAG}"
+          docker push "${FRONTEND_IMAGE_URL}:latest"
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ secrets.PROD_GKE_CLUSTER }}
+          location: ${{ secrets.PROD_GKE_LOCATION }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy Production Overlay
+        run: |
+          kubectl kustomize --load-restrictor=LoadRestrictionsNone k8s/overlays/prod | kubectl apply -f -
+
+      - name: Update Deployment Images
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          IMAGE_TAG: ${{ steps.tag.outputs.sha }}
+        run: |
+          API_IMAGE_URL="${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_REPOSITORY}/${API_IMAGE_NAME}"
+          FRONTEND_IMAGE_URL="${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_REPOSITORY}/${FRONTEND_IMAGE_NAME}"
+
+          kubectl set image deployment/vancity-lens-api \
+            api="${API_IMAGE_URL}:${IMAGE_TAG}" \
+            -n "${NAMESPACE}"
+
+          kubectl set image deployment/vancity-lens-frontend \
+            frontend="${FRONTEND_IMAGE_URL}:${IMAGE_TAG}" \
+            -n "${NAMESPACE}"
+
+          kubectl rollout status deployment/vancity-lens-api -n "${NAMESPACE}" --timeout=10m
+          kubectl rollout status deployment/vancity-lens-frontend -n "${NAMESPACE}" --timeout=10m
+
+      - name: API Smoke Tests
+        run: |
+          kubectl run prod-smoke --rm -i --restart=Never --image=curlimages/curl:8.7.1 \
+            --namespace "${NAMESPACE}" -- \
+            curl -fsS "http://vancity-lens-api.${NAMESPACE}.svc.cluster.local/health"
+          kubectl run prod-ready --rm -i --restart=Never --image=curlimages/curl:8.7.1 \
+            --namespace "${NAMESPACE}" -- \
+            curl -fsS "http://vancity-lens-api.${NAMESPACE}.svc.cluster.local/ready"
+
+      - name: UI Smoke Tests
+        run: |
+          kubectl run prod-ui --rm -i --restart=Never --image=curlimages/curl:8.7.1 \
+            --namespace "${NAMESPACE}" -- \
+            curl -fsS "http://vancity-lens-frontend.${NAMESPACE}.svc.cluster.local/" > /dev/null

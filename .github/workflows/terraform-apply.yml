@@ -1,0 +1,119 @@
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-apply.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to apply (dev, staging, prod, all)"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - dev
+          - staging
+          - prod
+
+concurrency:
+  group: terraform-apply
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: "1.9.8"
+  TERRAGRUNT_VERSION: "0.68.9"
+
+jobs:
+  detect-changes:
+    name: Detect Changed Environments
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.envs.outputs.environments }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Determine environments to apply
+        id: envs
+        env:
+          INPUT_ENV: ${{ inputs.environment }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$INPUT_ENV" = "all" ]; then
+              echo 'environments=["dev","staging","prod"]' >> "$GITHUB_OUTPUT"
+            else
+              echo "environments=[\"$INPUT_ENV\"]" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD -- terraform/)
+            if echo "$CHANGED" | grep -q "environments/dev/"; then
+              ENVS='["dev"]'
+            elif echo "$CHANGED" | grep -q "environments/staging/"; then
+              ENVS='["staging"]'
+            elif echo "$CHANGED" | grep -q "environments/prod/"; then
+              ENVS='["prod"]'
+            else
+              ENVS='["dev","staging","prod"]'
+            fi
+            echo "environments=$ENVS" >> "$GITHUB_OUTPUT"
+          fi
+
+  apply:
+    name: "Apply (${{ matrix.environment }})"
+    needs: detect-changes
+    runs-on: [self-hosted, linux]
+    environment: ${{ matrix.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        environment: ${{ fromJson(needs.detect-changes.outputs.environments) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        env:
+          TG_VERSION: ${{ env.TERRAGRUNT_VERSION }}
+        run: |
+          curl -sL "https://github.com/gruntwork-io/terragrunt/releases/download/v${TG_VERSION}/terragrunt_linux_amd64" \
+            -o /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Terragrunt Init
+        working-directory: terraform/environments/${{ matrix.environment }}
+        run: terragrunt init --terragrunt-non-interactive
+
+      - name: Terragrunt Plan
+        working-directory: terraform/environments/${{ matrix.environment }}
+        env:
+          TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          TF_VAR_cohere_api_key: ${{ secrets.COHERE_API_KEY }}
+        run: terragrunt plan -input=false -out=tfplan
+
+      - name: Terragrunt Apply
+        working-directory: terraform/environments/${{ matrix.environment }}
+        run: terragrunt apply -auto-approve tfplan

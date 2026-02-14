@@ -1,6 +1,14 @@
 terraform {
   required_version = ">= 1.0"
 
+  # GCS backend is configured dynamically by Terragrunt (see root.hcl).
+  # For standalone use without Terragrunt, uncomment and configure:
+  # backend "gcs" {
+  #   bucket  = "openclaw-antonmishel-03460-tf-state"
+  #   prefix  = "terraform/state"
+  #   project = "openclaw-antonmishel-03460"
+  # }
+
   required_providers {
     google = {
       source  = "hashicorp/google"

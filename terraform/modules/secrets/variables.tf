@@ -53,6 +53,20 @@ variable "db_password" {
   }
 }
 
+variable "jwt_secret" {
+  description = "JWT secret for user authentication tokens"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "rapidapi_key" {
+  description = "RapidAPI key for Realtor.ca scraper"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "environment_name" {
   description = "Environment label value"
   type        = string

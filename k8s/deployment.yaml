@@ -161,3 +161,19 @@ spec:
             configMapKeyRef:
               name: vancity-lens-config
               key: rate-limit-llm
+        - name: SCRAPER_SCHEDULER_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: scraper-scheduler-enabled
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: jwt-secret
+        - name: RAPIDAPI_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: rapidapi-key
+              optional: true
