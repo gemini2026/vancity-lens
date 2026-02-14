@@ -65,8 +65,9 @@ const SIGNAL_TYPE_ICONS: Record<string, string> = {
   other: "📌",
 };
 
-function escapeHtml(s: string): string {
-  return s
+function escapeHtml(s: string | null | undefined): string {
+  if (s == null) return "";
+  return String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

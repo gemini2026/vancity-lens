@@ -10,7 +10,8 @@ Usage:
         ...
 
 Set the ADMIN_API_KEY environment variable to enable authentication.
-In development, if ADMIN_API_KEY is not set, admin endpoints are unrestricted.
+If ADMIN_API_KEY is not set, admin endpoints return 503 Service Unavailable.
+Uses constant-time comparison (hmac.compare_digest) to prevent timing attacks.
 """
 
 import hmac
@@ -38,8 +39,7 @@ async def require_admin(
     Dependency that enforces admin authentication.
 
     - If ADMIN_API_KEY env var is set: requires matching X-Admin-Key header
-    - If ADMIN_API_KEY env var is NOT set: logs a warning but allows access
-      (development mode only)
+    - If ADMIN_API_KEY env var is NOT set: returns 503 Service Unavailable
     """
     expected = _get_admin_key()
 

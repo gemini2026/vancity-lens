@@ -811,6 +811,11 @@ VAN_BBOX = {
 
 def _rapidapi_post(endpoint: str, payload: dict) -> dict:
     """Generic POST to Realtor.ca RapidAPI scraper. Returns parsed JSON."""
+    if not RAPIDAPI_KEY:
+        raise RuntimeError(
+            "RAPIDAPI_KEY environment variable is required for RapidAPI calls. "
+            "Set it in your .env file."
+        )
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
         f"https://{RAPIDAPI_HOST}{endpoint}",
