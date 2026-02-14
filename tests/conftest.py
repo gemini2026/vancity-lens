@@ -1,5 +1,11 @@
 """Pytest configuration and fixtures for VanCity Lens intelligence layer tests."""
 
+import os
+
+# Ensure JWT_SECRET is set before any application modules are imported.
+# This prevents RuntimeError from api.user_auth during test collection.
+os.environ.setdefault("JWT_SECRET", "test-secret-for-ci-do-not-use-in-production")
+
 from datetime import date, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 import pytest
