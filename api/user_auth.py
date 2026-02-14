@@ -33,7 +33,12 @@ class UserRole(str, Enum):
 
 
 # Read from environment variables
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET environment variable is required. "
+        "Set it to a strong random string (>= 32 characters)."
+    )
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 

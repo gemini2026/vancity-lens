@@ -94,6 +94,7 @@ services:
       COHERE_API_KEY: "${COHERE_API_KEY:-}"
       ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-}"
       CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
+      JWT_SECRET: "${JWT_SECRET:-vcl-dev-jwt-secret-do-not-use-in-production-abc123}"
       ADMIN_API_KEY: "${ADMIN_API_KEY:-vcl-admin-dev-key-2026}"
       RATE_LIMIT_GENERAL: "${RATE_LIMIT_GENERAL:-1000}"
       RATE_LIMIT_LLM: "${RATE_LIMIT_LLM:-30}"
