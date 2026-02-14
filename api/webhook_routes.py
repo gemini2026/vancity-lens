@@ -228,10 +228,18 @@ async def test_webhook(
 )
 async def get_delivery_status(
     delivery_id: str,
+    user: Dict = Depends(get_current_user_from_request),
 ) -> DeliveryStatusResponse:
     """Check the delivery status of a specific webhook event."""
     delivery = webhook_manager.get_delivery_status(delivery_id)
     if not delivery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Delivery not found",
+        )
+    # Verify ownership: delivery -> webhook -> user
+    webhook = webhook_manager._webhooks.get(delivery.webhook_id)
+    if not webhook or webhook.user_id != str(user["id"]):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Delivery not found",
