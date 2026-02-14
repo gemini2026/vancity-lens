@@ -8,6 +8,7 @@ Uses only stdlib (urllib) so no Docker rebuild is needed.
 
 import asyncio
 import json
+import os
 import re
 import urllib.error
 import urllib.parse
@@ -796,8 +797,8 @@ async def load_listing(
 
 # ── Realtor.ca Scraper (RapidAPI) ─────────────────────────────
 
-RAPIDAPI_KEY = "7b25957278mshedaaf045e0327aep19e165jsnde9a409317e9"
-RAPIDAPI_HOST = "realtor-ca-scraper-api.p.rapidapi.com"
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
+RAPIDAPI_HOST = os.environ.get("RAPIDAPI_HOST", "realtor-ca-scraper-api.p.rapidapi.com")
 
 # Vancouver bounding box (covers city proper)
 VAN_BBOX = {
