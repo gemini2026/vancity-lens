@@ -65,6 +65,15 @@ const SIGNAL_TYPE_ICONS: Record<string, string> = {
   other: "📌",
 };
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 function fmt(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
@@ -560,7 +569,7 @@ export default function MapView() {
 
             const el = document.createElement("div");
             el.style.cssText = `width:${dotSize + 10}px;height:${dotSize + 10}px;border-radius:50%;background:${sevColor}30;border:2px solid ${sevColor};cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:${dotSize}px;line-height:1`;
-            el.innerHTML = icon;
+            el.textContent = icon;
             el.title = `${props.headline} (${props.severity})`;
             el.dataset.signalMarker = "true";
 
@@ -568,18 +577,18 @@ export default function MapView() {
               .setHTML(`
                 <div style="font-family:system-ui,sans-serif;padding:8px;background:#111827;color:#f3f4f6;border-radius:6px">
                   <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-                    <span style="font-size:16px">${icon}</span>
-                    <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:${sevColor};color:#fff;text-transform:uppercase">${props.severity}</span>
-                    <span style="font-size:9px;color:#6b7280">${props.signal_type.replace(/_/g, ' ')}</span>
+                    <span style="font-size:16px">${escapeHtml(icon)}</span>
+                    <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:${sevColor};color:#fff;text-transform:uppercase">${escapeHtml(props.severity)}</span>
+                    <span style="font-size:9px;color:#6b7280">${escapeHtml(props.signal_type.replace(/_/g, ' '))}</span>
                   </div>
-                  <div style="font-size:12px;font-weight:600;margin-bottom:4px">${props.headline}</div>
-                  <div style="font-size:10px;color:#9ca3af;margin-bottom:6px;line-height:1.4">${props.summary.substring(0, 150)}${props.summary.length > 150 ? '...' : ''}</div>
+                  <div style="font-size:12px;font-weight:600;margin-bottom:4px">${escapeHtml(props.headline)}</div>
+                  <div style="font-size:10px;color:#9ca3af;margin-bottom:6px;line-height:1.4">${escapeHtml(props.summary.substring(0, 150))}${props.summary.length > 150 ? '...' : ''}</div>
                   <div style="display:flex;justify-content:space-between;font-size:9px;color:#6b7280">
-                    <span>${props.neighborhood || ''}</span>
-                    <span>${props.event_date || ''}</span>
+                    <span>${escapeHtml(props.neighborhood || '')}</span>
+                    <span>${escapeHtml(props.event_date || '')}</span>
                   </div>
-                  ${props.decision ? `<div style="font-size:9px;margin-top:4px;color:${props.decision === 'approved' ? '#86efac' : props.decision === 'denied' ? '#f87171' : '#fbbf24'};font-weight:600">Decision: ${props.decision}</div>` : ''}
-                  ${props.id ? `<a href="${API_BASE}/api/v1/intel/documents/${props.id}/page" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:9px;color:#60a5fa;text-decoration:underline">View source ↗</a>` : ''}
+                  ${props.decision ? `<div style="font-size:9px;margin-top:4px;color:${props.decision === 'approved' ? '#86efac' : props.decision === 'denied' ? '#f87171' : '#fbbf24'};font-weight:600">Decision: ${escapeHtml(props.decision)}</div>` : ''}
+                  ${props.id ? `<a href="${API_BASE}/api/v1/intel/documents/${escapeHtml(String(props.id))}/page" target="_blank" rel="noopener" style="display:block;margin-top:6px;font-size:9px;color:#60a5fa;text-decoration:underline">View source ↗</a>` : ''}
                 </div>
               `);
 
