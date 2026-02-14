@@ -17,6 +17,7 @@ from .report_generator import (
     generate_parcel_report,
     ParcelReport,
 )
+from .user_auth import get_current_user_from_request
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ _batch_jobs: dict[str, BatchReportJob] = {}
 )
 async def download_parcel_report_pdf(
     pid: str,
-    request=None,
+    user: dict = Depends(get_current_user_from_request),
     pool: asyncpg.Pool = Depends(lambda: db.pool),
 ) -> Response:
     """
@@ -113,6 +114,7 @@ async def download_parcel_report_pdf(
 )
 async def preview_parcel_report(
     pid: str,
+    user: dict = Depends(get_current_user_from_request),
     pool: asyncpg.Pool = Depends(lambda: db.pool),
 ) -> ReportPreviewResponse:
     """
@@ -157,7 +159,7 @@ async def preview_parcel_report(
 )
 async def download_investor_memo_pdf(
     pid: str,
-    request=None,
+    user: dict = Depends(get_current_user_from_request),
     pool: asyncpg.Pool = Depends(lambda: db.pool),
 ) -> Response:
     """Generate and download an investor memo PDF for a parcel."""
@@ -202,6 +204,7 @@ async def download_investor_memo_pdf(
 )
 async def start_batch_report_generation(
     pids: list[str] = Query(..., description="List of parcel IDs"),
+    user: dict = Depends(get_current_user_from_request),
     pool: asyncpg.Pool = Depends(lambda: db.pool),
 ) -> dict:
     """
@@ -255,7 +258,10 @@ async def start_batch_report_generation(
     summary="Check batch report job status",
     description="Poll the status of a batch report generation job.",
 )
-async def get_batch_report_status(job_id: str) -> dict:
+async def get_batch_report_status(
+    job_id: str,
+    user: dict = Depends(get_current_user_from_request),
+) -> dict:
     """
     Get status of a batch report job.
 
@@ -289,7 +295,10 @@ async def get_batch_report_status(job_id: str) -> dict:
     summary="Get batch report results",
     description="Download generated PDF reports from a completed batch job.",
 )
-async def get_batch_report_results(job_id: str) -> dict:
+async def get_batch_report_results(
+    job_id: str,
+    user: dict = Depends(get_current_user_from_request),
+) -> dict:
     """
     Get results from a batch job (after completion).
 
