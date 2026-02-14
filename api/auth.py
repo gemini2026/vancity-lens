@@ -13,6 +13,7 @@ Set the ADMIN_API_KEY environment variable to enable authentication.
 In development, if ADMIN_API_KEY is not set, admin endpoints are unrestricted.
 """
 
+import hmac
 import os
 import logging
 from typing import Optional
@@ -54,7 +55,7 @@ async def require_admin(
             detail="Missing X-Admin-Key header. Admin authentication required.",
         )
 
-    if api_key != expected:
+    if not hmac.compare_digest(api_key, expected):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid admin API key.",
