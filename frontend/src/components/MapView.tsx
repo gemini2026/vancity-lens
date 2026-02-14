@@ -549,7 +549,7 @@ export default function MapView() {
 
       // Load intelligence signal markers
       try {
-        const geojson = await getSignalsGeoJSON(200, 90);
+        const geojson = await getSignalsGeoJSON(200, 365);
         if (geojson.features.length > 0) {
           geojson.features.forEach((feature: any) => {
             const props = feature.properties;

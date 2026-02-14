@@ -12,7 +12,7 @@ Provides REST API access to:
 import asyncio
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 import asyncpg
@@ -234,6 +234,10 @@ async def get_signals(
         None,
         description="Minimum severity level (info, low, medium, high, critical)",
     ),
+    date_range: Optional[str] = Query(
+        None,
+        description="Convenience lookback window: 7d|30d|90d|all (client-friendly alias for date_from/date_to)",
+    ),
     date_from: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
     limit: int = Query(20, ge=1, le=100, description="Results per page"),
@@ -252,13 +256,25 @@ async def get_signals(
             f"severity_min={severity_min}, limit={limit}, offset={offset}"
         )
 
+        effective_date_from = date_from
+        effective_date_to = date_to
+        if effective_date_from is None and effective_date_to is None and date_range:
+            dr = date_range.strip().lower()
+            if dr != "all":
+                try:
+                    days = int(dr[:-1]) if dr.endswith("d") else int(dr)
+                    effective_date_from = date.today() - timedelta(days=days)
+                    effective_date_to = date.today()
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid date_range: {date_range}")
+
         feed = await get_signal_feed(
             db_pool=db_pool,
             neighborhood=neighborhood,
             signal_type=signal_type,
             severity_min=severity_min,
-            date_from=date_from,
-            date_to=date_to,
+            date_from=effective_date_from,
+            date_to=effective_date_to,
             limit=limit,
             offset=offset,
         )

@@ -105,6 +105,8 @@ services:
       K2_TOP_K: "${K2_TOP_K:-10}"
       K2_TIMEOUT_SECONDS: "${K2_TIMEOUT_SECONDS:-20}"
       K2_FALLBACK_TO_LOCAL: "${K2_FALLBACK_TO_LOCAL:-true}"
+      # Used by /api/v1/geocode + /api/v1/reverse-geocode (falls back to NEXT_PUBLIC_MAPBOX_TOKEN)
+      MAPBOX_TOKEN: "${MAPBOX_TOKEN:-${NEXT_PUBLIC_MAPBOX_TOKEN:-}}"
     volumes:
       - ./api:/app/api
       - ./scripts:/app/scripts

@@ -223,7 +223,7 @@ class TestHandleChatDemoMode:
         """handle_chat with no API keys returns demo mode response."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.chat.sparse_search", return_value=_sample_chunks()):
+        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=_sample_chunks()):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     response = await handle_chat(
@@ -243,7 +243,7 @@ class TestHandleChatDemoMode:
         """Demo mode never calls Anthropic API."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.chat.sparse_search", return_value=[]):
+        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
@@ -264,8 +264,8 @@ class TestHandleChatPartialMode:
         """Partial mode uses sparse_search, not hybrid_search."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.chat.sparse_search", return_value=[]) as mock_sparse:
-            with patch("api.intelligence.chat.hybrid_search") as mock_hybrid:
+        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=[]) as mock_sparse:
+            with patch("api.intelligence.retrieval_backend.hybrid_search") as mock_hybrid:
                 with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                     with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                         with patch("api.intelligence.chat.build_context_window", return_value=""):
@@ -294,7 +294,7 @@ class TestHandleChatPartialMode:
         """Partial mode calls Claude API for answer generation."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.chat.sparse_search", return_value=[]):
+        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.build_context_window", return_value=""):
@@ -326,8 +326,8 @@ class TestHandleChatFullMode:
         """Full mode uses hybrid_search."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.chat.hybrid_search", return_value=[]) as mock_hybrid:
-            with patch("api.intelligence.chat.sparse_search") as mock_sparse:
+        with patch("api.intelligence.retrieval_backend.hybrid_search", return_value=[]) as mock_hybrid:
+            with patch("api.intelligence.retrieval_backend.sparse_search") as mock_sparse:
                 with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                     with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                         with patch("api.intelligence.chat.build_context_window", return_value=""):

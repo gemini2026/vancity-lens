@@ -89,7 +89,7 @@ export default function IntelPage() {
   >("");
   const [selectedDateRange, setSelectedDateRange] = useState<
     "7d" | "30d" | "90d" | "all"
-  >("7d");
+  >("90d");
 
   // Stats state
   const [stats, setStats] = useState<IntelStats | null>(null);
@@ -140,7 +140,7 @@ export default function IntelPage() {
         // Load initial signals
         const feedData = await getSignalFeed({
           limit: 20,
-          date_range: "7d",
+          date_range: "90d",
         });
         setSignals(feedData.signals);
         setSignalsHasMore(feedData.has_more);

@@ -5,7 +5,7 @@ export interface GeocodingResult {
   lat: number;
   lng: number;
   neighborhood?: string;
-  postalCode?: string;
+  postal_code?: string;
   confidence: number;
 }
 

@@ -5,13 +5,12 @@ import MapView from "@/components/MapView";
 import IntelPage from "@/components/IntelPage";
 import NeighborhoodPage from "@/components/NeighborhoodPage";
 import IngestPage from "@/components/IngestPage";
-import PricingPage from "@/components/PricingPage";
 import ThemeToggle from "@/components/ThemeToggle";
 import AlertsFeed from "@/components/AlertsFeed";
 import Disclaimer from "@/components/Disclaimer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 
-type Tab = "map" | "intel" | "hoods" | "pricing" | "ingest";
+type Tab = "map" | "intel" | "hoods" | "ingest";
 
 function AppContent() {
   const { token } = useAuth();
@@ -43,7 +42,6 @@ function AppContent() {
     { key: "map", label: "Map" },
     { key: "intel", label: "Intelligence" },
     { key: "hoods", label: "Neighborhoods" },
-    { key: "pricing", label: "Pricing" },
     { key: "ingest", label: "Ingest" },
   ];
 
@@ -144,16 +142,6 @@ function AppContent() {
           }}
         >
           <NeighborhoodPage />
-        </div>
-
-        <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            display: activeTab === "pricing" ? "block" : "none",
-          }}
-        >
-          <PricingPage />
         </div>
 
         <div

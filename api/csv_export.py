@@ -301,6 +301,48 @@ class CSVExporter:
         return output, filename
 
     @staticmethod
+    async def export_neighborhood_summaries(
+        pool: asyncpg.Pool,
+    ) -> tuple[io.StringIO, str]:
+        """
+        Export neighborhood scorecard summaries (rank + overall score) to CSV.
+
+        This is the "list view" export used by the UI when no comparison set is provided.
+        """
+        from api.intelligence.neighborhoods import get_all_neighborhood_summaries
+
+        summaries = await get_all_neighborhood_summaries(pool)
+
+        fieldnames = [
+            "name",
+            "slug",
+            "overall_score",
+            "rank",
+            "top_category",
+            "bottom_category",
+        ]
+
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for s in summaries:
+            writer.writerow(
+                {
+                    "name": CSVExporter._sanitize_csv_value(s.get("name")),
+                    "slug": CSVExporter._sanitize_csv_value(s.get("slug")),
+                    "overall_score": s.get("overall_score"),
+                    "rank": s.get("rank"),
+                    "top_category": CSVExporter._sanitize_csv_value(s.get("top_category")),
+                    "bottom_category": CSVExporter._sanitize_csv_value(s.get("bottom_category")),
+                }
+            )
+
+        filename = CSVExporter._build_filename("neighborhood_scorecards", "all")
+        output.seek(0)
+        return output, filename
+
+    @staticmethod
     async def export_parcels(
         pool: asyncpg.Pool,
         filters: ParcelExportFilters,

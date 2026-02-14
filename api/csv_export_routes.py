@@ -5,7 +5,8 @@ FastAPI endpoints for exporting signals, neighborhood comparisons, and parcels t
 """
 
 import logging
-from datetime import date
+import os
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
@@ -18,7 +19,7 @@ from .csv_export import (
     SignalExportFilters,
     ParcelExportFilters,
 )
-from .user_auth import get_current_user_from_request
+from .user_auth import get_optional_user_from_request
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,12 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
     return pool
 
 
+def _require_auth_in_production(user: Optional[dict]) -> None:
+    """CSV exports are public in non-production (demo/dev), authenticated in production."""
+    if os.getenv("VANCITY_ENV", "development").lower() == "production" and user is None:
+        raise HTTPException(status_code=401, detail="Missing authorization credentials")
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ────────────────────────────────────────────────────────────────────────────
@@ -72,11 +79,16 @@ async def export_signals(
     request: Request,
     neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
     category: Optional[str] = Query(None, description="Filter by signal category/type"),
+    signal_type: Optional[str] = Query(None, description="Alias for category (matches UI filter param)"),
     date_from: Optional[date] = Query(None, description="Export signals from this date onwards"),
     date_to: Optional[date] = Query(None, description="Export signals up to this date"),
+    date_range: Optional[str] = Query(
+        None,
+        description="Convenience lookback window: 7d|30d|90d|all (matches UI filter param)",
+    ),
     severity: Optional[str] = Query(None, description="Filter by severity level"),
     limit: int = Query(1000, ge=1, le=10000, description="Max rows to export"),
-    user: dict = Depends(get_current_user_from_request),
+    user: Optional[dict] = Depends(get_optional_user_from_request),
     pool: asyncpg.Pool = Depends(get_db_pool),
 ) -> StreamingResponse:
     """
@@ -105,12 +117,28 @@ async def export_signals(
         500: Export generation error
     """
     try:
+        _require_auth_in_production(user)
+
+        effective_category = category or signal_type
+        effective_date_from = date_from
+        effective_date_to = date_to
+        if effective_date_from is None and effective_date_to is None and date_range:
+            dr = date_range.strip().lower()
+            if dr != "all":
+                # Accept "7d" / "30d" / "90d"
+                try:
+                    days = int(dr[:-1]) if dr.endswith("d") else int(dr)
+                    effective_date_from = date.today() - timedelta(days=days)
+                    effective_date_to = date.today()
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid date_range: {date_range}")
+
         # Build filters
         filters = SignalExportFilters(
             neighborhood=neighborhood,
-            category=category,
-            date_from=date_from,
-            date_to=date_to,
+            category=effective_category,
+            date_from=effective_date_from,
+            date_to=effective_date_to,
             severity=severity,
             limit=limit,
         )
@@ -146,11 +174,14 @@ async def export_signals(
 )
 async def export_neighborhood_comparison(
     request: Request,
-    neighborhoods: str = Query(
-        ...,
-        description="Comma-separated list of neighborhood names to compare",
+    neighborhoods: Optional[str] = Query(
+        None,
+        description=(
+            "Optional comma-separated list of neighborhood names to compare. "
+            "If omitted, exports the full neighborhood scorecard summary table."
+        ),
     ),
-    user: dict = Depends(get_current_user_from_request),
+    user: Optional[dict] = Depends(get_optional_user_from_request),
     pool: asyncpg.Pool = Depends(get_db_pool),
 ) -> StreamingResponse:
     """
@@ -175,26 +206,27 @@ async def export_neighborhood_comparison(
         500: Export generation error
     """
     try:
-        # Parse neighborhoods list
-        neighborhood_list = [n.strip() for n in neighborhoods.split(",")]
+        _require_auth_in_production(user)
 
-        if not neighborhood_list or len(neighborhood_list) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one neighborhood required",
+        neighborhood_list: list[str] = []
+        if neighborhoods:
+            neighborhood_list = [n.strip() for n in neighborhoods.split(",") if n.strip()]
+
+        if neighborhood_list:
+            if len(neighborhood_list) > 10:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Maximum 10 neighborhoods allowed for comparison",
+                )
+
+            # Export comparison
+            csv_buffer, filename = await CSVExporter.export_neighborhood_comparison(
+                pool,
+                neighborhood_list,
             )
-
-        if len(neighborhood_list) > 10:
-            raise HTTPException(
-                status_code=400,
-                detail="Maximum 10 neighborhoods allowed for comparison",
-            )
-
-        # Export comparison
-        csv_buffer, filename = await CSVExporter.export_neighborhood_comparison(
-            pool,
-            neighborhood_list,
-        )
+        else:
+            # Export full summary table
+            csv_buffer, filename = await CSVExporter.export_neighborhood_summaries(pool)
 
         # Get content for response
         content = csv_buffer.getvalue()
@@ -205,7 +237,7 @@ async def export_neighborhood_comparison(
             media_type="text/csv",
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
-                "X-Export-Neighborhoods": str(len(neighborhood_list)),
+                "X-Export-Neighborhoods": str(len(neighborhood_list) if neighborhood_list else "all"),
             },
         )
     except HTTPException:
@@ -231,7 +263,7 @@ async def export_parcels(
     min_lot_sqft: Optional[float] = Query(None, ge=0, description="Minimum lot size in sqft"),
     max_lot_sqft: Optional[float] = Query(None, ge=0, description="Maximum lot size in sqft"),
     limit: int = Query(1000, ge=1, le=5000, description="Max rows to export"),
-    user: dict = Depends(get_current_user_from_request),
+    user: Optional[dict] = Depends(get_optional_user_from_request),
     pool: asyncpg.Pool = Depends(get_db_pool),
 ) -> StreamingResponse:
     """
@@ -260,6 +292,8 @@ async def export_parcels(
         500: Export generation error
     """
     try:
+        _require_auth_in_production(user)
+
         # Build filters
         filters = ParcelExportFilters(
             neighborhood=neighborhood,
