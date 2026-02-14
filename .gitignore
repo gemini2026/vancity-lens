@@ -39,6 +39,10 @@ terraform/environments/**/terraform.tfvars
 *.pem
 *.key
 
+# ── Local Auth Artifacts (never commit) ──────────────
+.gcloud/
+.docker-auth/
+
 # ── IDE ──────────────────────────────────────────────
 .vscode/
 .idea/
