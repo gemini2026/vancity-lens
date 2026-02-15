@@ -478,15 +478,20 @@ async def get_document_page(request: Request, document_id: int):
         import html as html_mod
 
         title = html_mod.escape(row["title"] or "Untitled Document")
-        source_type = (row["source_type"] or "document").replace("_", " ").title()
-        pub_date = str(row["published_date"]) if row["published_date"] else ""
+        source_type = html_mod.escape((row["source_type"] or "document").replace("_", " ").title())
+        pub_date = html_mod.escape(str(row["published_date"])) if row["published_date"] else ""
         raw_text = html_mod.escape(row["raw_text"] or "No content available.")
         source_url = html_mod.escape(row["source_url"] or "")
         url_status = row["url_status"] or "unchecked"
         signal_count = row["signal_count"] or 0
 
+        # Only render clickable links for http(s) URLs to prevent javascript: XSS
+        import urllib.parse as urlparse_mod
+        raw_url = row["source_url"] or ""
+        url_is_safe = urlparse_mod.urlparse(raw_url).scheme in ("http", "https")
+
         # Build source-box link/label based on URL health status
-        if url_status == "dead":
+        if url_status == "dead" or not url_is_safe:
             source_link_html = f'<span style="color: #64748b; word-break: break-all;">{source_url}</span>'
             status_html = "Content served from VanCity Lens intelligence archive"
         elif url_status == "alive":
