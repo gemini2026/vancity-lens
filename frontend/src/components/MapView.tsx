@@ -502,7 +502,7 @@ export default function MapView() {
 
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
-    const token = (typeof window !== "undefined" && (window as any).__ENV__?.MAPBOX_TOKEN) || process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    const token = typeof window !== "undefined" ? (window as any).__ENV__?.MAPBOX_TOKEN : undefined;
     if (!token) {
       setMapError("Mapbox token not configured");
       return;
