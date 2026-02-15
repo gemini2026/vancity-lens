@@ -132,13 +132,21 @@ class ReportGenerator:
 
         # Build report sections
         self._build_header_section(pdf, parcel_data)
+        self._build_executive_summary(pdf, parcel_data)
         self._build_parcel_overview(pdf, parcel_data)
+        self._build_before_after_section(pdf, parcel_data)
+        self._build_title_ownership(pdf, parcel_data)
         self._build_entitlement_analysis(pdf, parcel_data)
         self._build_pro_forma(pdf, parcel_data)
+        await self._build_environmental_section(pdf, parcel_data, db_pool)
+        await self._build_market_context(pdf, db_pool)
+        await self._build_demographic_profile(pdf, parcel_data, db_pool)
+        await self._build_nearby_development(pdf, parcel_data, db_pool)
         self._build_risk_assessment(pdf, parcel_data)
         self._build_due_diligence(pdf, parcel_data)
         if parcel_data.comparables:
             self._build_comparable_sales(pdf, parcel_data)
+        await self._build_data_currency(pdf, db_pool)
         self._build_sources(pdf, parcel_data)
         self._build_footer(pdf, parcel_data)
 
@@ -437,6 +445,113 @@ class ReportGenerator:
 
         pdf.ln(3)
 
+    def _build_before_after_section(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Build before/after Bill 47 comparison table with colored uplift cells."""
+        if not parcel_data.current_storeys and not parcel_data.entitled_storeys:
+            return
+
+        # Check if current zoning already exceeds Bill 47
+        current_exceeds = (
+            parcel_data.current_storeys
+            and parcel_data.entitled_storeys
+            and parcel_data.current_storeys > parcel_data.entitled_storeys
+        )
+        if current_exceeds:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_fill_color(200, 220, 255)
+            pdf.cell(
+                0, 8,
+                "  Current zoning already exceeds Bill 47 entitlement",
+                fill=True, ln=True,
+            )
+            pdf.ln(3)
+            return
+
+        # Section header
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Before / After Bill 47", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(
+            self.left_margin, pdf.get_y(),
+            self.page_width - self.right_margin, pdf.get_y(),
+        )
+        pdf.ln(4)
+
+        # Table header
+        col_widths = [35, 45, 45, 40]
+        total_w = sum(col_widths)
+        # Scale to fit page
+        avail = self.page_width - self.left_margin - self.right_margin
+        scale = avail / total_w
+        col_widths = [int(w * scale) for w in col_widths]
+
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(240, 240, 240)
+        headers = ["Field", "Before Bill 47", "After Bill 47", "Uplift"]
+        for i, h in enumerate(headers):
+            pdf.cell(col_widths[i], 6, h, border=1, fill=True)
+        pdf.ln()
+
+        # Compute before buildable SF
+        current_fsr = parcel_data.current_fsr or Decimal("0")
+        entitled_fsr = parcel_data.entitled_fsr or Decimal("1")
+        lot_sqft = parcel_data.lot_area_sqft
+        before_buildable = lot_sqft * current_fsr
+        after_buildable = parcel_data.buildable_sqft
+        buildable_delta = after_buildable - before_buildable
+
+        storey_uplift = (
+            (parcel_data.entitled_storeys - parcel_data.current_storeys)
+            if parcel_data.entitled_storeys and parcel_data.current_storeys
+            else 0
+        )
+        fsr_uplift = entitled_fsr - current_fsr
+
+        rows = [
+            (
+                "Zoning",
+                parcel_data.current_zoning or "N/A",
+                f"TOD Tier (Bill 47)",
+                "-",
+                False,
+            ),
+            (
+                "Max Height",
+                f"{parcel_data.current_storeys or '?'} storeys",
+                f"{parcel_data.entitled_storeys or '?'} storeys",
+                f"+{max(0, storey_uplift)} st",
+                storey_uplift > 0,
+            ),
+            (
+                "Max FSR",
+                f"{current_fsr}",
+                f"{entitled_fsr}",
+                f"+{max(Decimal('0'), fsr_uplift)}",
+                fsr_uplift > 0,
+            ),
+            (
+                "Buildable SF",
+                f"{before_buildable:,.0f}",
+                f"{after_buildable:,.0f}",
+                f"+{max(Decimal('0'), buildable_delta):,.0f}",
+                buildable_delta > 0,
+            ),
+        ]
+
+        pdf.set_font("Helvetica", "", 9)
+        for label, before, after, uplift, is_positive in rows:
+            pdf.cell(col_widths[0], 6, label, border=1)
+            pdf.cell(col_widths[1], 6, before, border=1)
+            pdf.cell(col_widths[2], 6, after, border=1)
+            if is_positive:
+                pdf.set_fill_color(200, 255, 200)
+                pdf.cell(col_widths[3], 6, uplift, border=1, fill=True)
+            else:
+                pdf.cell(col_widths[3], 6, uplift, border=1)
+            pdf.ln()
+
+        pdf.ln(4)
+
     def _build_entitlement_analysis(self, pdf: FPDF, parcel_data: ParcelReport):
         """Build entitlement analysis section with zoning, height, density."""
         # Section header
@@ -731,29 +846,517 @@ class ReportGenerator:
 
         pdf.ln(3)
 
-    def _build_sources(self, pdf: FPDF, parcel_data: ParcelReport):
-        """Build sources section with citations and links."""
-        if not parcel_data.sources:
-            return
+    # ── Sprint 6: New Due Diligence Report Sections ─────────────────────
 
-        # Add page break if needed
-        if pdf.get_y() > 250:
-            pdf.add_page()
-
-        # Section header
+    def _build_executive_summary(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Auto-generated executive summary (<300 words)."""
         pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "Sources & Citations", ln=True)
+        pdf.cell(0, 8, "Executive Summary", ln=True)
         pdf.set_draw_color(100, 100, 100)
         pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
         pdf.ln(4)
 
-        pdf.set_font("Helvetica", "", 8)
+        pdf.set_font("Helvetica", "", 10)
+        addr = parcel_data.civic_address or parcel_data.pid
+        zoning = parcel_data.current_zoning or "N/A"
 
-        for i, source in enumerate(parcel_data.sources[:5], 1):
-            pdf.cell(10, 4, f"{i}. ")
-            # Truncate long URLs for display
-            display_url = source[:70] + "..." if len(source) > 70 else source
-            pdf.cell(0, 4, display_url, ln=True)
+        parts = [
+            f"This report analyzes {addr} (PID: {parcel_data.pid}), "
+            f"a {parcel_data.lot_area_sqft:.0f} sqft lot "
+            f"currently zoned {zoning} in Vancouver, BC."
+        ]
+
+        if parcel_data.entitled_storeys and parcel_data.current_storeys:
+            uplift = parcel_data.entitled_storeys - parcel_data.current_storeys
+            if uplift > 0:
+                parts.append(
+                    f"Under Bill 47 Transit-Oriented Areas legislation, the property is entitled to "
+                    f"{parcel_data.entitled_storeys} storeys (up from {parcel_data.current_storeys}), "
+                    f"representing a {uplift}-storey density uplift."
+                )
+            else:
+                parts.append(
+                    f"The current zoning at {parcel_data.current_storeys} storeys already meets or "
+                    f"exceeds the Bill 47 entitlement of {parcel_data.entitled_storeys} storeys."
+                )
+
+        if parcel_data.buildable_sqft:
+            parts.append(f"Maximum buildable area is {parcel_data.buildable_sqft:,.0f} sqft.")
+
+        if parcel_data.estimated_land_value:
+            parts.append(f"Estimated land value is ${parcel_data.estimated_land_value:,}.")
+
+        if parcel_data.assessed_value:
+            parts.append(f"BC Assessment value is ${parcel_data.assessed_value:,}.")
+
+        if parcel_data.value_delta and parcel_data.value_delta > 0:
+            parts.append(
+                f"The estimated value delta of ${parcel_data.value_delta:,} suggests potential "
+                f"upside relative to current assessment."
+            )
+
+        risk_count = len(parcel_data.risk_flags)
+        if risk_count > 0:
+            high_risks = sum(1 for r in parcel_data.risk_flags if r.severity in ("high", "critical"))
+            risk_detail = f", including {high_risks} high/critical" if high_risks else ""
+            parts.append(
+                f"{risk_count} risk factor{'s' if risk_count != 1 else ''} identified{risk_detail}."
+            )
+
+        parts.append(
+            "This automated report is for preliminary analysis only. "
+            "Independent verification of all data points is recommended before making investment decisions."
+        )
+
+        summary = " ".join(parts)
+        pdf.multi_cell(0, 5, summary)
+        pdf.ln(4)
+
+    def _build_title_ownership(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Title & Ownership section — BCA data + LTSA placeholder."""
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Title & Ownership", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if parcel_data.assessed_value:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(50, 6, "Assessed Value (BCA):")
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(0, 6, f"${parcel_data.assessed_value:,}", ln=True)
+
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(50, 6, "PID:")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, parcel_data.pid, ln=True)
+
+        if parcel_data.current_zoning:
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.cell(50, 6, "Zoning:")
+            pdf.set_font("Helvetica", "", 10)
+            pdf.cell(0, 6, parcel_data.current_zoning, ln=True)
+
+        pdf.ln(2)
+
+        # LTSA placeholder
+        pdf.set_fill_color(240, 240, 255)
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.cell(
+            0, 8,
+            "  Full LTSA title search (ownership, encumbrances, charges) available in Pro tier",
+            fill=True, ln=True,
+        )
+        pdf.ln(4)
+
+    async def _build_environmental_section(
+        self, pdf: FPDF, parcel_data: ParcelReport, db_pool: asyncpg.Pool
+    ):
+        """Environmental section — nearby contaminated sites within 500m."""
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Environmental Assessment", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        sites = []
+        try:
+            async with db_pool.acquire() as conn:
+                sites = await conn.fetch("""
+                    SELECT cs.site_name, cs.address, cs.classification, cs.status,
+                           cs.contamination_type, cs.date_reported,
+                           ST_Distance(
+                               cs.geom::geography,
+                               p.geom::geography
+                           ) AS distance_m
+                    FROM contaminated_sites cs, parcels p
+                    WHERE p.pid = $1
+                      AND cs.geom IS NOT NULL
+                      AND p.geom IS NOT NULL
+                      AND ST_DWithin(cs.geom::geography, p.geom::geography, 500)
+                    ORDER BY distance_m ASC
+                    LIMIT 10
+                """, parcel_data.pid)
+        except Exception as e:
+            logger.debug("Environmental section query failed (table may not exist): %s", e)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if not sites:
+            pdf.set_fill_color(200, 255, 200)
+            pdf.cell(0, 6, "  No contaminated sites found within 500m radius", fill=True, ln=True)
+        else:
+            pdf.set_fill_color(255, 230, 200)
+            pdf.cell(
+                0, 6,
+                f"  {len(sites)} contaminated site{'s' if len(sites) != 1 else ''} found within 500m",
+                fill=True, ln=True,
+            )
+            pdf.ln(2)
+
+            pdf.set_font("Helvetica", "", 9)
+            for site in sites[:5]:
+                dist = int(site["distance_m"]) if site["distance_m"] else 0
+                name = (site["site_name"] or site["address"] or "Unknown site")[:50]
+                status = site["status"] or "Unknown"
+                contam = site["contamination_type"] or ""
+                line = f"- {name} ({dist}m) - {status}"
+                if contam:
+                    line += f", {contam}"
+                pdf.cell(0, 5, line, ln=True)
+
+        pdf.ln(4)
+
+    async def _build_market_context(self, pdf: FPDF, db_pool: asyncpg.Pool):
+        """Market context — CMHC housing data for Vancouver CMA."""
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Market Context (Vancouver CMA)", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        metrics = {}
+        try:
+            async with db_pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT metric, dwelling_type, value, ref_date
+                    FROM cmhc_housing
+                    WHERE cma_code = '933'
+                      AND dwelling_type = 'total'
+                    ORDER BY ref_date DESC
+                    LIMIT 20
+                """)
+                for row in rows:
+                    key = row["metric"]
+                    if key not in metrics:
+                        metrics[key] = {"value": row["value"], "ref_date": row["ref_date"]}
+        except Exception as e:
+            logger.debug("Market context query failed (table may not exist): %s", e)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if not metrics:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.cell(0, 6, "Market data source unavailable", ln=True)
+        else:
+            metric_labels = {
+                "starts": "Housing Starts",
+                "completions": "Completions",
+                "under_construction": "Under Construction",
+                "absorptions": "Absorptions",
+            }
+            for key, label in metric_labels.items():
+                data = metrics.get(key)
+                if data:
+                    pdf.set_font("Helvetica", "B", 10)
+                    pdf.cell(50, 6, f"{label}:")
+                    pdf.set_font("Helvetica", "", 10)
+                    pdf.cell(0, 6, f"{data['value']:,} ({data['ref_date']})", ln=True)
+
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.cell(0, 4, "Note: CSD-level data; may not reflect micro-market conditions.", ln=True)
+        pdf.ln(4)
+
+    async def _build_demographic_profile(
+        self, pdf: FPDF, parcel_data: ParcelReport, db_pool: asyncpg.Pool
+    ):
+        """Demographic profile — StatsCan data at census tract level."""
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Demographic Profile", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        demo = None
+        boundary_note = None
+        try:
+            async with db_pool.acquire() as conn:
+                lookup = await conn.fetchrow("""
+                    SELECT census_tract, distance_to_tract_boundary_m
+                    FROM parcel_census_lookup
+                    WHERE pid = $1
+                """, parcel_data.pid)
+
+                if lookup and lookup["census_tract"]:
+                    census_tract = lookup["census_tract"]
+                    if (
+                        lookup["distance_to_tract_boundary_m"]
+                        and float(lookup["distance_to_tract_boundary_m"]) < 100
+                    ):
+                        boundary_note = (
+                            f"Note: Parcel is within "
+                            f"{int(lookup['distance_to_tract_boundary_m'])}m "
+                            f"of census tract boundary. Adjacent tract data may also be relevant."
+                        )
+
+                    demo = await conn.fetchrow("""
+                        SELECT population, population_5yr_growth, median_household_income,
+                               avg_household_size, owner_pct, renter_pct,
+                               dominant_dwelling_type, total_dwellings, median_age,
+                               census_year
+                        FROM statscan_demographics
+                        WHERE census_tract = $1
+                        ORDER BY census_year DESC
+                        LIMIT 1
+                    """, census_tract)
+        except Exception as e:
+            logger.debug("Demographic profile query failed (table may not exist): %s", e)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if not demo:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.cell(0, 6, "Demographic data source unavailable", ln=True)
+        else:
+            fields = [
+                ("Census Year", str(demo["census_year"]) if demo["census_year"] else "N/A"),
+                ("Population", f"{demo['population']:,}" if demo["population"] else "N/A"),
+                ("5-Year Growth", f"{demo['population_5yr_growth']:.1f}%" if demo["population_5yr_growth"] is not None else "N/A"),
+                ("Median Income", f"${demo['median_household_income']:,}" if demo["median_household_income"] else "N/A"),
+                ("Avg Household Size", f"{demo['avg_household_size']:.1f}" if demo["avg_household_size"] is not None else "N/A"),
+                ("Owner-Occupied", f"{demo['owner_pct']:.1f}%" if demo["owner_pct"] is not None else "N/A"),
+                ("Renter-Occupied", f"{demo['renter_pct']:.1f}%" if demo["renter_pct"] is not None else "N/A"),
+                ("Dominant Dwelling", demo["dominant_dwelling_type"] or "N/A"),
+            ]
+
+            for label, value in fields:
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(50, 6, f"{label}:")
+                pdf.set_font("Helvetica", "", 10)
+                pdf.cell(0, 6, value, ln=True)
+
+        if boundary_note:
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.cell(0, 4, boundary_note, ln=True)
+
+        pdf.ln(4)
+
+    async def _build_nearby_development(
+        self, pdf: FPDF, parcel_data: ParcelReport, db_pool: asyncpg.Pool
+    ):
+        """Nearby development activity within 500m radius."""
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Nearby Development Activity (500m)", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        projects = []
+        try:
+            async with db_pool.acquire() as conn:
+                projects = await conn.fetch("""
+                    SELECT sp.address, sp.developer, sp.pipeline_stage,
+                           sp.proposed_units, sp.proposed_storeys,
+                           ST_Distance(
+                               sp_parcel.geom::geography,
+                               subject.geom::geography
+                           ) AS distance_m
+                    FROM supply_pipeline sp
+                    JOIN parcels sp_parcel ON sp_parcel.pid = sp.parcel_pid
+                    JOIN parcels subject ON subject.pid = $1
+                    WHERE sp_parcel.geom IS NOT NULL
+                      AND subject.geom IS NOT NULL
+                      AND ST_DWithin(sp_parcel.geom::geography, subject.geom::geography, 500)
+                    ORDER BY distance_m ASC
+                    LIMIT 10
+                """, parcel_data.pid)
+        except Exception as e:
+            logger.debug("Nearby development query failed (table may not exist): %s", e)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if not projects:
+            pdf.cell(0, 6, "No active development applications found within 500m", ln=True)
+        else:
+            pdf.cell(
+                0, 6,
+                f"{len(projects)} development project{'s' if len(projects) != 1 else ''} within 500m:",
+                ln=True,
+            )
+            pdf.ln(2)
+
+            # Table header
+            col_widths = [55, 30, 25, 20, 30]
+            avail = self.page_width - self.left_margin - self.right_margin
+            scale = avail / sum(col_widths)
+            col_widths = [int(w * scale) for w in col_widths]
+
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_fill_color(240, 240, 240)
+            for w, h in zip(col_widths, ["Address", "Stage", "Units", "Storeys", "Distance"]):
+                pdf.cell(w, 5, h, border=1, fill=True)
+            pdf.ln()
+
+            pdf.set_font("Helvetica", "", 8)
+            for proj in projects[:8]:
+                addr = (proj["address"] or "N/A")[:28]
+                stage = (proj["pipeline_stage"] or "N/A")[:16]
+                units = str(proj["proposed_units"] or "?")
+                storeys = str(proj["proposed_storeys"] or "?")
+                dist = f"{int(proj['distance_m'])}m" if proj["distance_m"] else "?"
+
+                pdf.cell(col_widths[0], 5, addr, border=1)
+                pdf.cell(col_widths[1], 5, stage, border=1)
+                pdf.cell(col_widths[2], 5, units, border=1)
+                pdf.cell(col_widths[3], 5, storeys, border=1)
+                pdf.cell(col_widths[4], 5, dist, border=1)
+                pdf.ln()
+
+        pdf.ln(4)
+
+    async def _build_data_currency(self, pdf: FPDF, db_pool: asyncpg.Pool):
+        """Data currency section — retrieval dates per source."""
+        if pdf.get_y() > 250:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Data Currency", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        source_dates = {}
+        queries = [
+            ("BC Assessment (Parcels)", "SELECT MAX(updated_at) AS latest FROM parcels"),
+            ("StatsCan Demographics", "SELECT MAX(retrieved_at) AS latest FROM statscan_demographics"),
+            ("CMHC Housing Market", "SELECT MAX(retrieved_at) AS latest FROM cmhc_housing"),
+            ("Contaminated Sites", "SELECT MAX(updated_at) AS latest FROM contaminated_sites"),
+            ("Development Pipeline", "SELECT MAX(updated_at) AS latest FROM supply_pipeline"),
+            ("Intelligence Signals", "SELECT MAX(extracted_at) AS latest FROM intelligence_signals"),
+        ]
+
+        try:
+            async with db_pool.acquire() as conn:
+                for label, query in queries:
+                    try:
+                        row = await conn.fetchrow(query)
+                        if row and row["latest"]:
+                            source_dates[label] = row["latest"].strftime("%Y-%m-%d")
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.debug("Data currency query failed: %s", e)
+
+        pdf.set_font("Helvetica", "", 9)
+
+        if source_dates:
+            for label, date_str in source_dates.items():
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(55, 5, f"{label}:")
+                pdf.set_font("Helvetica", "", 9)
+                pdf.cell(0, 5, f"Last updated {date_str}", ln=True)
+        else:
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.cell(0, 5, "Data currency information unavailable", ln=True)
+
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.cell(0, 4, "All data subject to source availability. Verify critical data points independently.", ln=True)
+        pdf.ln(4)
+
+    def _build_sources(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Sprint 10.4: Sources & methodology section with citations and methodology."""
+        # Add page break if needed
+        if pdf.get_y() > 230:
+            pdf.add_page()
+
+        # Section header
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Sources & Methodology", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        # Methodology subsection
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, "Methodology", ln=True)
+        pdf.set_font("Helvetica", "", 8)
+        methodology_lines = [
+            "This report is generated by VanCity Lens using a multi-source data integration approach:",
+            "",
+            "1. Entitlement Analysis: Bill 47 TOA tiers computed via PostGIS spatial intersection of parcel "
+            "centroids with transit station buffers (200m/400m/800m). Distance measured in BC Albers (EPSG:3005).",
+            "2. Value Estimation: Buildable square footage (lot area x entitled FSR) multiplied by market "
+            "price per buildable SF assumption. Three-scenario analysis (bull/base/bear) with +/-20% variance.",
+            "3. Risk Assessment: Composite score from heritage proximity, view cone restrictions, environmental "
+            "contamination, and political opposition signals.",
+            "4. Data Precedence: When multiple sources conflict, BC Assessment Authority data takes precedence "
+            "over City of Vancouver Open Data, which takes precedence over commercial listings (REW.ca).",
+        ]
+        for line in methodology_lines:
+            if line == "":
+                pdf.ln(2)
+            else:
+                pdf.multi_cell(0, 3.5, line)
+                pdf.ln(1)
+
+        pdf.ln(2)
+
+        # Data sources table
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 5, "Data Sources", ln=True)
+        pdf.ln(2)
+
+        # Table header
+        col_widths = [55, 50, 35, 30]
+        headers = ["Source", "Origin", "Confidence", "Type"]
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_fill_color(240, 240, 240)
+        for w, h in zip(col_widths, headers):
+            pdf.cell(w, 4, h, border=1, fill=True)
+        pdf.ln()
+
+        # Standard sources always included
+        standard_sources = [
+            ("Parcel Boundaries", "Vancouver Open Data", "Verified", "Spatial"),
+            ("Zoning Districts", "Vancouver Open Data", "Verified", "Regulatory"),
+            ("Bill 47 TOA Tiers", "BC Legislation", "Calculated", "Regulatory"),
+            ("Transit Stations", "TransLink GTFS", "Verified", "Spatial"),
+            ("Assessed Values", "BC Assessment Authority", "Verified", "Financial"),
+            ("Heritage Sites", "City of Vancouver", "Verified", "Constraint"),
+            ("View Cones", "City of Vancouver", "Verified", "Constraint"),
+            ("Contaminated Sites", "BC Min. of Environment", "Verified", "Constraint"),
+            ("Market Listings", "REW.ca", "Estimated", "Financial"),
+        ]
+
+        pdf.set_font("Helvetica", "", 7)
+        for row in standard_sources:
+            for w, val in zip(col_widths, row):
+                pdf.cell(w, 3.5, val, border=1)
+            pdf.ln()
+
+        pdf.ln(3)
+
+        # URL citations if available
+        if parcel_data.sources:
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(0, 5, "Verification Links", ln=True)
+            pdf.set_font("Helvetica", "", 7)
+            pdf.ln(1)
+
+            for i, source in enumerate(parcel_data.sources[:8], 1):
+                display_url = source[:80] + "..." if len(source) > 80 else source
+                pdf.cell(8, 3.5, f"{i}.")
+                pdf.cell(0, 3.5, display_url, ln=True)
 
         pdf.ln(3)
 

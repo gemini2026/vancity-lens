@@ -7,7 +7,7 @@ if [ -n "${NEXT_PUBLIC_MAPBOX_TOKEN:-}" ]; then
   if echo "$NEXT_PUBLIC_MAPBOX_TOKEN" | grep -qE '^pk\.[a-zA-Z0-9._-]+=*$'; then
     # Escape sed special characters in the token value for safety
     ESCAPED_TOKEN=$(printf '%s\n' "$NEXT_PUBLIC_MAPBOX_TOKEN" | sed 's/[&/\|]/\\&/g')
-    find /app/.next -name '*.js' -exec sed -i "s|__MAPBOX_TOKEN_PLACEHOLDER__|${ESCAPED_TOKEN}|g" {} +
+    find /app/.next \( -name '*.js' -o -name '*.html' -o -name '*.rsc' \) -exec sed -i "s|__MAPBOX_TOKEN_PLACEHOLDER__|${ESCAPED_TOKEN}|g" {} +
 
     # Verify replacement actually occurred
     remaining=$(grep -rl '__MAPBOX_TOKEN_PLACEHOLDER__' /app/.next/ 2>/dev/null | head -1 || true)

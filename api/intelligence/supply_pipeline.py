@@ -14,12 +14,13 @@ Features:
 """
 
 import logging
+import re
 from datetime import date, datetime
 from enum import Enum
 from typing import Optional, List
 
 import asyncpg
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,15 @@ class PipelineEntry(BaseModel):
     updated_at: datetime
 
 
+_PID_PATTERN = re.compile(r"^\d{3}-?\d{3}-?\d{3}$")
+
+# Vancouver bounding box (WGS84) for geocode validation
+_VAN_BBOX = {
+    "min_lng": -123.27, "max_lng": -123.02,
+    "min_lat": 49.20, "max_lat": 49.32,
+}
+
+
 class PipelineEntryCreate(BaseModel):
     """Request model for creating a pipeline entry."""
     parcel_pid: str
@@ -73,6 +83,39 @@ class PipelineEntryCreate(BaseModel):
     developer: Optional[str] = None
     estimated_completion: Optional[date] = None
     metadata: dict = Field(default_factory=dict)
+
+    @field_validator("parcel_pid")
+    @classmethod
+    def validate_pid(cls, v: str) -> str:
+        if not _PID_PATTERN.match(v):
+            raise ValueError(
+                f"Invalid PID format: '{v}'. Must be 9 digits (NNN-NNN-NNN)."
+            )
+        return v
+
+    @field_validator("proposed_storeys")
+    @classmethod
+    def validate_storeys(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 1 or v > 100):
+            raise ValueError(f"proposed_storeys must be 1-100, got {v}")
+        return v
+
+    @field_validator("proposed_units")
+    @classmethod
+    def validate_units(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and (v < 1 or v > 5000):
+            raise ValueError(f"proposed_units must be 1-5000, got {v}")
+        return v
+
+    @field_validator("estimated_completion")
+    @classmethod
+    def validate_completion_date(cls, v: Optional[date]) -> Optional[date]:
+        if v is not None:
+            if v < date(2020, 1, 1):
+                raise ValueError(f"estimated_completion {v} is before 2020 — likely a data error")
+            if v > date(2050, 1, 1):
+                raise ValueError(f"estimated_completion {v} is after 2050 — likely a data error")
+        return v
 
 
 class PipelineStageChange(BaseModel):
@@ -265,6 +308,11 @@ class SupplyPipelineTracker:
                     notes
                 )
 
+                # AC-PIPE-005: Generate stage transition alerts for matching watchlists
+                await _generate_stage_transition_alerts(
+                    conn, updated_row, old_stage, new_stage.value
+                )
+
             logger.info(
                 f"Updated pipeline {pipeline_id} from {old_stage} to {new_stage.value}"
             )
@@ -279,6 +327,11 @@ class SupplyPipelineTracker:
         db_pool: asyncpg.Pool,
         neighborhood: Optional[str] = None,
         stage: Optional[str] = None,
+        height_min: Optional[int] = None,
+        height_max: Optional[int] = None,
+        units_min: Optional[int] = None,
+        units_max: Optional[int] = None,
+        developer: Optional[str] = None,
         limit: int = 50,
         offset: int = 0
     ) -> tuple[List[PipelineEntry], int]:
@@ -289,6 +342,11 @@ class SupplyPipelineTracker:
             db_pool: AsyncPG connection pool
             neighborhood: Filter by neighborhood (optional)
             stage: Filter by pipeline stage (optional)
+            height_min: Minimum proposed storeys (optional)
+            height_max: Maximum proposed storeys (optional)
+            units_min: Minimum proposed units (optional)
+            units_max: Maximum proposed units (optional)
+            developer: Developer name search (partial, case-insensitive) (optional)
             limit: Maximum results (max 100, default 50)
             offset: Pagination offset
 
@@ -310,6 +368,26 @@ class SupplyPipelineTracker:
             if stage:
                 where_clauses.append("pipeline_stage = $" + str(len(params) + 1))
                 params.append(stage)
+
+            if height_min is not None:
+                where_clauses.append("proposed_storeys >= $" + str(len(params) + 1))
+                params.append(height_min)
+
+            if height_max is not None:
+                where_clauses.append("proposed_storeys <= $" + str(len(params) + 1))
+                params.append(height_max)
+
+            if units_min is not None:
+                where_clauses.append("proposed_units >= $" + str(len(params) + 1))
+                params.append(units_min)
+
+            if units_max is not None:
+                where_clauses.append("proposed_units <= $" + str(len(params) + 1))
+                params.append(units_max)
+
+            if developer:
+                where_clauses.append("developer ILIKE $" + str(len(params) + 1))
+                params.append(f"%{developer}%")
 
             where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -342,6 +420,67 @@ class SupplyPipelineTracker:
 
         except Exception as e:
             logger.error(f"Error retrieving pipeline: {e}", exc_info=True)
+            raise
+
+    @staticmethod
+    async def get_pipeline_in_polygon(
+        db_pool: asyncpg.Pool,
+        geojson_polygon: dict,
+        stage: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[PipelineEntry]:
+        """
+        FR-PIPE-005: Get pipeline entries whose parcels intersect a GeoJSON polygon.
+
+        Uses spatial join: supply_pipeline.parcel_pid → parcels.geom.
+
+        Args:
+            db_pool: AsyncPG connection pool
+            geojson_polygon: GeoJSON Polygon or MultiPolygon geometry dict
+            stage: Optional stage filter
+            limit: Max results (default 100)
+
+        Returns:
+            List of PipelineEntry within the polygon
+        """
+        import json
+
+        try:
+            geojson_str = json.dumps(geojson_polygon)
+
+            where_extra = ""
+            params = [geojson_str, limit]
+            if stage:
+                where_extra = "AND sp.pipeline_stage = $3"
+                params.append(stage)
+
+            query = f"""
+                SELECT
+                    sp.id, sp.parcel_pid, sp.address, sp.neighborhood,
+                    sp.pipeline_stage, sp.current_zoning, sp.proposed_zoning,
+                    sp.proposed_storeys, sp.proposed_units, sp.proposed_sqft,
+                    sp.developer, sp.estimated_completion, sp.signal_ids,
+                    sp.metadata, sp.created_at, sp.updated_at
+                FROM supply_pipeline sp
+                JOIN parcels p ON p.pid = sp.parcel_pid
+                WHERE ST_Intersects(
+                    p.geom,
+                    ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)
+                )
+                {where_extra}
+                ORDER BY sp.created_at DESC
+                LIMIT $2
+            """
+
+            async with db_pool.acquire() as conn:
+                rows = await conn.fetch(query, *params)
+
+            entries = [_row_to_entry(row) for row in rows]
+            logger.info(f"Found {len(entries)} pipeline entries in polygon")
+            return entries
+
+        except Exception as e:
+            logger.error(f"Error querying pipeline in polygon: {e}", exc_info=True)
             raise
 
     @staticmethod
@@ -915,3 +1054,66 @@ def _row_to_entry(row) -> PipelineEntry:
         created_at=row['created_at'],
         updated_at=row['updated_at']
     )
+
+
+async def _generate_stage_transition_alerts(
+    conn,
+    pipeline_row,
+    old_stage: str,
+    new_stage: str,
+) -> None:
+    """
+    AC-PIPE-005: Generate alerts for watchlists that match a pipeline stage transition.
+
+    Matches watchlists with rules targeting:
+    - The pipeline entry's neighborhood
+    - The pipeline entry's zoning
+    - signal_type='stage_transition'
+    """
+    address = pipeline_row["address"] or "Unknown address"
+    neighborhood = pipeline_row["neighborhood"]
+    headline = f"Stage change: {address} moved from {old_stage} → {new_stage}"
+    summary = (
+        f"Pipeline project at {address}"
+        f"{' in ' + neighborhood if neighborhood else ''}"
+        f" transitioned from '{old_stage}' to '{new_stage}'."
+    )
+    severity = "info"
+    if new_stage in ("under_construction", "completed"):
+        severity = "high"
+    elif new_stage in ("building_permit", "development_permit"):
+        severity = "medium"
+
+    # Find matching watchlists (neighborhood or signal_type rules)
+    match_query = """
+        SELECT DISTINCT w.id AS watchlist_id
+        FROM watchlists w
+        JOIN watchlist_rules wr ON wr.watchlist_id = w.id
+        WHERE w.is_active = true
+          AND (
+            (wr.rule_type = 'neighborhood' AND LOWER(wr.rule_value) = LOWER($1))
+            OR (wr.rule_type = 'signal_type' AND wr.rule_value = 'stage_transition')
+            OR (wr.rule_type = 'zoning' AND LOWER(wr.rule_value) = LOWER($2))
+          )
+    """
+    zoning = pipeline_row.get("proposed_zoning") or pipeline_row.get("current_zoning") or ""
+
+    try:
+        watchlist_rows = await conn.fetch(match_query, neighborhood or "", zoning)
+        for wl in watchlist_rows:
+            await conn.execute(
+                """
+                INSERT INTO alerts
+                (watchlist_id, signal_id, alert_type, headline, summary, severity, is_read, created_at)
+                VALUES ($1, 0, 'stage_transition', $2, $3, $4, false, NOW())
+                """,
+                wl["watchlist_id"], headline, summary, severity,
+            )
+        if watchlist_rows:
+            logger.info(
+                f"Generated {len(watchlist_rows)} stage transition alerts for pipeline "
+                f"{pipeline_row['id']}: {old_stage} → {new_stage}"
+            )
+    except Exception as e:
+        # Don't fail the stage update if alert generation fails
+        logger.warning(f"Failed to generate stage transition alerts: {e}")

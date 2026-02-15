@@ -394,20 +394,29 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
 # DOCUMENT PROCESSING
 # ──────────────────────────────────────────────────────────────────────────
 
+# DV-REG-002: Confidence threshold for auto-approval vs manual review
+CONFIDENCE_AUTO_APPROVE_THRESHOLD = 0.85
+
+
 async def process_document(
     db_pool: asyncpg.Pool,
     document_id: int,
     api_key: str,
+    confidence_threshold: float = CONFIDENCE_AUTO_APPROVE_THRESHOLD,
 ) -> int:
     """Process a document by extracting signals from all its chunks.
 
     Fetches the document and its chunks, extracts signals from each chunk,
     geocodes addresses, and stores results in intelligence_signals table.
 
+    Signals with confidence < confidence_threshold are flagged for manual review
+    (DV-REG-002).
+
     Args:
         db_pool: asyncpg connection pool
         document_id: ID of document to process
         api_key: Anthropic API key
+        confidence_threshold: Signals below this confidence get flagged for review
 
     Returns:
         Count of signals extracted and stored
@@ -510,6 +519,13 @@ async def process_document(
                                     logger.debug(f"Geocoded {addr} to {lat}, {lon}")
                                     break  # Use first successful geocode
 
+                        # DV-REG-002: Determine review status based on confidence
+                        review_status = (
+                            "auto_approved"
+                            if signal.confidence >= confidence_threshold
+                            else "pending_review"
+                        )
+
                         # Insert signal into database
                         await conn.execute(
                             """
@@ -520,7 +536,7 @@ async def process_document(
                                 unit_count, project_value_dollars,
                                 decision, vote_for, vote_against, conditions,
                                 sentiment, severity, confidence, event_date,
-                                geom, llm_model, extracted_at
+                                geom, llm_model, extracted_at, review_status
                             ) VALUES (
                                 $1, $2, $3, $4, $5,
                                 $6, $7, $8, $9,
@@ -528,7 +544,7 @@ async def process_document(
                                 $14, $15,
                                 $16, $17, $18, $19,
                                 $20, $21, $22, $23,
-                                ST_GeomFromEWKT($24), $25, $26
+                                ST_GeomFromEWKT($24), $25, $26, $27
                             )
                             """,
                             document_id,
@@ -557,6 +573,7 @@ async def process_document(
                             geom if geom else "SRID=4326;POINT(0 0)",  # default point if geocoding failed
                             (os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-20240620"),
                             datetime.now(timezone.utc),
+                            review_status,
                         )
 
                         logger.debug(f"Stored signal: {signal.signal_type} at {signal.addresses}")

@@ -18,7 +18,7 @@ from .audit import AuditMiddleware
 from .compression import CompressionMiddleware
 from .db import db
 from .cache import CacheManager
-from .entitlement import ParcelNotFoundError, compute_entitlement
+from .entitlement import InvalidPIDFormatError, ParcelNotFoundError, compute_entitlement, validate_pid_format
 from .models import ParcelEntitlementResponse
 from .admin import router as admin_router
 from .intelligence.routes import router as intelligence_router
@@ -48,6 +48,10 @@ from .saved_views_routes import router as saved_views_router
 from .org_routes import router as org_router
 from .saved_parcels_routes import router as saved_parcels_router
 from .case_studies_routes import router as case_studies_router
+from .data_sources_routes import router as data_sources_router
+from .intelligence.review_routes import router as review_queue_router
+from .intelligence.political_risk_routes import router as political_risk_router
+from .intelligence.undervalued_routes import router as undervalued_router
 from .rate_limit import rate_limit_general
 from .json_logging import setup_json_logging
 from .versioning import APIVersionMiddleware, get_api_versions
@@ -202,12 +206,22 @@ async def lifespan(app: FastAPI):
     from .intelligence.scraper_rezoning import scrape_and_store as scrape_rezoning
     from .intelligence.scraper_news import scrape_news_feeds as scrape_news
     from .intelligence.scraper_opendata import run_all_scrapers as scrape_opendata
+    from .intelligence.scraper_bclaws import scrape_and_store as scrape_bclaws
+    from .intelligence.scraper_gazette import scrape_and_store as scrape_gazette
+    from .intelligence.scraper_contaminated import scrape_and_store as scrape_contaminated
+    from .statscan_client import scrape_and_store as scrape_statscan
+    from .cmhc_client import scrape_and_store as scrape_cmhc
 
     scheduler.register_scraper("council", scrape_council, "0 6 * * *", enabled=True)
     scheduler.register_scraper("dpb", scrape_dpb, "0 7 * * *", enabled=True)
     scheduler.register_scraper("rezoning", scrape_rezoning, "0 8 * * *", enabled=True)
     scheduler.register_scraper("news", scrape_news, "0 */6 * * *", enabled=True)
     scheduler.register_scraper("opendata", scrape_opendata, "0 3 * * 1", enabled=True)
+    scheduler.register_scraper("bclaws", scrape_bclaws, "0 5 * * *", enabled=True)
+    scheduler.register_scraper("gazette", scrape_gazette, "0 5 30 * *", enabled=True)
+    scheduler.register_scraper("contaminated", scrape_contaminated, "0 4 1 * *", enabled=True)
+    scheduler.register_scraper("statscan", scrape_statscan, "0 3 1 * *", enabled=True)
+    scheduler.register_scraper("cmhc", scrape_cmhc, "0 3 15 * *", enabled=True)
 
     # Start background loop if enabled
     if os.getenv("SCRAPER_SCHEDULER_ENABLED", "false").lower() == "true":
@@ -336,6 +350,10 @@ app.include_router(saved_views_router)
 app.include_router(org_router)
 app.include_router(saved_parcels_router)
 app.include_router(case_studies_router)
+app.include_router(data_sources_router)
+app.include_router(review_queue_router)
+app.include_router(political_risk_router)
+app.include_router(undervalued_router)
 
 
 # ── Routes ───────────────────────────────────────────────────
@@ -454,6 +472,14 @@ async def get_entitlement(
     """
     **The Red Dot** — Colin clicks a listing, sees the hidden value.
     """
+    # DV-HBU-001: Validate PID format before querying
+    try:
+        validate_pid_format(pid)
+    except InvalidPIDFormatError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=str(e),
+        )
     if response:
         response.headers["X-API-Version"] = "1"
     async with db.acquire() as conn:
@@ -462,7 +488,13 @@ async def get_entitlement(
         except ParcelNotFoundError:
             raise HTTPException(
                 status_code=404,
-                detail=f"Parcel {pid} not found in our fabric. Is the PID correct?"
+                detail=(
+                    f"Parcel '{pid}' not found in our database. "
+                    "Please verify the PID is correct — you can look it up at "
+                    "https://www.bcassessment.ca or check the address at "
+                    "https://maps.vancouver.ca/van-zoning/. "
+                    "If the address is outside Vancouver, it may not be in our coverage area."
+                ),
             )
     return result
 

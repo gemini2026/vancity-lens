@@ -141,10 +141,11 @@ class DigestGenerator:
             DigestContent object with full digest information
         """
         try:
-            # Set default date range (last 7 days)
+            # Set default date range based on frequency
             if date_to is None:
                 date_to = date.today()
             if date_from is None:
+                # Default: 7 days for weekly, 1 day for daily
                 date_from = date_to - timedelta(days=7)
 
             logger.info(
@@ -608,12 +609,15 @@ class DigestScheduler:
         try:
             logger.info(f"Processing subscription {subscription.id} for user {subscription.user_id}")
 
-            # Generate digest content
+            # Generate digest content with frequency-aware date range
+            days_back = 1 if subscription.frequency == DigestFrequency.DAILY else 7
+            digest_date_from = date.today() - timedelta(days=days_back)
             digest_content = await DigestGenerator.generate_weekly_digest(
                 db_pool,
                 subscription.user_id,
                 neighborhoods=subscription.neighborhoods if subscription.neighborhoods else None,
                 signal_types=subscription.signal_types if subscription.signal_types else None,
+                date_from=digest_date_from,
             )
 
             # Create delivery record

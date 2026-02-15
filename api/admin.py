@@ -2201,3 +2201,168 @@ async def get_scrapers_history(
         }
     except Exception as e:
         return {"error": f"Failed to retrieve history: {str(e)}"}
+
+
+# ── Data Freshness Dashboard ──────────────────────────────────────
+
+
+@router.get(
+    "/data-freshness",
+    summary="Data freshness dashboard",
+    description="Returns freshness metrics for all data sources — last updated timestamp, "
+                "record count, and staleness assessment.",
+)
+async def data_freshness():
+    """Sprint 10.1: Data freshness admin dashboard.
+
+    Returns per-source freshness metrics:
+    - last_updated: most recent timestamp in the table
+    - record_count: total rows
+    - staleness: "fresh" (<7d), "aging" (7-30d), "stale" (>30d), "unknown"
+    """
+    from datetime import datetime, timezone, timedelta
+
+    sources = [
+        {
+            "name": "BC Assessment (Parcels)",
+            "table": "parcels",
+            "ts_col": "updated_at",
+            "count_filter": None,
+            "origin": "BC Assessment via Vancouver Open Data",
+        },
+        {
+            "name": "Transit Stations",
+            "table": "transit_stations",
+            "ts_col": "created_at",
+            "count_filter": None,
+            "origin": "TransLink GTFS",
+        },
+        {
+            "name": "TOA Buffers",
+            "table": "toa_buffers",
+            "ts_col": "created_at",
+            "count_filter": None,
+            "origin": "Calculated from transit stations + Bill 47 tiers",
+        },
+        {
+            "name": "Heritage Sites",
+            "table": "heritage_sites",
+            "ts_col": "updated_at",
+            "count_filter": None,
+            "origin": "City of Vancouver Open Data",
+        },
+        {
+            "name": "Contaminated Sites",
+            "table": "contaminated_sites",
+            "ts_col": "updated_at",
+            "count_filter": None,
+            "origin": "BC Ministry of Environment",
+        },
+        {
+            "name": "Development Pipeline",
+            "table": "supply_pipeline",
+            "ts_col": "updated_at",
+            "count_filter": None,
+            "origin": "City of Vancouver Permits",
+        },
+        {
+            "name": "Comparable Sales",
+            "table": "comparable_sales",
+            "ts_col": "created_at",
+            "count_filter": None,
+            "origin": "BC Assessment / MLS",
+        },
+        {
+            "name": "Intelligence Signals",
+            "table": "intelligence_signals",
+            "ts_col": "extracted_at",
+            "count_filter": None,
+            "origin": "K2 Pipeline (multi-source)",
+        },
+        {
+            "name": "StatsCan Demographics",
+            "table": "statscan_demographics",
+            "ts_col": "retrieved_at",
+            "count_filter": None,
+            "origin": "Statistics Canada Census API",
+        },
+        {
+            "name": "CMHC Housing Market",
+            "table": "cmhc_housing",
+            "ts_col": "retrieved_at",
+            "count_filter": None,
+            "origin": "CMHC Housing Market Indicators",
+        },
+        {
+            "name": "View Cones",
+            "table": "view_cones",
+            "ts_col": "created_at",
+            "count_filter": None,
+            "origin": "City of Vancouver Open Data",
+        },
+        {
+            "name": "Building Permits",
+            "table": "issued_building_permits",
+            "ts_col": "created_at",
+            "count_filter": None,
+            "origin": "City of Vancouver Permit Portal",
+        },
+    ]
+
+    now = datetime.now(timezone.utc)
+    results = []
+
+    async with db.acquire() as conn:
+        for src in sources:
+            entry = {
+                "name": src["name"],
+                "origin": src["origin"],
+                "table": src["table"],
+                "last_updated": None,
+                "record_count": 0,
+                "staleness": "unknown",
+                "days_old": None,
+            }
+            try:
+                ts_val = await conn.fetchval(
+                    f"SELECT MAX({src['ts_col']}) FROM {src['table']}"
+                )
+                count_val = await conn.fetchval(
+                    f"SELECT COUNT(*) FROM {src['table']}"
+                )
+                entry["record_count"] = count_val or 0
+                if ts_val:
+                    # Ensure timezone-aware
+                    if ts_val.tzinfo is None:
+                        ts_val = ts_val.replace(tzinfo=timezone.utc)
+                    entry["last_updated"] = ts_val.isoformat()
+                    age = now - ts_val
+                    entry["days_old"] = age.days
+                    if age < timedelta(days=7):
+                        entry["staleness"] = "fresh"
+                    elif age < timedelta(days=30):
+                        entry["staleness"] = "aging"
+                    else:
+                        entry["staleness"] = "stale"
+            except Exception:
+                entry["staleness"] = "unavailable"
+
+            results.append(entry)
+
+    # Summary stats
+    fresh = sum(1 for r in results if r["staleness"] == "fresh")
+    aging = sum(1 for r in results if r["staleness"] == "aging")
+    stale = sum(1 for r in results if r["staleness"] == "stale")
+    unavail = sum(1 for r in results if r["staleness"] in ("unknown", "unavailable"))
+
+    return {
+        "sources": results,
+        "summary": {
+            "total_sources": len(results),
+            "fresh": fresh,
+            "aging": aging,
+            "stale": stale,
+            "unavailable": unavail,
+        },
+        "generated_at": now.isoformat(),
+    }

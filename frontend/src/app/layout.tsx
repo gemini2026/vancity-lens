@@ -22,6 +22,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        {/* Runtime env injection — placeholder replaced by entrypoint.sh at container start.
+            Value is a build-time constant (not user input), safe for inline script. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__ENV__={MAPBOX_TOKEN:"${process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ""}"}`,
+          }}
+        />
+      </head>
       <body className="font-sans bg-surface text-foreground antialiased">
         <ThemeProvider>
           {children}

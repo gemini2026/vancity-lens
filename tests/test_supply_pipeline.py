@@ -51,7 +51,7 @@ def mock_db_pool():
 def sample_entry_create():
     """Sample pipeline entry creation data."""
     return PipelineEntryCreate(
-        parcel_pid="00012345",
+        parcel_pid="000-123-456",
         address="1234 Main Street",
         neighborhood="Downtown",
         pipeline_stage=PipelineStage.REZONING_APPLICATION,
@@ -71,7 +71,7 @@ def sample_pipeline_row():
     """Sample database row from supply_pipeline table."""
     return {
         'id': 1,
-        'parcel_pid': '00012345',
+        'parcel_pid': '000-123-456',
         'address': '1234 Main Street',
         'neighborhood': 'Downtown',
         'pipeline_stage': 'rezoning_application',
@@ -136,7 +136,7 @@ async def test_add_entry_success(mock_db_pool, sample_entry_create, sample_pipel
     result = await SupplyPipelineTracker.add_entry(mock_db_pool, sample_entry_create)
 
     assert result.id == 1
-    assert result.parcel_pid == '00012345'
+    assert result.parcel_pid == '000-123-456'
     assert result.address == '1234 Main Street'
     assert result.proposed_units == 300
     assert result.pipeline_stage == PipelineStage.REZONING_APPLICATION
@@ -164,7 +164,7 @@ async def test_get_entry_success(mock_db_pool, sample_pipeline_row):
 
     assert result is not None
     assert result.id == 1
-    assert result.parcel_pid == '00012345'
+    assert result.parcel_pid == '000-123-456'
 
 
 @pytest.mark.asyncio
@@ -184,10 +184,10 @@ async def test_get_entry_by_parcel_success(mock_db_pool, sample_pipeline_row):
     mock_conn = mock_db_pool.acquire.return_value.__aenter__.return_value
     mock_conn.fetchrow.return_value = sample_pipeline_row
 
-    result = await SupplyPipelineTracker.get_entry_by_parcel(mock_db_pool, '00012345')
+    result = await SupplyPipelineTracker.get_entry_by_parcel(mock_db_pool, '000-123-456')
 
     assert result is not None
-    assert result.parcel_pid == '00012345'
+    assert result.parcel_pid == '000-123-456'
 
 
 @pytest.mark.asyncio
@@ -267,7 +267,7 @@ async def test_stage_history_tracking(mock_db_pool):
     # Mock the update query
     mock_conn.fetchrow.return_value = {
         'id': 1,
-        'parcel_pid': '00012345',
+        'parcel_pid': '000-123-456',
         'address': '1234 Main Street',
         'neighborhood': 'Downtown',
         'pipeline_stage': 'public_hearing',
@@ -323,7 +323,7 @@ async def test_get_pipeline_no_filters(mock_db_pool, sample_pipeline_row):
 
     assert len(entries) == 1
     assert total == 1
-    assert entries[0].parcel_pid == '00012345'
+    assert entries[0].parcel_pid == '000-123-456'
 
 
 @pytest.mark.asyncio
@@ -522,9 +522,9 @@ async def test_ingest_from_signal_new_entry(mock_db_pool, sample_pipeline_row):
     # Mock get_entry_by_parcel to return None (new entry)
     mock_conn.fetchrow.return_value = None
 
-    # Mock add_entry response - use signal_42 as parcel_pid
+    # Mock add_entry response
     new_row = dict(sample_pipeline_row)
-    new_row['parcel_pid'] = 'signal_42'
+    new_row['parcel_pid'] = '042-042-042'
     new_row['signal_ids'] = [42]
     new_row['metadata'] = {
         'sourced_from_signal': 42,
@@ -539,6 +539,7 @@ async def test_ingest_from_signal_new_entry(mock_db_pool, sample_pipeline_row):
 
             signal = {
                 'id': 42,
+                'parcel_pid': '042-042-042',
                 'addresses': ['1234 Main Street'],
                 'neighborhood': 'Downtown',
                 'zoning_from': 'RS-1',
@@ -551,7 +552,7 @@ async def test_ingest_from_signal_new_entry(mock_db_pool, sample_pipeline_row):
 
             result = await SupplyPipelineTracker.ingest_from_signal(mock_db_pool, signal)
 
-            assert result.parcel_pid.startswith('signal_')
+            assert result.parcel_pid == '042-042-042'
             assert 42 in result.signal_ids
 
 
@@ -581,7 +582,7 @@ async def test_ingest_from_signal_update_existing(mock_db_pool, sample_pipeline_
 
         result = await SupplyPipelineTracker.ingest_from_signal(mock_db_pool, signal)
 
-        assert result.parcel_pid == '00012345'
+        assert result.parcel_pid == '000-123-456'
         assert 42 in result.signal_ids
 
 
@@ -632,7 +633,7 @@ async def test_row_to_entry_with_nulls():
     """Test conversion handles null values correctly."""
     row = {
         'id': 1,
-        'parcel_pid': '00012345',
+        'parcel_pid': '000-123-456',
         'address': '1234 Main Street',
         'neighborhood': None,
         'pipeline_stage': 'rezoning_application',
@@ -717,7 +718,7 @@ async def test_complete_project_lifecycle(mock_db_pool):
     # Create entry
     create_row = {
         'id': 1,
-        'parcel_pid': '00012345',
+        'parcel_pid': '000-123-456',
         'address': '1234 Main Street',
         'neighborhood': 'Downtown',
         'pipeline_stage': 'rezoning_application',
@@ -805,6 +806,7 @@ async def test_signal_to_pipeline_workflow(mock_db_pool):
 
     sample_signal = {
         'id': 100,
+        'parcel_pid': '100-100-100',
         'addresses': ['555 Cambie Street'],
         'neighborhood': 'Marpole',
         'zoning_from': 'RM-4',
@@ -827,7 +829,7 @@ async def test_signal_to_pipeline_workflow(mock_db_pool):
         ) as mock_add:
             ingested_row = {
                 'id': 42,
-                'parcel_pid': 'signal_100',
+                'parcel_pid': '100-100-100',
                 'address': '555 Cambie Street',
                 'neighborhood': 'Marpole',
                 'pipeline_stage': 'rezoning_application',
@@ -889,7 +891,7 @@ async def test_entry_create_validation():
     # Missing required field: address
     with pytest.raises(ValidationError):
         PipelineEntryCreate(
-            parcel_pid="00012345",
+            parcel_pid="000-123-456",
             pipeline_stage=PipelineStage.REZONING_APPLICATION
             # address is missing
         )

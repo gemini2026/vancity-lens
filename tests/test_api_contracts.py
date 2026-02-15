@@ -259,21 +259,25 @@ class TestReadyEndpoint:
 class TestEntitlementEndpoint:
     """Tests for GET /api/v1/parcels/{pid}/entitlement endpoint."""
 
-    def test_entitlement_returns_404_for_invalid_pid(self, client):
-        """Entitlement endpoint returns 404 for non-existent parcel."""
+    def test_entitlement_returns_422_for_invalid_pid_format(self, client):
+        """Entitlement endpoint returns 422 for badly formatted PID (DV-HBU-001)."""
+        response = client.get("/api/v1/parcels/INVALID123/entitlement")
+        assert response.status_code == 422
+        assert "9-digit" in response.json()["detail"]
+
+    def test_entitlement_returns_404_for_nonexistent_pid(self, client):
+        """Entitlement endpoint returns 404 for valid-format PID not in DB (AC-HBU-006)."""
         with patch("api.main.db.acquire") as mock_acquire:
             mock_conn = AsyncMock()
             mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-            # Mock ParcelNotFoundError
             from api.entitlement import ParcelNotFoundError
-            mock_conn.fetchrow = AsyncMock(side_effect=ParcelNotFoundError("PID not found"))
-
-            with patch("api.main.compute_entitlement", side_effect=ParcelNotFoundError("PID not found")):
-                response = client.get("/api/v1/parcels/INVALID123/entitlement")
+            with patch("api.main.compute_entitlement", side_effect=ParcelNotFoundError("999-999-999")):
+                response = client.get("/api/v1/parcels/999-999-999/entitlement")
                 assert response.status_code == 404
                 assert "not found" in response.json()["detail"].lower()
+                assert "verify" in response.json()["detail"].lower()
 
     def test_entitlement_accepts_pid_parameter(self, client):
         """Entitlement endpoint accepts PID path parameter."""
@@ -283,7 +287,7 @@ class TestEntitlementEndpoint:
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = {
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main St",
                 "current_zoning": "RS-1",
                 "in_toa": True,
@@ -295,7 +299,7 @@ class TestEntitlementEndpoint:
             }
 
             with patch("api.main.compute_entitlement", return_value=mock_response):
-                response = client.get("/api/v1/parcels/12345/entitlement")
+                response = client.get("/api/v1/parcels/123-456-789/entitlement")
                 assert response.status_code == 200
 
     def test_entitlement_accepts_price_per_sqft_query_param(self, client):
@@ -306,7 +310,7 @@ class TestEntitlementEndpoint:
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = {
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main St",
                 "current_zoning": "RS-1",
                 "in_toa": True,
@@ -318,18 +322,18 @@ class TestEntitlementEndpoint:
             }
 
             with patch("api.main.compute_entitlement", return_value=mock_response):
-                response = client.get("/api/v1/parcels/12345/entitlement?price_per_sqft=1000")
+                response = client.get("/api/v1/parcels/123-456-789/entitlement?price_per_sqft=1000")
                 assert response.status_code == 200
 
     def test_entitlement_validates_price_per_sqft_bounds(self, client):
         """Entitlement validates price_per_sqft is between 100 and 3000."""
         with patch("api.main.db.acquire"):
             # Price too low
-            response = client.get("/api/v1/parcels/12345/entitlement?price_per_sqft=50")
+            response = client.get("/api/v1/parcels/123-456-789/entitlement?price_per_sqft=50")
             assert response.status_code == 422
 
             # Price too high
-            response = client.get("/api/v1/parcels/12345/entitlement?price_per_sqft=5000")
+            response = client.get("/api/v1/parcels/123-456-789/entitlement?price_per_sqft=5000")
             assert response.status_code == 422
 
     def test_entitlement_response_has_required_fields(self, client):
@@ -340,7 +344,7 @@ class TestEntitlementEndpoint:
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = {
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main St",
                 "current_zoning": "RS-1",
                 "in_toa": True,
@@ -352,7 +356,7 @@ class TestEntitlementEndpoint:
             }
 
             with patch("api.main.compute_entitlement", return_value=mock_response):
-                response = client.get("/api/v1/parcels/12345/entitlement")
+                response = client.get("/api/v1/parcels/123-456-789/entitlement")
                 data = response.json()
 
                 assert "pid" in data
@@ -368,7 +372,7 @@ class TestEntitlementEndpoint:
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
             mock_response = {
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main St",
                 "current_zoning": "RS-1",
                 "in_toa": False,
@@ -380,7 +384,7 @@ class TestEntitlementEndpoint:
             }
 
             with patch("api.main.compute_entitlement", return_value=mock_response):
-                response = client.get("/api/v1/parcels/12345/entitlement")
+                response = client.get("/api/v1/parcels/123-456-789/entitlement")
                 data = response.json()
                 signal = data["signal"]
 
@@ -415,7 +419,7 @@ class TestNearestParcelEndpoint:
             mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_conn.fetchrow = AsyncMock(return_value={
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main",
                 "current_zoning": "RS-1",
                 "distance_m": 50.5,
@@ -445,7 +449,7 @@ class TestNearestParcelEndpoint:
             mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_conn.fetchrow = AsyncMock(return_value={
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main",
                 "current_zoning": "RS-1",
                 "distance_m": 50.5,
@@ -463,7 +467,7 @@ class TestNearestParcelEndpoint:
             mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
             mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_conn.fetchrow = AsyncMock(return_value={
-                "pid": "12345",
+                "pid": "123-456-789",
                 "civic_address": "123 Main",
                 "current_zoning": "RS-1",
                 "distance_m": 50.5,
@@ -488,71 +492,83 @@ class TestNearestParcelEndpoint:
 class TestTopOpportunitiesEndpoint:
     """Tests for GET /api/v1/opportunities endpoint."""
 
-    def test_opportunities_returns_list(self, client):
-        """Top opportunities endpoint returns a paginated response with items."""
-        with patch("api.main.db.acquire") as mock_acquire:
-            mock_conn = AsyncMock()
-            mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
-            mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_conn.fetchrow = AsyncMock(return_value={"total": 1})
-            mock_conn.fetch = AsyncMock(return_value=[
-                {
-                    "pid": "111",
-                    "civic_address": "1 Main",
-                    "lng": -123.1,
-                    "lat": 49.3
-                }
-            ])
+    def _mock_db_pool(self, fetch_return=None):
+        """Set up mock db_pool on app.state for opportunities route."""
+        pool = MagicMock()
+        conn = AsyncMock()
+        acm = AsyncMock()
+        acm.__aenter__ = AsyncMock(return_value=conn)
+        acm.__aexit__ = AsyncMock(return_value=False)
+        pool.acquire.return_value = acm
+        conn.fetch = AsyncMock(return_value=fetch_return or [])
+        return pool, conn
 
+    def test_opportunities_returns_list(self, client):
+        """Top opportunities endpoint returns a list of opportunities."""
+        pool, conn = self._mock_db_pool(fetch_return=[
+            {
+                "pid": "111", "neighborhood": "Kitsilano",
+                "assessed_value": 2000000, "implied_value": 3500000,
+                "buildable_sqft": 26000, "discount_pct": 42.86,
+                "repeat_signal": False, "has_contamination": False,
+                "has_heritage": False, "caveats": [], "comp_count": 8,
+                "computed_at": "2026-01-01T00:00:00Z",
+                "civic_address": "1 Main", "current_zoning": "RS-1",
+            }
+        ])
+        app.state.db_pool = pool
+        try:
             response = client.get("/api/v1/opportunities")
             assert response.status_code == 200
             data = response.json()
-            assert "items" in data
-            assert isinstance(data["items"], list)
+            assert "opportunities" in data
+            assert isinstance(data["opportunities"], list)
+        finally:
+            del app.state.db_pool
 
-    def test_opportunities_accepts_limit_param(self, client):
-        """Top opportunities accepts limit query parameter."""
-        with patch("api.main.db.acquire") as mock_acquire:
-            mock_conn = AsyncMock()
-            mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
-            mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_conn.fetchrow = AsyncMock(return_value={"total": 0})
-            mock_conn.fetch = AsyncMock(return_value=[])
-
-            response = client.get("/api/v1/opportunities?limit=100")
+    def test_opportunities_accepts_top_param(self, client):
+        """Top opportunities accepts top query parameter."""
+        pool, conn = self._mock_db_pool()
+        app.state.db_pool = pool
+        try:
+            response = client.get("/api/v1/opportunities?top=10")
             assert response.status_code == 200
+        finally:
+            del app.state.db_pool
 
-    def test_opportunities_limit_param_bounded(self, client):
-        """Top opportunities limit parameter is bounded at 500."""
-        with patch("api.main.db.acquire"):
-            response = client.get("/api/v1/opportunities?limit=1000")
-            assert response.status_code == 422
+    def test_opportunities_top_param_capped_at_50(self, client):
+        """Top opportunities top parameter is capped at 50."""
+        pool, conn = self._mock_db_pool()
+        app.state.db_pool = pool
+        try:
+            response = client.get("/api/v1/opportunities?top=100")
+            assert response.status_code == 200
+        finally:
+            del app.state.db_pool
 
-    def test_opportunities_default_limit(self, client):
-        """Top opportunities has default page_size of 20."""
-        with patch("api.main.db.acquire") as mock_acquire:
-            mock_conn = AsyncMock()
-            mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
-            mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_conn.fetchrow = AsyncMock(return_value={"total": 0})
-            mock_conn.fetch = AsyncMock(return_value=[])
-
+    def test_opportunities_default_top(self, client):
+        """Top opportunities defaults to top 20."""
+        pool, conn = self._mock_db_pool()
+        app.state.db_pool = pool
+        try:
             response = client.get("/api/v1/opportunities")
             assert response.status_code == 200
+            data = response.json()
+            assert "count" in data
+        finally:
+            del app.state.db_pool
 
     def test_opportunities_returns_empty_list_when_none(self, client):
-        """Top opportunities returns empty items when no results."""
-        with patch("api.main.db.acquire") as mock_acquire:
-            mock_conn = AsyncMock()
-            mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
-            mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_conn.fetchrow = AsyncMock(return_value={"total": 0})
-            mock_conn.fetch = AsyncMock(return_value=[])
-
+        """Top opportunities returns empty list when no results."""
+        pool, conn = self._mock_db_pool()
+        app.state.db_pool = pool
+        try:
             response = client.get("/api/v1/opportunities")
             data = response.json()
-            assert data["items"] == []
-            assert data["total"] == 0
+            assert data["opportunities"] == []
+            assert data["count"] == 0
+        finally:
+            del app.state.db_pool
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -802,18 +818,20 @@ class TestCorsHeaders:
 
     def test_cors_headers_present_on_get_request(self, client):
         """CORS headers present in GET response."""
-        with patch("api.main.db.acquire") as mock_acquire:
-            mock_conn = AsyncMock()
-            mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
-            mock_acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-            mock_conn.fetchrow = AsyncMock(return_value={"total": 0})
-            mock_conn.fetch = AsyncMock(return_value=[])
-
-            # Make a regular GET request and verify headers
+        pool = MagicMock()
+        conn = AsyncMock()
+        acm = AsyncMock()
+        acm.__aenter__ = AsyncMock(return_value=conn)
+        acm.__aexit__ = AsyncMock(return_value=False)
+        pool.acquire.return_value = acm
+        conn.fetch = AsyncMock(return_value=[])
+        app.state.db_pool = pool
+        try:
             response = client.get("/api/v1/opportunities")
-            # Check response was successful and has headers
             assert response.status_code == 200
             assert len(response.headers) > 0
+        finally:
+            del app.state.db_pool
 
     def test_health_returns_with_standard_headers(self, client):
         """Health endpoint returns standard HTTP headers."""

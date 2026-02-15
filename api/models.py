@@ -81,6 +81,18 @@ class StationEntitlement(BaseModel):
         default=False,
         description="True if current zoning already exceeds Bill 47 minimums"
     )
+    # DV-HBU-005: Height in metres (3.0m residential, 3.5m ground floor commercial)
+    entitled_height_m: Optional[Decimal] = Field(
+        None, description="Max height in metres (3.5m ground floor + 3.0m per additional storey)"
+    )
+    # DV-HBU-008: View cone hard cap
+    view_cone_capped: bool = Field(
+        default=False,
+        description="True if a view cone limits height below entitled storeys"
+    )
+    view_cone_max_m: Optional[Decimal] = Field(
+        None, description="View cone height limit in metres, if applicable"
+    )
 
 
 class ValueEstimate(BaseModel):
@@ -99,6 +111,13 @@ class ValueEstimate(BaseModel):
     # NLA / Unit Count (Phase 2.5)
     estimated_units: Optional[int] = Field(None, description="Estimated unit count based on avg unit size")
     nla_sqft: Optional[int] = Field(None, description="Net leasable area after efficiency ratio")
+
+
+class DataQualityWarning(BaseModel):
+    """A data quality or staleness warning."""
+    code: str = Field(..., description="Machine-readable warning code")
+    message: str = Field(..., description="Human-readable warning message")
+    field: Optional[str] = Field(None, description="Which field this warning applies to")
 
 
 class ParcelEntitlementResponse(BaseModel):
@@ -120,6 +139,26 @@ class ParcelEntitlementResponse(BaseModel):
     value_estimate: Optional[ValueEstimate] = None
     sources: Optional[SourceAttribution] = None
     validation: Optional[DealValidation] = None
+    # DV-HBU: Data quality warnings (staleness, range anomalies)
+    data_warnings: list[DataQualityWarning] = Field(
+        default_factory=list,
+        description="Data quality warnings (stale assessment, anomalous values, etc.)"
+    )
+    market_data_date: Optional[str] = Field(
+        None, description="AC-HBU-007: When market data (cost/revenue assumptions) was last updated"
+    )
+    # FR-HBU-008: Setbacks and site coverage
+    setbacks: Optional[dict] = Field(
+        None, description="Setback distances (front/rear/side) and site coverage from zoning rules"
+    )
+    # FR-HBU-004: Bill 44 small-scale multi-unit housing
+    bill44: Optional[dict] = Field(
+        None, description="Bill 44 SSMUH entitlement (eligible zones, max units, transit bonus)"
+    )
+    # FR-HBU-005: Community plan density bonuses
+    community_plan: Optional[dict] = Field(
+        None, description="Community plan density bonus (plan name, bonus FSR/storeys, conditions)"
+    )
 
     @computed_field
     @property

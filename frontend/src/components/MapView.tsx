@@ -11,6 +11,7 @@ import type { IntelSignal } from "@/lib/intel-types";
 import ParcelDetailPanel from "./ParcelDetailPanel";
 import AddressSearchBar from "./AddressSearchBar";
 import FinancingCalculator from "./FinancingCalculator";
+import CaseStudyCarousel from "./CaseStudyCarousel";
 import type { GeocodingResult } from "@/lib/geocoding";
 import { getApiBase } from "@/lib/api-base";
 
@@ -107,6 +108,7 @@ export default function MapView() {
   const [selectedSignals, setSelectedSignals] = useState<IntelSignal[]>([]);
   const [showFinancing, setShowFinancing] = useState(false);
   const [financingPid, setFinancingPid] = useState<string>("");
+  const [showCaseStudies, setShowCaseStudies] = useState(true);
 
   const openDetailPanel = useCallback((data: ParcelEntitlement, nearbySignals?: IntelSignal[]) => {
     popupRef.current?.remove();
@@ -479,9 +481,28 @@ export default function MapView() {
     }
   }, [openDetailPanel]);
 
+  const handleCaseStudySelect = useCallback(async (pid: string, lng: number, lat: number) => {
+    setShowCaseStudies(false);
+    if (map.current) {
+      map.current.flyTo({ center: [lng, lat], zoom: 16, duration: 1500 });
+    }
+    setLoading(true);
+    try {
+      const [data, signals] = await Promise.all([
+        fetchEntitlement(pid),
+        getSignalsForParcel(pid, 500).catch(() => [] as IntelSignal[]),
+      ]);
+      openDetailPanel(data, signals);
+    } catch (err) {
+      console.error("Case study lookup failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [openDetailPanel]);
+
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    const token = (typeof window !== "undefined" && (window as any).__ENV__?.MAPBOX_TOKEN) || process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     if (!token) {
       setMapError("Mapbox token not configured");
       return;
@@ -677,8 +698,8 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Signal layer toggle */}
-      <div className="absolute top-20 md:top-[90px] right-4 z-10">
+      {/* Signal layer toggle + Examples button */}
+      <div className="absolute top-20 md:top-[90px] right-4 z-10 flex flex-col gap-2">
         <button
           onClick={() => setShowSignals(!showSignals)}
           className={cn(
@@ -690,6 +711,14 @@ export default function MapView() {
         >
           🧠 {showSignals ? "Hide" : "Show"} Signals
         </button>
+        {!showCaseStudies && (
+          <button
+            onClick={() => setShowCaseStudies(true)}
+            className="px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-gray-900/92 border border-white/10 text-gray-400 hover:text-gray-200"
+          >
+            Examples
+          </button>
+        )}
       </div>
 
       {/* Loading overlay */}
@@ -706,6 +735,14 @@ export default function MapView() {
           nearbySignals={selectedSignals}
           onClose={() => { setSelectedParcel(null); setSelectedSignals([]); }}
           onRunDealModel={(pid) => { setFinancingPid(pid); setShowFinancing(true); }}
+        />
+      )}
+
+      {/* Case Study Carousel */}
+      {showCaseStudies && !selectedParcel && (
+        <CaseStudyCarousel
+          onSelectParcel={handleCaseStudySelect}
+          onDismiss={() => setShowCaseStudies(false)}
         />
       )}
 

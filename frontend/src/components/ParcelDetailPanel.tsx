@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { X, Star } from "lucide-react";
 import type { ParcelEntitlement, DataSource } from "@/lib/types";
 import type { IntelSignal } from "@/lib/intel-types";
 import ProFormaSection from "./ProFormaSection";
 import RiskFlagsSection from "./RiskFlagsSection";
 import ShareButton from "./ShareButton";
+import BeforeAfterComparison from "./BeforeAfterComparison";
+import { saveParcel, unsaveParcel, checkParcelSaved } from "@/lib/saved-parcels-api";
 import { cn } from "@/lib/utils";
 import { getApiBase } from "@/lib/api-base";
 
@@ -78,6 +80,9 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
   const [dueDiligenceEvidence, setDueDiligenceEvidence] = useState<any>(null);
   const [dueDiligenceEvidenceLoading, setDueDiligenceEvidenceLoading] = useState(false);
   const [dueDiligenceEvidenceError, setDueDiligenceEvidenceError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const isAuthenticated = typeof window !== "undefined" && !!localStorage.getItem("token");
 
   const color = SIGNAL_COLORS[data.signal] || "#6b7280";
   const ve = data.value_estimate;
@@ -107,6 +112,32 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
 
     return () => { cancelled = true; controller.abort(); };
   }, [data?.pid]);
+
+  // Check if parcel is saved (bookmark state)
+  useEffect(() => {
+    if (!data?.pid || !isAuthenticated) return;
+    let cancelled = false;
+    checkParcelSaved(data.pid).then((res) => {
+      if (!cancelled) setIsSaved(res.saved);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [data?.pid, isAuthenticated]);
+
+  const handleToggleSave = useCallback(async () => {
+    if (savePending) return;
+    setSavePending(true);
+    try {
+      if (isSaved) {
+        await unsaveParcel(data.pid);
+        setIsSaved(false);
+      } else {
+        await saveParcel(data.pid);
+        setIsSaved(true);
+      }
+    } catch {} finally {
+      setSavePending(false);
+    }
+  }, [data.pid, isSaved, savePending]);
 
   const handleDownloadReport = () => window.open(`${API_BASE}/api/v1/parcels/${data.pid}/report.pdf`, "_blank");
   const handleDownloadMemo = () => window.open(`${API_BASE}/api/v1/parcels/${data.pid}/memo.pdf`, "_blank");
@@ -146,6 +177,16 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
                 {v.deal_grade}
               </span>
             </>
+          )}
+          {isAuthenticated && (
+            <button
+              onClick={handleToggleSave}
+              disabled={savePending}
+              className="w-6 h-6 rounded flex items-center justify-center bg-white/20 text-white cursor-pointer border-none disabled:opacity-50"
+              title={isSaved ? "Unsave parcel" : "Save parcel"}
+            >
+              <Star className={cn("w-3.5 h-3.5", isSaved && "fill-yellow-400 text-yellow-400")} />
+            </button>
           )}
           <button
             onClick={onClose}
@@ -213,6 +254,71 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
           </div>
         ))}
         {!be && <div className="text-gray-400 mb-3">Outside all Transit-Oriented Areas</div>}
+
+        {/* Before/After Comparison */}
+        {be && (
+          <CollapsibleSection title="Before / After Bill 47" defaultOpen>
+            <BeforeAfterComparison
+              entitlement={be}
+              valueEstimate={ve}
+              currentZoning={data.current_zoning}
+            />
+          </CollapsibleSection>
+        )}
+
+        {/* Bill 44 Small-Scale Multi-Unit Housing */}
+        {data.bill44?.is_eligible && (
+          <CollapsibleSection title="Bill 44 Multiplex" defaultOpen>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              <span className="text-gray-500">Eligible</span>
+              <span className="text-green-400 text-right font-semibold">Yes</span>
+              <span className="text-gray-500">Zone Category</span>
+              <span className="text-gray-300 text-right">{data.bill44.zone_category?.replace('_', ' ')}</span>
+              <span className="text-gray-500">Lot Size</span>
+              <span className="text-gray-300 text-right">{data.bill44.lot_size_category}</span>
+              <span className="text-gray-500">Base Units</span>
+              <span className="text-gray-300 text-right">{data.bill44.max_units}</span>
+              {data.bill44.transit_bonus && (
+                <>
+                  <span className="text-gray-500">Transit Bonus</span>
+                  <span className="text-green-400 text-right">+{data.bill44.transit_bonus_units}</span>
+                </>
+              )}
+              <span className="text-gray-500 font-semibold">Max Units</span>
+              <span className="text-green-400 text-right font-bold">{data.bill44.effective_max_units}</span>
+            </div>
+          </CollapsibleSection>
+        )}
+
+        {/* Community Plan Density Bonus */}
+        {data.community_plan?.has_bonus && data.community_plan.best_bonus && (
+          <CollapsibleSection title="Community Plan Bonus">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              <span className="text-gray-500">Plan</span>
+              <span className="text-gray-300 text-right">{data.community_plan.best_bonus.plan_name}</span>
+              <span className="text-gray-500">Area</span>
+              <span className="text-gray-300 text-right">{data.community_plan.best_bonus.plan_area}</span>
+              {data.community_plan.best_bonus.max_fsr && (
+                <>
+                  <span className="text-gray-500">Plan Max FSR</span>
+                  <span className="text-green-400 text-right font-semibold">{data.community_plan.best_bonus.max_fsr}</span>
+                </>
+              )}
+              {data.community_plan.best_bonus.max_storeys && (
+                <>
+                  <span className="text-gray-500">Plan Max Storeys</span>
+                  <span className="text-green-400 text-right font-semibold">{data.community_plan.best_bonus.max_storeys}</span>
+                </>
+              )}
+              {data.community_plan.best_bonus.conditions && (
+                <>
+                  <span className="text-gray-500">Conditions</span>
+                  <span className="text-amber-500 text-right text-[10px]">{data.community_plan.best_bonus.conditions}</span>
+                </>
+              )}
+            </div>
+          </CollapsibleSection>
+        )}
 
         {/* Value Estimate */}
         {ve && (

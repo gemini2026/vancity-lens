@@ -3,12 +3,14 @@ VanCity Lens — Bill 47 Entitlement Engine
 Core business logic: spatial query → domain model → API response.
 """
 
+import re
 from decimal import Decimal
 from typing import Optional
 
 import asyncpg
 
 from .models import (
+    DataQualityWarning,
     DataSource,
     ParcelEntitlementResponse,
     SourceAttribution,
@@ -16,9 +18,88 @@ from .models import (
     TOATier,
     ValueEstimate,
 )
+from .bill44_entitlement import compute_bill44
+from .community_plan_rules import compute_community_plan_bonus
+from .setback_rules import compute_setbacks
 from .validation import compute_validation
 
 from datetime import datetime
+
+# DV-HBU-001: PID format — 9 digits, optionally separated by hyphens (NNN-NNN-NNN)
+_PID_PATTERN = re.compile(r"^\d{3}-?\d{3}-?\d{3}$")
+
+# AC-HBU-007: Market data assumptions last verified date
+MARKET_DATA_DATE = "2025-Q4"
+
+# Sprint 10.2: Multi-source conflict precedence
+# When multiple sources provide conflicting data for the same field,
+# the higher-precedence source wins. Higher number = higher priority.
+SOURCE_PRECEDENCE = {
+    "BC Assessment Authority": 100,   # Government authority — highest
+    "BC Assessment via Vancouver Open Data": 90,  # BCA data via CoV portal
+    "Bill 47 — Housing Statutes (TOA) Amendment Act, 2023": 85,  # Legislation
+    "TransLink GTFS": 80,            # Official transit data
+    "City of Vancouver Open Data": 70,  # CoV datasets
+    "Vancouver Open Data": 70,        # Alias
+    "CMHC Housing Market Indicators": 60,
+    "Statistics Canada Census API": 60,
+    "BC Ministry of Environment": 55,
+    "REW.ca Listings": 40,           # Commercial listing — lower trust
+    "VanCity Lens Model": 30,        # Our own calculations — lowest
+}
+
+
+def resolve_source_conflict(
+    field: str,
+    values: list[dict],
+) -> dict:
+    """Resolve conflicting values from multiple sources using precedence.
+
+    Each value dict: {"value": ..., "origin": str, "confidence": str}
+    Returns the winning value dict with conflict_note added.
+    """
+    if not values:
+        return {}
+    if len(values) == 1:
+        return values[0]
+
+    # Sort by precedence (highest first)
+    ranked = sorted(
+        values,
+        key=lambda v: SOURCE_PRECEDENCE.get(v.get("origin", ""), 0),
+        reverse=True,
+    )
+    winner = ranked[0]
+    runner_up = ranked[1] if len(ranked) > 1 else None
+
+    if runner_up and winner.get("value") != runner_up.get("value"):
+        winner["conflict_note"] = (
+            f"Conflict resolved: {winner['origin']} (precedence "
+            f"{SOURCE_PRECEDENCE.get(winner.get('origin', ''), 0)}) "
+            f"preferred over {runner_up['origin']} "
+            f"(precedence {SOURCE_PRECEDENCE.get(runner_up.get('origin', ''), 0)})"
+        )
+    return winner
+
+# DV-HBU-005: Storey-to-metres conversion constants
+_GROUND_FLOOR_HEIGHT_M = Decimal("3.5")  # commercial ground floor
+_UPPER_FLOOR_HEIGHT_M = Decimal("3.0")   # residential upper floors
+
+
+def _storeys_to_metres(storeys: int) -> Decimal:
+    """Convert storeys to metres: 3.5m ground floor + 3.0m per additional storey."""
+    if storeys <= 0:
+        return Decimal("0")
+    if storeys == 1:
+        return _GROUND_FLOOR_HEIGHT_M
+    return _GROUND_FLOOR_HEIGHT_M + _UPPER_FLOOR_HEIGHT_M * (storeys - 1)
+
+
+def validate_pid_format(pid: str) -> str:
+    """DV-HBU-001: Validate PID is 9-digit NNN-NNN-NNN format. Returns normalized PID."""
+    if not _PID_PATTERN.match(pid):
+        raise InvalidPIDFormatError(pid)
+    return pid
 
 # ── SQL Queries ──────────────────────────────────────────────
 
@@ -55,6 +136,15 @@ SQL_ENTITLEMENTS = """
     ORDER BY b.station_name, b.max_storeys DESC
 """
 
+# DV-HBU-008: Query the most restrictive view cone affecting this parcel
+SQL_VIEW_CONE_CAP = """
+    SELECT MIN(vc.max_height_m) AS view_cone_max_m
+    FROM view_cones vc
+    WHERE vc.is_active = TRUE
+      AND vc.max_height_m IS NOT NULL
+      AND ST_Intersects(vc.geom, (SELECT geom FROM parcels WHERE pid = $1))
+"""
+
 
 # ── Engine ───────────────────────────────────────────────────
 
@@ -67,14 +157,59 @@ async def compute_entitlement(
     The core "magic trick":
     Given a parcel PID, return the full Bill 47 entitlement analysis.
     """
+    data_warnings: list[DataQualityWarning] = []
 
     # 1. Fetch parcel info
     parcel = await conn.fetchrow(SQL_PARCEL_INFO, pid)
     if parcel is None:
         raise ParcelNotFoundError(pid)
 
+    # DV-HBU-002: Lot area range check (0–500K SF warning)
+    if parcel["lot_area_sqm"]:
+        lot_sqft = float(parcel["lot_area_sqm"]) * 10.7639
+        if lot_sqft <= 0 or lot_sqft > 500_000:
+            data_warnings.append(DataQualityWarning(
+                code="LOT_AREA_ANOMALY",
+                message=f"Lot area {lot_sqft:,.0f} SF is outside expected range (0–500,000 SF). Possible data error.",
+                field="lot_area_sqm",
+            ))
+
+    # DV-HBU-003: FSR range check (0.1–15.0)
+    if parcel["current_fsr"] is not None:
+        fsr_val = float(parcel["current_fsr"])
+        if fsr_val < 0.1 or fsr_val > 15.0:
+            data_warnings.append(DataQualityWarning(
+                code="FSR_ANOMALY",
+                message=f"Current FSR {fsr_val} is outside expected range (0.1–15.0). Flagged as anomalous.",
+                field="current_fsr",
+            ))
+
+    # DV-HBU-006: BC Assessment staleness (>18 months)
+    # BC Assessment rolls are typically dated July 1 of the prior year
+    now = datetime.now()
+    # Assessment year 2024 → data from Jul 2024 → stale after Jan 2026
+    assessment_cutoff = datetime(now.year - 1, 1, 1) if now.month >= 7 else datetime(now.year - 2, 7, 1)
+    if parcel["assessed_value"] and parcel.get("year_built"):
+        # We use year_built as a proxy — if the assessment is old, warn
+        pass  # Assessment year not stored separately; we warn based on static date
+    # Static staleness: our seed data is from 2024 assessment roll
+    _ASSESSMENT_YEAR = 2024
+    months_old = (now.year - _ASSESSMENT_YEAR) * 12 + now.month - 7  # July roll date
+    if months_old > 18:
+        data_warnings.append(DataQualityWarning(
+            code="ASSESSMENT_STALE",
+            message=f"BC Assessment data is from the {_ASSESSMENT_YEAR} roll year ({months_old} months old). Values may not reflect current market.",
+            field="assessed_value",
+        ))
+
     # 2. Run spatial intersection against TOA buffers
     rows = await conn.fetch(SQL_ENTITLEMENTS, pid)
+
+    # 2b. DV-HBU-008: Query view cone hard cap
+    view_cone_row = await conn.fetchrow(SQL_VIEW_CONE_CAP, pid)
+    view_cone_max_m: Optional[Decimal] = None
+    if view_cone_row and view_cone_row["view_cone_max_m"] is not None:
+        view_cone_max_m = Decimal(str(view_cone_row["view_cone_max_m"]))
 
     # 3. Build entitlement objects
     #    CRITICAL: Bill 47 sets MINIMUM density floors, not replacements.
@@ -95,6 +230,26 @@ async def compute_entitlement(
         storey_uplift = max(0, bill47_storeys - current_h)
         fsr_uplift = max(Decimal("0"), bill47_fsr - current_f)
 
+        # DV-HBU-005: Convert storeys to metres
+        entitled_height_m = _storeys_to_metres(effective_storeys)
+
+        # DV-HBU-008: Apply view cone hard cap if it restricts height
+        view_cone_capped = False
+        ent_view_cone_max_m: Optional[Decimal] = None
+        if view_cone_max_m is not None and entitled_height_m > view_cone_max_m:
+            view_cone_capped = True
+            ent_view_cone_max_m = view_cone_max_m
+            # Cap the effective storeys to what the view cone allows
+            # Reverse: metres → storeys (3.5m ground + 3.0m per upper)
+            if view_cone_max_m <= _GROUND_FLOOR_HEIGHT_M:
+                effective_storeys = 1
+            else:
+                effective_storeys = 1 + int(
+                    (view_cone_max_m - _GROUND_FLOOR_HEIGHT_M) / _UPPER_FLOOR_HEIGHT_M
+                )
+            entitled_height_m = view_cone_max_m
+            storey_uplift = max(0, effective_storeys - current_h)
+
         ent = StationEntitlement(
             station_name=row["station_name"],
             distance_m=row["distance_m"],
@@ -108,6 +263,9 @@ async def compute_entitlement(
             storey_uplift=storey_uplift,
             fsr_uplift=fsr_uplift,
             zoning_already_exceeds=current_h > bill47_storeys or current_f > bill47_fsr,
+            entitled_height_m=entitled_height_m,
+            view_cone_capped=view_cone_capped,
+            view_cone_max_m=ent_view_cone_max_m,
         )
         entitlements.append(ent)
 
@@ -157,6 +315,30 @@ async def compute_entitlement(
     # 6. Run validation engine
     validation = await compute_validation(conn, pid, parcel, best, value_estimate)
 
+    # 7. FR-HBU-008: Compute setbacks and site coverage
+    setback_result = await compute_setbacks(
+        conn,
+        parcel["current_zoning"],
+        parcel["lot_area_sqm"],
+    )
+    setbacks_dict = setback_result.model_dump() if setback_result else None
+
+    # 8. FR-HBU-004: Bill 44 small-scale multi-unit housing
+    bill44_result = await compute_bill44(
+        conn,
+        pid,
+        parcel["current_zoning"],
+        parcel["lot_area_sqm"],
+    )
+    bill44_dict = bill44_result.model_dump() if bill44_result else None
+
+    # 9. FR-HBU-005: Community plan density bonuses
+    cp_result = await compute_community_plan_bonus(
+        conn,
+        parcel["current_zoning"],
+    )
+    cp_dict = cp_result.model_dump() if cp_result and cp_result.has_bonus else None
+
     return ParcelEntitlementResponse(
         pid=pid,
         civic_address=parcel["civic_address"],
@@ -167,6 +349,11 @@ async def compute_entitlement(
         value_estimate=value_estimate,
         sources=sources,
         validation=validation,
+        data_warnings=data_warnings,
+        market_data_date=MARKET_DATA_DATE,
+        setbacks=setbacks_dict,
+        bill44=bill44_dict,
+        community_plan=cp_dict,
     )
 
 
@@ -325,3 +512,13 @@ class ParcelNotFoundError(Exception):
     def __init__(self, pid: str):
         self.pid = pid
         super().__init__(f"Parcel {pid} not found")
+
+
+class InvalidPIDFormatError(Exception):
+    """DV-HBU-001: Raised when a PID doesn't match the 9-digit NNN-NNN-NNN format."""
+    def __init__(self, pid: str):
+        self.pid = pid
+        super().__init__(
+            f"Invalid PID format: '{pid}'. "
+            "A valid BC Land Title PID is a 9-digit number in the format NNN-NNN-NNN (e.g., 012-345-678)."
+        )
