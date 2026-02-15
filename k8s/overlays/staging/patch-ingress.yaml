@@ -46,3 +46,35 @@ spec:
                 name: vancity-lens-frontend
                 port:
                   number: 80
+    # Keep old domain working during transition
+    - host: "staging.vancitylense.com"
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          - path: /ready
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-api
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vancity-lens-frontend
+                port:
+                  number: 80
