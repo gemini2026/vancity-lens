@@ -163,6 +163,31 @@ export interface DealValidation {
   one_liner: string;
 }
 
+export interface Bill44Entitlement {
+  is_eligible: boolean;
+  zone_category: string | null;
+  max_units: number;
+  lot_size_category: string | null;
+  transit_bonus: boolean;
+  transit_bonus_units: number;
+  effective_max_units: number;
+  current_zoning: string | null;
+  notes: string | null;
+}
+
+export interface CommunityPlanBonus {
+  plan_name: string;
+  plan_area: string | null;
+  max_fsr: number | null;
+  max_storeys: number | null;
+  conditions: string | null;
+}
+
+export interface CommunityPlanResult {
+  has_bonus: boolean;
+  best_bonus: CommunityPlanBonus | null;
+}
+
 export interface ParcelEntitlement {
   pid: string;
   civic_address: string | null;
@@ -175,4 +200,7 @@ export interface ParcelEntitlement {
   validation: DealValidation | null;
   signal: EntitlementSignal;
   headline: string;
+  bill44?: Bill44Entitlement | null;
+  community_plan?: CommunityPlanResult | null;
+  setbacks?: Record<string, unknown> | null;
 }
