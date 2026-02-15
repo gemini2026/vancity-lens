@@ -22,9 +22,10 @@ variable "cluster_name" {
 }
 
 variable "db_password" {
-  description = "Password for Cloud SQL database user"
+  description = "Password for Cloud SQL database user (optional — empty uses IAM auth)"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "anthropic_api_key" {

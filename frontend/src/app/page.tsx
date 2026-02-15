@@ -1,20 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import MapView from "@/components/MapView";
 import IntelPage from "@/components/IntelPage";
 import NeighborhoodPage from "@/components/NeighborhoodPage";
-import IngestPage from "@/components/IngestPage";
 import ThemeToggle from "@/components/ThemeToggle";
 import AlertsFeed from "@/components/AlertsFeed";
 import Disclaimer from "@/components/Disclaimer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 
-type Tab = "map" | "intel" | "hoods" | "ingest";
+type Tab = "map" | "intel" | "hoods";
+
+const VALID_TABS: Tab[] = ["map", "intel", "hoods"];
+
+function getTabFromHash(): Tab {
+  if (typeof window === "undefined") return "map";
+  const hash = window.location.hash.replace("#", "");
+  return VALID_TABS.includes(hash as Tab) ? (hash as Tab) : "map";
+}
 
 function AppContent() {
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("map");
+  const [activeTab, setActiveTab] = useState<Tab>(getTabFromHash);
+
+  const handleSetTab = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    window.location.hash = tab;
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => setActiveTab(getTabFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   const tabStyle = (tab: string) => ({
     padding: "14px 20px",
@@ -42,7 +60,6 @@ function AppContent() {
     { key: "map", label: "Map" },
     { key: "intel", label: "Intelligence" },
     { key: "hoods", label: "Neighborhoods" },
-    { key: "ingest", label: "Ingest" },
   ];
 
   return (
@@ -95,7 +112,7 @@ function AppContent() {
           {tabs.map((t) => (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => handleSetTab(t.key)}
               style={tabStyle(t.key)}
               onMouseEnter={handleHover(t.key, true)}
               onMouseLeave={handleHover(t.key, false)}
@@ -144,15 +161,6 @@ function AppContent() {
           <NeighborhoodPage />
         </div>
 
-        <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            display: activeTab === "ingest" ? "block" : "none",
-          }}
-        >
-          <IngestPage />
-        </div>
       </div>
 
       <Disclaimer />

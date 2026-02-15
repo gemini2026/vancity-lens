@@ -816,12 +816,13 @@ class TestDatabaseUrlConfiguration:
     """Validate Cloud SQL-backed database URL generation."""
 
     def test_main_tf_derives_database_url_from_cloudsql_when_not_set(self):
-        """Secrets module receives an effective URL with Cloud SQL private IP fallback."""
+        """Secrets module receives an effective URL via IAM auth proxy (localhost)."""
         main_tf = TERRAFORM_DIR / "main.tf"
         content = main_tf.read_text()
 
         assert "effective_database_url" in content
-        assert "module.cloudsql.private_ip_address" in content
+        assert "module.cloudsql.iam_database_user" in content
+        assert "localhost:5432" in content
         assert "database_url         = local.effective_database_url" in content
 
     def test_staging_terragrunt_explicitly_clears_database_url_override(self):

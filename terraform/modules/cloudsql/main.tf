@@ -34,6 +34,11 @@ resource "google_sql_database_instance" "instance" {
       value = "1000"
     }
 
+    database_flags {
+      name  = "cloudsql.iam_authentication"
+      value = "on"
+    }
+
     insights_config {
       query_insights_enabled  = true
       query_string_length     = 1024
@@ -73,10 +78,19 @@ resource "google_sql_database" "database" {
   project  = var.project_id
 }
 
-# PostgreSQL User
+# PostgreSQL User (password-based, kept for rollback — omit db_password to disable)
 resource "google_sql_user" "user" {
+  count    = var.db_password != "" ? 1 : 0
   name     = "vancity"
   instance = google_sql_database_instance.instance.name
   password = var.db_password
+  project  = var.project_id
+}
+
+# IAM-authenticated database user (Cloud SQL IAM auth via proxy)
+resource "google_sql_user" "iam_user" {
+  name     = trimsuffix(var.gke_service_account_email, ".gserviceaccount.com")
+  instance = google_sql_database_instance.instance.name
+  type     = "CLOUD_IAM_SERVICE_ACCOUNT"
   project  = var.project_id
 }

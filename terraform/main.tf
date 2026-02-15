@@ -23,10 +23,8 @@ resource "google_project_service" "required_apis" {
 locals {
   # Prefer an explicitly provided runtime URL; otherwise use Cloud SQL private IP.
   effective_database_url = trimspace(var.database_url) != "" ? var.database_url : format(
-    "postgresql://%s:%s@%s:5432/%s",
-    module.cloudsql.database_user,
-    urlencode(var.db_password),
-    module.cloudsql.private_ip_address,
+    "postgresql://%s@localhost:5432/%s",
+    module.cloudsql.iam_database_user,
     module.cloudsql.database_name
   )
 
@@ -50,10 +48,11 @@ module "network" {
 module "cloudsql" {
   source = "./modules/cloudsql"
 
-  project_id  = var.project_id
-  region      = var.region
-  network_id  = module.network.vpc_id
-  db_password = var.db_password
+  project_id                = var.project_id
+  region                    = var.region
+  network_id                = module.network.vpc_id
+  db_password               = var.db_password
+  gke_service_account_email = google_service_account.gke_sa.email
 
   depends_on = [
     google_project_service.required_apis,
@@ -103,6 +102,26 @@ resource "google_project_iam_member" "gke_monitoring_viewer" {
   project = var.project_id
   role    = "roles/monitoring.viewer"
   member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+# Cloud SQL IAM roles for GKE service account (IAM auth via proxy)
+resource "google_project_iam_member" "gke_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+resource "google_project_iam_member" "gke_cloudsql_instance_user" {
+  project = var.project_id
+  role    = "roles/cloudsql.instanceUser"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+# Workload Identity binding: K8s SA → GCP SA
+resource "google_service_account_iam_member" "gke_workload_identity" {
+  service_account_id = google_service_account.gke_sa.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[vancity-lens/vancity-lens-api]"
 }
 
 # Artifact Registry Module

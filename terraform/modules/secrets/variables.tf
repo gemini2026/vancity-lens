@@ -44,13 +44,10 @@ variable "admin_api_key" {
 }
 
 variable "db_password" {
-  description = "Database password"
+  description = "Database password (optional — empty when using IAM auth)"
   type        = string
   sensitive   = true
-  validation {
-    condition     = trimspace(var.db_password) != ""
-    error_message = "db_password must be non-empty."
-  }
+  default     = ""
 }
 
 variable "jwt_secret" {

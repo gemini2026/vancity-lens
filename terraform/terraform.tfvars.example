@@ -12,9 +12,9 @@ network_name = "vancity-lens-vpc"
 # GKE Cluster name
 cluster_name = "vancity-lens-gke"
 
-# Cloud SQL database password
-# Generate a secure password: openssl rand -base64 32
-db_password = "your-secure-database-password"
+# Cloud SQL database password (optional — leave empty to use IAM auth via Cloud SQL Auth Proxy)
+# Only needed for password-based rollback: openssl rand -base64 32
+# db_password = "your-secure-database-password"
 
 # Anthropic API Key (for Claude integration)
 anthropic_api_key = "your-anthropic-api-key"

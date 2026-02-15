@@ -17,6 +17,7 @@ spec:
         app: vancity-lens-api
         version: v1
     spec:
+      serviceAccountName: vancity-lens-api
       containers:
       - name: api
         image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api:latest
@@ -177,3 +178,20 @@ spec:
               name: vancity-lens-secrets
               key: rapidapi-key
               optional: true
+      - name: cloud-sql-proxy
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+        args:
+          - "openclaw-antonmishel-03460:us-west1:vancity-lens-db"
+          - "--private-ip"
+          - "--auto-iam-authn"
+          - "--port=5432"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534

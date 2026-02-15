@@ -6,6 +6,7 @@ namespace: vancity-lens
 # List of all resource files
 resources:
 - namespace.yaml
+- serviceaccount.yaml
 - configmap.yaml
 - secret.yaml
 - deployment.yaml
