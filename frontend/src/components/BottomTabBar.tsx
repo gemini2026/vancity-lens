@@ -1,44 +1,50 @@
 "use client";
 
-import React from "react";
+import { Map, Brain, Building2, Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export type Tab = "map" | "intel" | "hoods";
 
 interface BottomTabBarProps {
-  activeTab: "map" | "intel" | "hoods" | "alerts";
-  onTabChange: (tab: "map" | "intel" | "hoods" | "alerts") => void;
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
 }
 
-export default function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
-  const tabs = [
-    { id: "map", label: "Map", icon: "📍" },
-    { id: "intel", label: "Intel", icon: "🧠" },
-    { id: "hoods", label: "Neighborhoods", icon: "🏢" },
-    { id: "alerts", label: "Alerts", icon: "🔔" },
-  ] as const;
+const tabs = [
+  { id: "map" as Tab, label: "Map", icon: Map },
+  { id: "intel" as Tab, label: "Intel", icon: Brain },
+  { id: "hoods" as Tab, label: "Hoods", icon: Building2 },
+];
 
+export default function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 z-30 safe-pb"
+      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border safe-area-bottom"
       role="tablist"
-      aria-label="Mobile navigation tabs"
+      aria-label="Navigation"
     >
-      <div className="flex justify-around items-center h-16 pb-safe">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id as "map" | "intel" | "hoods" | "alerts")}
-            className={`flex-1 flex flex-col items-center justify-center min-h-14 transition-all duration-200 ${
-              activeTab === tab.id
-                ? "text-blue-500 border-t-2 border-blue-500 bg-slate-800/50"
-                : "text-gray-400 hover:text-gray-300 border-t-2 border-transparent"
-            }`}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            aria-current={activeTab === tab.id ? "page" : undefined}
-          >
-            <span className="text-xl mb-1">{tab.icon}</span>
-            <span className="text-xs font-medium">{tab.label}</span>
-          </button>
-        ))}
+      <div className="flex items-stretch h-16">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors",
+                isActive
+                  ? "text-brand"
+                  : "text-foreground-muted hover:text-foreground-secondary"
+              )}
+              role="tab"
+              aria-selected={isActive}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
+import { cn } from "@/lib/utils";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { fetchTOAGeoJSON, fetchEntitlement, fetchNearestParcel, fetchOpportunities } from "@/lib/api";
 import { getSignalsForParcel, getSignalsGeoJSON } from "@/lib/intel-api";
@@ -625,92 +626,79 @@ export default function MapView() {
   }, [showSignals]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <div ref={mapContainer} style={{ width: "100%", height: "100%", background: "#0a0a0a" }} />
+    <div className="relative w-full h-full">
+      <div ref={mapContainer} className="w-full h-full bg-[#0a0a0a]" />
+
       {/* Fallback when map cannot initialize */}
       {mapError && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#0a0a0a",
-            fontFamily: "system-ui, sans-serif",
-            color: "#6b7280",
-            fontSize: 14,
-            zIndex: 5,
-          }}
-        >
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
-            <div style={{ color: "#9ca3af", marginBottom: 4 }}>Map unavailable</div>
-            <div style={{ fontSize: 12 }}>{mapError}</div>
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] text-gray-500 text-sm z-5">
+          <div className="text-center">
+            <div className="text-5xl mb-4">🗺️</div>
+            <div className="text-gray-400 mb-1">Map unavailable</div>
+            <div className="text-xs">{mapError}</div>
           </div>
         </div>
       )}
-      {/* Address Search */}
-      <div style={{ position:"absolute",top:16,left:16,zIndex:10,display:"flex",flexDirection:"column",gap:"8px" }}>
-        <div style={{ background:"rgba(17,24,39,0.92)",borderRadius:8,padding:"12px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)" }}>
-          <div style={{ color:"#f3f4f6",fontWeight:700,fontSize:18,fontFamily:"system-ui" }}>VanCity Lens</div>
-          <div style={{ color:"#9ca3af",fontSize:11,marginTop:2 }}>Bill 47 Entitlement Engine · 92K parcels</div>
+
+      {/* Address Search — top-left overlay */}
+      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+        <div className="hidden md:block bg-gray-900/92 backdrop-blur-md rounded-lg px-4 py-3 border border-white/10">
+          <div className="text-gray-100 font-bold text-lg">VanCity Lens</div>
+          <div className="text-gray-400 text-[11px] mt-0.5">Bill 47 Entitlement Engine · 92K parcels</div>
         </div>
-        <div style={{ width:"320px" }}>
+        <div className="w-[280px] md:w-[320px]">
           <AddressSearchBar onSelect={handleAddressSelect} placeholder="Search address in Vancouver" />
         </div>
       </div>
-      {/* Legend */}
-      <div style={{ position:"absolute",bottom:32,left:16,zIndex:10,background:"rgba(17,24,39,0.92)",borderRadius:8,padding:"12px 16px",backdropFilter:"blur(8px)",border:"1px solid rgba(255,255,255,0.1)",fontFamily:"system-ui",fontSize:11,color:"#d1d5db" }}>
-        <div style={{ fontWeight:600,marginBottom:6,color:"#f3f4f6" }}>TOA Zones (Bill 47)</div>
+
+      {/* Legend — hidden on mobile, shown on desktop */}
+      <div className="hidden md:block absolute bottom-8 left-4 z-10 bg-gray-900/92 backdrop-blur-md rounded-lg px-4 py-3 border border-white/10 text-[11px] text-gray-300">
+        <div className="font-semibold mb-1.5 text-gray-100">TOA Zones (Bill 47)</div>
         {[
           { tier:1, label:"0–200m: 20 storeys / 5.5 FSR", color:TIER_COLORS[1], border:TIER_BORDERS[1] },
           { tier:2, label:"200–400m: 12 storeys / 4.0 FSR", color:TIER_COLORS[2], border:TIER_BORDERS[2] },
           { tier:3, label:"400–800m: 8 storeys / 3.0 FSR", color:TIER_COLORS[3], border:TIER_BORDERS[3] },
         ].map(t => (
-          <div key={t.tier} style={{ display:"flex",alignItems:"center",marginTop:4 }}>
-            <div style={{ width:14,height:14,borderRadius:3,marginRight:8,background:t.color,border:`1px solid ${t.border}` }} />
+          <div key={t.tier} className="flex items-center mt-1">
+            <div className="w-3.5 h-3.5 rounded-sm mr-2" style={{ background:t.color, border:`1px solid ${t.border}` }} />
             <span>Tier {t.tier}: {t.label}</span>
           </div>
         ))}
-        <div style={{ display:"flex",alignItems:"center",marginTop:6,borderTop:"1px solid #374151",paddingTop:6 }}>
-          <div style={{ width:12,height:12,borderRadius:"50%",background:"#22c55e",border:"2px solid rgba(255,255,255,0.85)",marginRight:8 }} />
-          <span style={{ fontSize:10 }}>Green = has asking price</span>
+        <div className="flex items-center mt-1.5 border-t border-gray-700 pt-1.5">
+          <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-white/85 mr-2" />
+          <span className="text-[10px]">Green = has asking price</span>
         </div>
-        <div style={{ display:"flex",alignItems:"center",marginTop:6,borderTop:"1px solid #374151",paddingTop:6 }}>
-          <div style={{ width:12,height:12,borderRadius:"50%",background:"transparent",border:"2px solid #f97316",marginRight:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7 }}>🏗️</div>
-          <span style={{ fontSize:10 }}>Intelligence signals (emoji markers)</span>
+        <div className="flex items-center mt-1.5 border-t border-gray-700 pt-1.5">
+          <div className="w-3 h-3 rounded-full bg-transparent border-2 border-orange-500 mr-2 flex items-center justify-center text-[7px]">🏗️</div>
+          <span className="text-[10px]">Intelligence signals (emoji markers)</span>
         </div>
-        <div style={{ marginTop:6,fontSize:10,color:"#6b7280" }}>
+        <div className="mt-1.5 text-[10px] text-gray-500">
           Click anywhere on map to analyze a parcel
         </div>
       </div>
+
       {/* Signal layer toggle */}
-      <div style={{ position:"absolute",top:90,right:16,zIndex:10 }}>
+      <div className="absolute top-20 md:top-[90px] right-4 z-10">
         <button
           onClick={() => setShowSignals(!showSignals)}
-          style={{
-            background: showSignals ? "rgba(59,130,246,0.9)" : "rgba(17,24,39,0.92)",
-            border: showSignals ? "1px solid #60a5fa" : "1px solid rgba(255,255,255,0.1)",
-            color: showSignals ? "#fff" : "#9ca3af",
-            padding: "8px 12px",
-            borderRadius: 8,
-            cursor: "pointer",
-            fontFamily: "system-ui",
-            fontSize: 11,
-            fontWeight: 600,
-            backdropFilter: "blur(8px)",
-            transition: "all 0.2s",
-          }}
+          className={cn(
+            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            showSignals
+              ? "bg-blue-500/90 border border-blue-400 text-white"
+              : "bg-gray-900/92 border border-white/10 text-gray-400"
+          )}
         >
           🧠 {showSignals ? "Hide" : "Show"} Signals
         </button>
       </div>
+
+      {/* Loading overlay */}
       {loading && (
-        <div style={{ position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",background:"rgba(17,24,39,0.95)",borderRadius:8,padding:"16px 24px",color:"#f3f4f6",fontFamily:"system-ui",fontSize:14,zIndex:20 }}>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 rounded-lg px-6 py-4 text-gray-100 text-sm z-20">
           Analyzing parcel…
         </div>
       )}
+
       {/* Parcel Detail Panel */}
       {selectedParcel && (
         <ParcelDetailPanel
@@ -720,6 +708,7 @@ export default function MapView() {
           onRunDealModel={(pid) => { setFinancingPid(pid); setShowFinancing(true); }}
         />
       )}
+
       {/* Financing Calculator Modal */}
       {showFinancing && (
         <FinancingCalculator

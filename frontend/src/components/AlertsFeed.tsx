@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   getAlerts,
   markAlertRead,
@@ -12,11 +14,11 @@ interface AlertsFeedProps {
   token: string | null;
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#dc2626",
-  high: "#f97316",
-  medium: "#f59e0b",
-  low: "#10b981",
+const SEVERITY_BG: Record<string, string> = {
+  critical: "bg-red-600",
+  high: "bg-orange-500",
+  medium: "bg-amber-500",
+  low: "bg-emerald-500",
 };
 
 function formatTimeAgo(dateStr: string): string {
@@ -41,10 +43,7 @@ export default function AlertsFeed({ token }: AlertsFeedProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchUnreadCount = useCallback(async () => {
-    if (!token) {
-      setUnreadCount(0);
-      return;
-    }
+    if (!token) { setUnreadCount(0); return; }
     try {
       const count = await getUnreadCount(token);
       setUnreadCount(count);
@@ -66,27 +65,19 @@ export default function AlertsFeed({ token }: AlertsFeedProps) {
     }
   }, [token]);
 
-  // Poll unread count every 30s
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
-  // Load alerts when dropdown opens
   useEffect(() => {
-    if (isOpen && token) {
-      fetchAlerts();
-    }
+    if (isOpen && token) fetchAlerts();
   }, [isOpen, token, fetchAlerts]);
 
-  // Click outside to close
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -108,59 +99,19 @@ export default function AlertsFeed({ token }: AlertsFeedProps) {
   };
 
   return (
-    <div
-      ref={dropdownRef}
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      {/* Bell Button */}
+    <div ref={dropdownRef} className="relative inline-flex">
+      {/* Bell */}
       <button
-        onClick={() => {
-          if (token) setIsOpen(!isOpen);
-        }}
-        style={{
-          position: "relative",
-          background: "none",
-          border: "none",
-          cursor: token ? "pointer" : "default",
-          padding: "6px",
-          fontSize: "18px",
-          lineHeight: "1",
-          color: "#9ca3af",
-          transition: "color 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          if (token) e.currentTarget.style.color = "#f3f4f6";
-        }}
-        onMouseLeave={(e) => {
-          if (token) e.currentTarget.style.color = "#9ca3af";
-        }}
+        onClick={() => token && setIsOpen(!isOpen)}
+        className={cn(
+          "relative p-1.5 text-gray-400 transition-colors",
+          token ? "cursor-pointer hover:text-gray-100" : "cursor-default"
+        )}
         title={token ? "Alerts" : "Login to view alerts"}
       >
-        &#128276;
+        <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span
-            style={{
-              position: "absolute",
-              top: "2px",
-              right: "0px",
-              background: "#dc2626",
-              color: "#fff",
-              fontSize: "9px",
-              fontWeight: "700",
-              minWidth: "16px",
-              height: "16px",
-              borderRadius: "8px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "0 4px",
-              lineHeight: "1",
-            }}
-          >
+          <span className="absolute top-0.5 right-0 bg-red-600 text-white text-[9px] font-bold min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -168,164 +119,61 @@ export default function AlertsFeed({ token }: AlertsFeedProps) {
 
       {/* Dropdown */}
       {isOpen && token && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "8px",
-            width: "360px",
-            maxHeight: "420px",
-            overflowY: "auto",
-            background: "#111827",
-            border: "1px solid #1f2937",
-            borderRadius: "8px",
-            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
-            zIndex: 1000,
-          }}
-        >
+        <div className="absolute top-full right-0 mt-2 w-[360px] max-h-[420px] overflow-y-auto bg-gray-900 border border-gray-800 rounded-lg shadow-2xl z-[1000]">
           {/* Header */}
-          <div
-            style={{
-              padding: "12px 16px",
-              borderBottom: "1px solid #1f2937",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ fontSize: "13px", fontWeight: "700", color: "#f3f4f6" }}>
-              Alerts
-            </div>
+          <div className="px-4 py-3 border-b border-gray-800 flex justify-between items-center">
+            <span className="text-[13px] font-bold text-gray-100">Alerts</span>
             {unreadCount > 0 && (
-              <span
-                style={{
-                  fontSize: "10px",
-                  color: "#60a5fa",
-                  fontWeight: "600",
-                }}
-              >
+              <span className="text-[10px] text-blue-400 font-semibold">
                 {unreadCount} unread
               </span>
             )}
           </div>
 
-          {/* Alert List */}
+          {/* List */}
           {loading ? (
-            <div
-              style={{
-                padding: "24px",
-                textAlign: "center",
-                color: "#6b7280",
-                fontSize: "12px",
-              }}
-            >
-              Loading alerts...
-            </div>
+            <div className="p-6 text-center text-gray-500 text-xs">Loading alerts...</div>
           ) : alerts.length === 0 ? (
-            <div
-              style={{
-                padding: "24px",
-                textAlign: "center",
-                color: "#6b7280",
-                fontSize: "12px",
-              }}
-            >
-              No alerts yet
-            </div>
+            <div className="p-6 text-center text-gray-500 text-xs">No alerts yet</div>
           ) : (
             alerts.map((alert) => (
               <div
                 key={alert.id}
-                style={{
-                  padding: "10px 16px",
-                  borderBottom: "1px solid #1f2937",
-                  background: alert.is_read ? "transparent" : "rgba(59, 130, 246, 0.05)",
-                  transition: "background 0.2s",
-                  cursor: "default",
-                }}
+                className={cn(
+                  "px-4 py-2.5 border-b border-gray-800 transition-colors",
+                  !alert.is_read && "bg-blue-500/5"
+                )}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "8px",
-                  }}
-                >
-                  {/* Severity dot */}
+                <div className="flex items-start gap-2">
                   <div
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background:
-                        SEVERITY_COLORS[alert.severity || "low"] || "#6b7280",
-                      marginTop: "4px",
-                      flexShrink: 0,
-                    }}
+                    className={cn(
+                      "w-2 h-2 rounded-full mt-1 shrink-0",
+                      SEVERITY_BG[alert.severity || "low"] || "bg-gray-500"
+                    )}
                   />
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="flex-1 min-w-0">
                     <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: alert.is_read ? "400" : "600",
-                        color: alert.is_read ? "#9ca3af" : "#f3f4f6",
-                        lineHeight: "1.4",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
+                      className={cn(
+                        "text-xs leading-snug truncate",
+                        alert.is_read ? "font-normal text-gray-400" : "font-semibold text-gray-100"
+                      )}
                     >
                       {alert.headline || alert.summary || "New alert"}
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginTop: "4px",
-                        fontSize: "10px",
-                        color: "#6b7280",
-                      }}
-                    >
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
                       {alert.signal_type && (
-                        <span
-                          style={{
-                            background: "#374151",
-                            padding: "1px 5px",
-                            borderRadius: "3px",
-                          }}
-                        >
+                        <span className="bg-gray-700 px-1.5 py-px rounded">
                           {alert.signal_type.replace(/_/g, " ")}
                         </span>
                       )}
-                      {alert.neighborhood && (
-                        <span>{alert.neighborhood}</span>
-                      )}
+                      {alert.neighborhood && <span>{alert.neighborhood}</span>}
                       <span>{formatTimeAgo(alert.created_at)}</span>
                     </div>
                   </div>
-
-                  {/* Mark as read */}
                   {!alert.is_read && (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMarkRead(alert.id);
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#60a5fa",
-                        fontSize: "10px",
-                        cursor: "pointer",
-                        padding: "2px 6px",
-                        flexShrink: 0,
-                        fontFamily: "system-ui, sans-serif",
-                        whiteSpace: "nowrap",
-                      }}
+                      onClick={(e) => { e.stopPropagation(); handleMarkRead(alert.id); }}
+                      className="shrink-0 text-[10px] text-blue-400 px-1.5 py-0.5 hover:text-blue-300"
                     >
                       Mark read
                     </button>

@@ -2,6 +2,22 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
+  Shield,
+  GraduationCap,
+  Bus,
+  Trees,
+  Building2,
+  Wind,
+  DollarSign,
+  Footprints,
+  TrendingUp,
+  ArrowRight,
+  TrendingDown,
+  ArrowLeft,
+  Check,
+  BarChart3,
+} from "lucide-react";
+import {
   getNeighborhoodScorecards,
   getNeighborhoodScorecard,
   compareNeighborhoods,
@@ -14,19 +30,20 @@ import type {
   CategoryScore,
   TrendDirection,
 } from "@/lib/intel-types";
+import { cn } from "@/lib/utils";
 import ExportButton from "./ExportButton";
 
 // ── Constants ────────────────────────────────────────────
 
-const CATEGORY_ICONS: Record<MetricCategory, string> = {
-  safety: "🛡️",
-  schools: "🎓",
-  transit: "🚌",
-  parks: "🌳",
-  development: "🏗️",
-  air_quality: "💨",
-  affordability: "💰",
-  walkability: "🚶",
+const CATEGORY_ICONS: Record<MetricCategory, React.ReactNode> = {
+  safety: <Shield className="size-4" />,
+  schools: <GraduationCap className="size-4" />,
+  transit: <Bus className="size-4" />,
+  parks: <Trees className="size-4" />,
+  development: <Building2 className="size-4" />,
+  air_quality: <Wind className="size-4" />,
+  affordability: <DollarSign className="size-4" />,
+  walkability: <Footprints className="size-4" />,
 };
 
 const CATEGORY_LABELS: Record<MetricCategory, string> = {
@@ -40,13 +57,19 @@ const CATEGORY_LABELS: Record<MetricCategory, string> = {
   walkability: "Walkability",
 };
 
-const TREND_ICONS: Record<TrendDirection, string> = {
-  improving: "↗",
-  stable: "→",
-  declining: "↘",
+const TREND_ICONS: Record<TrendDirection, React.ReactNode> = {
+  improving: <TrendingUp className="size-3.5" />,
+  stable: <ArrowRight className="size-3.5" />,
+  declining: <TrendingDown className="size-3.5" />,
 };
 
 const TREND_COLORS: Record<TrendDirection, string> = {
+  improving: "text-emerald-500",
+  stable: "text-gray-500",
+  declining: "text-red-500",
+};
+
+const TREND_RAW_COLORS: Record<TrendDirection, string> = {
   improving: "#10b981",
   stable: "#6b7280",
   declining: "#ef4444",
@@ -122,23 +145,21 @@ function getScoreLabel(score: number): string {
 
 // ── Score Ring Component ─────────────────────────────────
 
-function ScoreRing({
-  score,
-  size = 80,
-  strokeWidth = 6,
-}: {
+interface ScoreRingProps {
   score: number;
   size?: number;
   strokeWidth?: number;
-}) {
+}
+
+function ScoreRing({ score, size = 80, strokeWidth = 6 }: ScoreRingProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 10) * circumference;
   const color = getScoreColor(score);
 
   return (
-    <div style={{ position: "relative", width: size, height: size }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -157,30 +178,19 @@ function ScoreRing({
           strokeDasharray={circumference}
           strokeDashoffset={circumference - progress}
           strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.8s ease" }}
+          className="transition-[stroke-dashoffset] duration-700 ease-out"
         />
       </svg>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
-          style={{
-            fontSize: size * 0.3,
-            fontWeight: 700,
-            color: "#f3f4f6",
-            lineHeight: 1,
-          }}
+          className="font-bold text-gray-100 leading-none"
+          style={{ fontSize: size * 0.3 }}
         >
           {score.toFixed(1)}
         </span>
-        <span style={{ fontSize: size * 0.12, color: "#9ca3af" }}>/ 10</span>
+        <span className="text-gray-400" style={{ fontSize: size * 0.12 }}>
+          / 10
+        </span>
       </div>
     </div>
   );
@@ -188,96 +198,59 @@ function ScoreRing({
 
 // ── Category Bar Component ───────────────────────────────
 
-function CategoryBar({ item, showSource = false }: { item: CategoryScore; showSource?: boolean }) {
+interface CategoryBarProps {
+  item: CategoryScore;
+  showSource?: boolean;
+}
+
+function CategoryBar({ item, showSource = false }: CategoryBarProps) {
   const color = getScoreColor(item.score);
   const pct = (item.score / 10) * 100;
   const src = CATEGORY_SOURCES[item.category];
   const weight = CATEGORY_WEIGHTS[item.category];
 
   return (
-    <div style={{ padding: "6px 0" }}>
+    <div className="py-1.5">
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}
+        className="flex items-center gap-3"
         title={`${src.metric}\nSource: ${src.source}\nWeight: ${weight}%`}
       >
-        <div style={{ width: "28px", textAlign: "center", fontSize: "16px" }}>
+        <div className="w-7 flex items-center justify-center text-gray-400">
           {CATEGORY_ICONS[item.category]}
         </div>
-        <div style={{ width: "100px", fontSize: "13px", color: "#d1d5db" }}>
+        <div className="w-[100px] text-[13px] text-gray-300">
           {CATEGORY_LABELS[item.category]}
         </div>
-        <div
-          style={{
-            flex: 1,
-            height: "8px",
-            background: "rgba(255,255,255,0.06)",
-            borderRadius: "4px",
-            overflow: "hidden",
-          }}
-        >
+        <div className="flex-1 h-2 bg-white/[0.06] rounded overflow-hidden">
           <div
-            style={{
-              width: `${pct}%`,
-              height: "100%",
-              background: color,
-              borderRadius: "4px",
-              transition: "width 0.6s ease",
-            }}
+            className="h-full rounded transition-[width] duration-500 ease-out"
+            style={{ width: `${pct}%`, background: color }}
           />
         </div>
         <div
-          style={{
-            width: "40px",
-            textAlign: "right",
-            fontSize: "14px",
-            fontWeight: 600,
-            color,
-          }}
+          className="w-10 text-right text-sm font-semibold"
+          style={{ color }}
         >
           {item.score.toFixed(1)}
         </div>
-        <div
-          style={{
-            width: "36px",
-            textAlign: "center",
-            fontSize: "10px",
-            color: "#4b5563",
-            fontWeight: 500,
-          }}
-        >
+        <div className="w-9 text-center text-[10px] text-gray-600 font-medium">
           {weight}%
         </div>
         <div
-          style={{
-            width: "20px",
-            textAlign: "center",
-            fontSize: "14px",
-            color: TREND_COLORS[item.trend],
-          }}
+          className={cn("w-5 flex items-center justify-center", TREND_COLORS[item.trend])}
           title={`${item.trend} (${item.trend_delta >= 0 ? "+" : ""}${item.trend_delta.toFixed(1)})`}
         >
           {TREND_ICONS[item.trend]}
         </div>
       </div>
       {showSource && (
-        <div
-          style={{
-            marginLeft: "40px",
-            fontSize: "10px",
-            color: "#4b5563",
-            marginTop: "2px",
-          }}
-        >
+        <div className="ml-10 text-[10px] text-gray-600 mt-0.5">
           {src.url ? (
             <a
               href={src.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: "#475569", textDecoration: "none" }}
+              className="text-slate-600 no-underline hover:text-slate-400 transition-colors"
             >
               {src.source} — {src.metric}
             </a>
@@ -292,77 +265,51 @@ function CategoryBar({ item, showSource = false }: { item: CategoryScore; showSo
 
 // ── Neighborhood Card (List View) ────────────────────────
 
+interface NeighborhoodCardProps {
+  summary: NeighborhoodSummary;
+  onSelect: () => void;
+  isSelected: boolean;
+  onCompareToggle: () => void;
+  isComparing: boolean;
+}
+
 function NeighborhoodCard({
   summary,
   onSelect,
   isSelected,
   onCompareToggle,
   isComparing,
-}: {
-  summary: NeighborhoodSummary;
-  onSelect: () => void;
-  isSelected: boolean;
-  onCompareToggle: () => void;
-  isComparing: boolean;
-}) {
+}: NeighborhoodCardProps) {
   const color = getScoreColor(summary.overall_score);
 
   return (
     <div
       onClick={onSelect}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "16px",
-        padding: "14px 16px",
-        background: isSelected
-          ? "rgba(59, 130, 246, 0.12)"
-          : "rgba(255,255,255,0.03)",
-        border: isSelected
-          ? "1px solid rgba(59, 130, 246, 0.4)"
-          : "1px solid rgba(255,255,255,0.06)",
-        borderRadius: "10px",
-        cursor: "pointer",
-        transition: "all 0.15s",
-      }}
-      onMouseEnter={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-          e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-          e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-        }
-      }}
+      className={cn(
+        "flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3.5 rounded-[10px] cursor-pointer transition-all duration-150",
+        isSelected
+          ? "bg-blue-500/[0.12] border border-blue-500/40"
+          : "bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.12]",
+      )}
     >
       {/* Rank */}
       <div
-        style={{
-          width: "32px",
-          height: "32px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background:
-            summary.rank <= 3 ? "rgba(59, 130, 246, 0.15)" : "rgba(255,255,255,0.05)",
-          borderRadius: "8px",
-          fontSize: "14px",
-          fontWeight: 700,
-          color: summary.rank <= 3 ? "#60a5fa" : "#9ca3af",
-        }}
+        className={cn(
+          "w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold shrink-0",
+          summary.rank <= 3
+            ? "bg-blue-500/15 text-blue-400"
+            : "bg-white/5 text-gray-400",
+        )}
       >
         #{summary.rank}
       </div>
 
       {/* Name + categories */}
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: "#f3f4f6" }}>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-gray-100 truncate">
           {summary.name}
         </div>
-        <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
+        <div className="text-[11px] text-gray-500 mt-0.5 truncate">
           Best: {CATEGORY_LABELS[summary.top_category as MetricCategory] || summary.top_category}{" "}
           · Weakest:{" "}
           {CATEGORY_LABELS[summary.bottom_category as MetricCategory] || summary.bottom_category}
@@ -370,11 +317,11 @@ function NeighborhoodCard({
       </div>
 
       {/* Score */}
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontSize: "20px", fontWeight: 700, color, lineHeight: 1 }}>
+      <div className="text-right shrink-0">
+        <div className="text-xl font-bold leading-none" style={{ color }}>
           {summary.overall_score.toFixed(1)}
         </div>
-        <div style={{ fontSize: "10px", color: "#6b7280" }}>
+        <div className="text-[10px] text-gray-500">
           {getScoreLabel(summary.overall_score)}
         </div>
       </div>
@@ -385,24 +332,15 @@ function NeighborhoodCard({
           e.stopPropagation();
           onCompareToggle();
         }}
-        style={{
-          width: "24px",
-          height: "24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: isComparing
-            ? "2px solid #3b82f6"
-            : "2px solid rgba(255,255,255,0.15)",
-          borderRadius: "6px",
-          background: isComparing ? "rgba(59, 130, 246, 0.2)" : "transparent",
-          cursor: "pointer",
-          fontSize: "14px",
-          transition: "all 0.15s",
-        }}
+        className={cn(
+          "w-6 h-6 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 shrink-0",
+          isComparing
+            ? "border-2 border-blue-500 bg-blue-500/20"
+            : "border-2 border-white/15 hover:border-white/30",
+        )}
         title="Add to comparison"
       >
-        {isComparing ? "✓" : ""}
+        {isComparing && <Check className="size-3.5 text-blue-400" />}
       </div>
     </div>
   );
@@ -410,43 +348,28 @@ function NeighborhoodCard({
 
 // ── Detail Panel ─────────────────────────────────────────
 
-function ScorecardDetail({
-  scorecard,
-  onBack,
-}: {
+interface ScorecardDetailProps {
   scorecard: NeighborhoodScorecard;
   onBack: () => void;
-}) {
+}
+
+function ScorecardDetail({ scorecard, onBack }: ScorecardDetailProps) {
   return (
-    <div style={{ padding: "24px" }}>
+    <div className="p-4 sm:p-6">
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+      <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "8px",
-            color: "#9ca3af",
-            padding: "6px 12px",
-            cursor: "pointer",
-            fontSize: "13px",
-          }}
+          className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/10 rounded-lg text-gray-400 px-3 py-1.5 cursor-pointer text-[13px] hover:bg-white/10 hover:text-gray-300 transition-colors"
         >
-          ← Back
+          <ArrowLeft className="size-3.5" />
+          Back
         </button>
-        <div style={{ flex: 1 }}>
-          <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: 700,
-              color: "#f3f4f6",
-              margin: 0,
-            }}
-          >
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-100 m-0 truncate">
             {scorecard.neighborhood.name}
           </h2>
-          <div style={{ fontSize: "12px", color: "#6b7280" }}>
+          <div className="text-xs text-gray-500">
             Rank #{scorecard.rank} of 22 Vancouver neighborhoods
           </div>
         </div>
@@ -455,14 +378,9 @@ function ScorecardDetail({
 
       {/* Score label */}
       <div
+        className="text-center p-2.5 rounded-lg mb-6 text-[13px] font-semibold"
         style={{
-          textAlign: "center",
-          padding: "10px",
           background: `${getScoreColor(scorecard.overall_score)}15`,
-          borderRadius: "8px",
-          marginBottom: "24px",
-          fontSize: "13px",
-          fontWeight: 600,
           color: getScoreColor(scorecard.overall_score),
         }}
       >
@@ -470,30 +388,12 @@ function ScorecardDetail({
       </div>
 
       {/* Category Breakdown */}
-      <div style={{ marginBottom: "24px" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "12px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#9ca3af",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-              margin: 0,
-            }}
-          >
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide m-0">
             Category Breakdown
           </h3>
-          <span style={{ fontSize: "10px", color: "#4b5563" }}>
-            Weight
-          </span>
+          <span className="text-[10px] text-gray-600">Weight</span>
         </div>
         {scorecard.category_scores.map((cs) => (
           <CategoryBar key={cs.category} item={cs} showSource />
@@ -501,103 +401,54 @@ function ScorecardDetail({
       </div>
 
       {/* Context Stats */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "12px",
-          marginBottom: "24px",
-        }}
-      >
-        <div
-          style={{
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: "10px",
-            padding: "16px",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: "24px", fontWeight: 700, color: "#f59e0b" }}>
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-[10px] p-4 text-center">
+          <div className="text-2xl font-bold text-amber-500">
             {scorecard.active_rezonings}
           </div>
-          <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
+          <div className="text-[11px] text-gray-500 mt-1">
             Active Rezonings
           </div>
         </div>
-        <div
-          style={{
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: "10px",
-            padding: "16px",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: "24px", fontWeight: 700, color: "#3b82f6" }}>
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-[10px] p-4 text-center">
+          <div className="text-2xl font-bold text-blue-500">
             {scorecard.recent_permits}
           </div>
-          <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
+          <div className="text-[11px] text-gray-500 mt-1">
             Recent Permits
           </div>
         </div>
       </div>
 
       {/* Methodology */}
-      <div
-        style={{
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.06)",
-          borderRadius: "10px",
-          padding: "16px",
-        }}
-      >
-        <h3
-          style={{
-            fontSize: "12px",
-            fontWeight: 600,
-            color: "#6b7280",
-            textTransform: "uppercase",
-            letterSpacing: "0.5px",
-            marginBottom: "10px",
-          }}
-        >
+      <div className="bg-white/[0.02] border border-white/[0.06] rounded-[10px] p-4">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2.5">
           Scoring Methodology
         </h3>
-        <div style={{ fontSize: "11px", color: "#6b7280", lineHeight: 1.6 }}>
-          <p style={{ margin: "0 0 8px" }}>
-            Scores are computed using a <strong style={{ color: "#9ca3af" }}>weighted composite</strong> of
+        <div className="text-[11px] text-gray-500 leading-relaxed">
+          <p className="mb-2">
+            Scores are computed using a <strong className="text-gray-400">weighted composite</strong> of
             8 quality-of-life categories, each normalized to a 0-10 scale using min-max normalization
             across all 22 Vancouver neighbourhoods. Categories where lower values indicate better
             outcomes (safety, affordability) are inverted before scoring.
           </p>
-          <p style={{ margin: "0 0 8px" }}>
-            <strong style={{ color: "#9ca3af" }}>Overall score</strong> = weighted average of all category
+          <p className="mb-2">
+            <strong className="text-gray-400">Overall score</strong> = weighted average of all category
             scores, with weights reflecting investment-relevance: Safety, Schools, Transit, Development,
             and Affordability each at 15%; Parks and Walkability at 10%; Air Quality at 5%.
           </p>
-          <p style={{ margin: "0 0 10px" }}>
-            <strong style={{ color: "#9ca3af" }}>Trends</strong> compare current period vs. prior period.
+          <p className="mb-2.5">
+            <strong className="text-gray-400">Trends</strong> compare current period vs. prior period.
             Changes above +0.3 are marked improving; below -0.3 declining; otherwise stable.
           </p>
-          <div
-            style={{
-              fontSize: "10px",
-              color: "#4b5563",
-              borderTop: "1px solid rgba(255,255,255,0.06)",
-              paddingTop: "8px",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "6px 16px",
-            }}
-          >
-            <span style={{ fontWeight: 600, color: "#6b7280" }}>Data sources:</span>
-            <a href="https://geodash.vpd.ca/opendata/" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>VPD Crime Data</a>
-            <a href="https://opendata.vancouver.ca/" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>CoV Open Data</a>
-            <a href="https://www.translink.ca/about-us/doing-business-with-translink/app-developer-resources/gtfs" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>TransLink GTFS</a>
-            <a href="https://www.walkscore.com/CA-BC/Vancouver" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>Walk Score</a>
-            <a href="https://www.env.gov.bc.ca/epd/bcairquality/data/aqhi.html" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>BC AQHI</a>
-            <a href="https://www.compareschoolrankings.org/" target="_blank" rel="noopener noreferrer" style={{ color: "#475569", textDecoration: "none" }}>Fraser Institute</a>
+          <div className="text-[10px] text-gray-600 border-t border-white/[0.06] pt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+            <span className="font-semibold text-gray-500">Data sources:</span>
+            <a href="https://geodash.vpd.ca/opendata/" target="_blank" rel="noopener noreferrer" className="text-slate-600 no-underline hover:text-slate-400 transition-colors">VPD Crime Data</a>
+            <a href="https://opendata.vancouver.ca/" target="_blank" rel="noopener noreferrer" className="text-slate-600 no-underline hover:text-slate-400 transition-colors">CoV Open Data</a>
+            <a href="https://www.translink.ca/about-us/doing-business-with-translink/app-developer-resources/gtfs" target="_blank" rel="noopener noreferrer" className="text-slate-600 no-underline hover:text-slate-400 transition-colors">TransLink GTFS</a>
+            <a href="https://www.walkscore.com/CA-BC/Vancouver" target="_blank" rel="noopener noreferrer" className="text-slate-600 no-underline hover:text-slate-400 transition-colors">Walk Score</a>
+            <a href="https://www.env.gov.bc.ca/epd/bcairquality/data/aqhi.html" target="_blank" rel="noopener noreferrer" className="text-slate-600 no-underline hover:text-slate-400 transition-colors">BC AQHI</a>
+            <a href="https://www.compareschoolrankings.org/" target="_blank" rel="noopener noreferrer" className="text-slate-600 no-underline hover:text-slate-400 transition-colors">Fraser Institute</a>
           </div>
         </div>
       </div>
@@ -607,82 +458,53 @@ function ScorecardDetail({
 
 // ── Compare Panel ────────────────────────────────────────
 
-function CompareView({
-  comparison,
-  onBack,
-}: {
+interface CompareViewProps {
   comparison: NeighborhoodComparison;
   onBack: () => void;
-}) {
+}
+
+function CompareView({ comparison, onBack }: CompareViewProps) {
   const categories = comparison.categories;
   const hoods = comparison.neighborhoods;
 
   return (
-    <div style={{ padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+    <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "8px",
-            color: "#9ca3af",
-            padding: "6px 12px",
-            cursor: "pointer",
-            fontSize: "13px",
-          }}
+          className="inline-flex items-center gap-1.5 bg-white/[0.06] border border-white/10 rounded-lg text-gray-400 px-3 py-1.5 cursor-pointer text-[13px] hover:bg-white/10 hover:text-gray-300 transition-colors"
         >
-          ← Back
+          <ArrowLeft className="size-3.5" />
+          Back
         </button>
-        <h2
-          style={{
-            fontSize: "18px",
-            fontWeight: 700,
-            color: "#f3f4f6",
-            margin: 0,
-          }}
-        >
+        <h2 className="text-lg font-bold text-gray-100 m-0">
           Neighborhood Comparison
         </h2>
       </div>
 
       {/* Score headers */}
       <div
+        className="gap-2 mb-5 p-3 bg-white/[0.03] rounded-[10px] overflow-x-auto"
         style={{
           display: "grid",
           gridTemplateColumns: `120px repeat(${hoods.length}, 1fr)`,
-          gap: "8px",
-          marginBottom: "20px",
-          padding: "12px",
-          background: "rgba(255,255,255,0.03)",
-          borderRadius: "10px",
         }}
       >
-        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600 }}>
+        <div className="text-[11px] text-gray-500 font-semibold">
           OVERALL
         </div>
         {hoods.map((h) => (
-          <div key={h.neighborhood.slug} style={{ textAlign: "center" }}>
-            <div
-              style={{
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#d1d5db",
-                marginBottom: "4px",
-              }}
-            >
+          <div key={h.neighborhood.slug} className="text-center">
+            <div className="text-[13px] font-semibold text-gray-300 mb-1 truncate">
               {h.neighborhood.name}
             </div>
             <div
-              style={{
-                fontSize: "22px",
-                fontWeight: 700,
-                color: getScoreColor(h.overall_score),
-              }}
+              className="text-[22px] font-bold"
+              style={{ color: getScoreColor(h.overall_score) }}
             >
               {h.overall_score.toFixed(1)}
             </div>
-            <div style={{ fontSize: "10px", color: "#6b7280" }}>
+            <div className="text-[10px] text-gray-500">
               Rank #{h.rank}
             </div>
           </div>
@@ -693,24 +515,13 @@ function CompareView({
       {categories.map((cat) => (
         <div
           key={cat}
+          className="gap-2 py-2.5 px-3 border-b border-white/[0.04] items-center"
           style={{
             display: "grid",
             gridTemplateColumns: `120px repeat(${hoods.length}, 1fr)`,
-            gap: "8px",
-            padding: "10px 12px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
-            alignItems: "center",
           }}
         >
-          <div
-            style={{
-              fontSize: "12px",
-              color: "#9ca3af",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
+          <div className="text-xs text-gray-400 flex items-center gap-1.5">
             <span>{CATEGORY_ICONS[cat]}</span>
             <span>{CATEGORY_LABELS[cat]}</span>
           </div>
@@ -727,28 +538,21 @@ function CompareView({
             return (
               <div
                 key={h.neighborhood.slug}
-                style={{
-                  textAlign: "center",
-                  padding: "4px",
-                  borderRadius: "6px",
-                  background: isBest ? `${color}15` : "transparent",
-                }}
+                className={cn(
+                  "text-center p-1 rounded-md",
+                  isBest && "bg-current/[0.08]",
+                )}
+                style={isBest ? { background: `${color}15` } : undefined}
               >
                 <span
-                  style={{
-                    fontSize: "15px",
-                    fontWeight: isBest ? 700 : 500,
-                    color,
-                  }}
+                  className={cn("text-[15px]", isBest ? "font-bold" : "font-medium")}
+                  style={{ color }}
                 >
                   {cs.score.toFixed(1)}
                 </span>
                 <span
-                  style={{
-                    marginLeft: "4px",
-                    fontSize: "12px",
-                    color: TREND_COLORS[cs.trend],
-                  }}
+                  className="ml-1 text-xs"
+                  style={{ color: TREND_RAW_COLORS[cs.trend] }}
                 >
                   {TREND_ICONS[cs.trend]}
                 </span>
@@ -790,7 +594,7 @@ export default function NeighborhoodPage() {
           setLoading(false);
         }
       })
-      .catch((e) => {
+      .catch(() => {
         if (!cancelled) {
           setError("Failed to load neighborhoods");
           setLoading(false);
@@ -880,66 +684,23 @@ export default function NeighborhoodPage() {
   // ── Render ───────────────────────────────────────
 
   return (
-    <div
-      style={{
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        background: "#0f172a",
-        color: "#f3f4f6",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
+    <div className="h-full flex flex-col bg-slate-900 text-gray-100">
       {/* Page Header */}
-      <div
-        style={{
-          padding: "20px 24px 12px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
+      <div className="px-4 sm:px-6 pt-5 pb-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between">
           <div>
-            <h1
-              style={{
-                fontSize: "18px",
-                fontWeight: 700,
-                color: "#f3f4f6",
-                margin: 0,
-              }}
-            >
+            <h1 className="text-lg font-bold text-gray-100 m-0">
               Neighborhood Scorecards
             </h1>
-            <p style={{ fontSize: "12px", color: "#6b7280", margin: "4px 0 0" }}>
+            <p className="text-xs text-gray-500 mt-1 mb-0">
               Quality-of-life ratings across 22 Vancouver neighborhoods
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="flex items-center gap-2">
             {view.type === "list" && compareSet.size >= 2 && (
               <button
                 onClick={handleCompare}
-                style={{
-                  background: "#3b82f6",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#2563eb";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#3b82f6";
-                }}
+                className="bg-blue-500 border-none rounded-lg text-white px-4 py-2 text-[13px] font-semibold cursor-pointer transition-colors hover:bg-blue-600"
               >
                 Compare ({compareSet.size})
               </button>
@@ -950,60 +711,28 @@ export default function NeighborhoodPage() {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: "auto" }}>
+      <div className="flex-1 overflow-auto">
         {loading && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "200px",
-              color: "#6b7280",
-              fontSize: "14px",
-            }}
-          >
+          <div className="flex items-center justify-center h-[200px] text-gray-500 text-sm">
             Loading neighborhoods...
           </div>
         )}
 
         {error && (
-          <div
-            style={{
-              margin: "24px",
-              padding: "16px",
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.2)",
-              borderRadius: "10px",
-              color: "#fca5a5",
-              fontSize: "13px",
-            }}
-          >
+          <div className="mx-4 sm:mx-6 mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-[10px] text-red-300 text-[13px]">
             {error}
           </div>
         )}
 
         {!loading && !error && view.type === "list" && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-              padding: "16px 24px",
-            }}
-          >
+          <div className="flex flex-col gap-2 px-4 sm:px-6 py-4">
             {summaries.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "48px 24px",
-                  color: "#6b7280",
-                }}
-              >
-                <div style={{ fontSize: "32px", marginBottom: "12px" }}>📊</div>
-                <div style={{ fontSize: "14px", fontWeight: 500 }}>
+              <div className="text-center py-12 px-6 text-gray-500">
+                <BarChart3 className="size-8 mx-auto mb-3 text-gray-600" />
+                <div className="text-sm font-medium">
                   No neighborhood data yet
                 </div>
-                <div style={{ fontSize: "12px", marginTop: "4px" }}>
+                <div className="text-xs mt-1">
                   Run the data scrapers to populate quality-of-life scores
                 </div>
               </div>

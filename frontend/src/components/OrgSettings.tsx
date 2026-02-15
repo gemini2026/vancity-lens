@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { getApiBase } from "@/lib/api-base";
 
 const API_BASE = getApiBase();
@@ -95,68 +96,31 @@ export default function OrgSettings({ token }: { token?: string }) {
 
   if (!token) {
     return (
-      <div style={{ padding: "48px", textAlign: "center", color: "#6b7280" }}>
-        <div style={{ fontSize: "32px", marginBottom: "12px" }}>🏢</div>
-        <div style={{ fontSize: "14px" }}>Sign in to manage organizations</div>
+      <div className="p-12 text-center text-gray-500">
+        <div className="text-[32px] mb-3">&#127970;</div>
+        <div className="text-sm">Sign in to manage organizations</div>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        padding: "24px",
-        maxWidth: "800px",
-        margin: "0 auto",
-        fontFamily: "system-ui, sans-serif",
-        color: "#f3f4f6",
-      }}
-    >
-      <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "20px" }}>
-        Organization Settings
-      </h2>
+    <div className="p-6 max-w-[800px] mx-auto text-gray-100">
+      <h2 className="text-lg font-bold mb-5">Organization Settings</h2>
 
       {/* Create org */}
-      <div
-        style={{
-          padding: "16px",
-          background: "#1e293b",
-          borderRadius: "8px",
-          border: "1px solid #374151",
-          marginBottom: "20px",
-        }}
-      >
-        <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px" }}>
-          Create Organization
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
+      <div className="p-4 bg-slate-800 rounded-lg border border-gray-700 mb-5">
+        <div className="text-[13px] font-semibold mb-2">Create Organization</div>
+        <div className="flex gap-2">
           <input
             value={newOrgName}
             onChange={(e) => setNewOrgName(e.target.value)}
             placeholder="Organization name"
-            style={{
-              flex: 1,
-              padding: "8px 12px",
-              background: "#0f172a",
-              border: "1px solid #374151",
-              borderRadius: "6px",
-              color: "#f3f4f6",
-              fontSize: "13px",
-            }}
+            className="flex-1 px-3 py-2 bg-slate-900 border border-gray-700 rounded-md text-gray-100 text-[13px]"
           />
           <button
             onClick={handleCreateOrg}
             disabled={loading}
-            style={{
-              padding: "8px 16px",
-              background: "#3b82f6",
-              border: "none",
-              borderRadius: "6px",
-              color: "#fff",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            className="px-4 py-2 bg-blue-500 border-none rounded-md text-white text-[13px] font-semibold cursor-pointer"
           >
             Create
           </button>
@@ -165,8 +129,8 @@ export default function OrgSettings({ token }: { token?: string }) {
 
       {/* Org list */}
       {orgs.length > 0 && (
-        <div style={{ marginBottom: "20px" }}>
-          <div style={{ fontSize: "13px", fontWeight: 600, color: "#9ca3af", marginBottom: "8px" }}>
+        <div className="mb-5">
+          <div className="text-[13px] font-semibold text-gray-400 mb-2">
             Your Organizations
           </div>
           {orgs.map((org) => (
@@ -176,25 +140,20 @@ export default function OrgSettings({ token }: { token?: string }) {
                 setSelectedOrg(org);
                 loadMembers(org.id);
               }}
-              style={{
-                padding: "12px 16px",
-                background: selectedOrg?.id === org.id ? "rgba(59,130,246,0.12)" : "#1e293b",
-                border: selectedOrg?.id === org.id ? "1px solid #3b82f6" : "1px solid #374151",
-                borderRadius: "8px",
-                cursor: "pointer",
-                marginBottom: "8px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
+              className={cn(
+                "px-4 py-3 rounded-lg cursor-pointer mb-2 flex justify-between items-center",
+                selectedOrg?.id === org.id
+                  ? "bg-blue-500/[0.12] border border-blue-500"
+                  : "bg-slate-800 border border-gray-700"
+              )}
             >
               <div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>{org.name}</div>
-                <div style={{ fontSize: "11px", color: "#6b7280" }}>
+                <div className="text-sm font-semibold">{org.name}</div>
+                <div className="text-[11px] text-gray-500">
                   {org.plan} · {org.max_seats} seats
                 </div>
               </div>
-              <span style={{ fontSize: "10px", color: "#6b7280", background: "#374151", padding: "2px 6px", borderRadius: "3px" }}>
+              <span className="text-[10px] text-gray-500 bg-gray-700 px-1.5 py-0.5 rounded-sm">
                 {(org as any).role || "owner"}
               </span>
             </div>
@@ -204,45 +163,23 @@ export default function OrgSettings({ token }: { token?: string }) {
 
       {/* Members for selected org */}
       {selectedOrg && (
-        <div
-          style={{
-            padding: "16px",
-            background: "#1e293b",
-            borderRadius: "8px",
-            border: "1px solid #374151",
-          }}
-        >
-          <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "12px" }}>
+        <div className="p-4 bg-slate-800 rounded-lg border border-gray-700">
+          <div className="text-[13px] font-semibold mb-3">
             {selectedOrg.name} — Members
           </div>
 
           {/* Invite */}
-          <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          <div className="flex gap-2 mb-4">
             <input
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="Email address"
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                background: "#0f172a",
-                border: "1px solid #374151",
-                borderRadius: "6px",
-                color: "#f3f4f6",
-                fontSize: "12px",
-              }}
+              className="flex-1 px-3 py-2 bg-slate-900 border border-gray-700 rounded-md text-gray-100 text-xs"
             />
             <select
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value)}
-              style={{
-                padding: "8px",
-                background: "#0f172a",
-                border: "1px solid #374151",
-                borderRadius: "6px",
-                color: "#d1d5db",
-                fontSize: "12px",
-              }}
+              className="px-2 py-2 bg-slate-900 border border-gray-700 rounded-md text-gray-300 text-xs"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -250,16 +187,7 @@ export default function OrgSettings({ token }: { token?: string }) {
             <button
               onClick={handleInvite}
               disabled={loading}
-              style={{
-                padding: "8px 12px",
-                background: "#3b82f6",
-                border: "none",
-                borderRadius: "6px",
-                color: "#fff",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
+              className="px-3 py-2 bg-blue-500 border-none rounded-md text-white text-xs font-semibold cursor-pointer"
             >
               Invite
             </button>
@@ -269,43 +197,31 @@ export default function OrgSettings({ token }: { token?: string }) {
           {members.map((m) => (
             <div
               key={m.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "8px 0",
-                borderBottom: "1px solid #374151",
-              }}
+              className="flex items-center justify-between py-2 border-b border-gray-700"
             >
               <div>
-                <div style={{ fontSize: "13px", color: "#d1d5db" }}>
+                <div className="text-[13px] text-gray-300">
                   {m.full_name || m.email}
                 </div>
-                <div style={{ fontSize: "10px", color: "#6b7280" }}>{m.email}</div>
+                <div className="text-[10px] text-gray-500">{m.email}</div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="flex items-center gap-2">
                 <span
-                  style={{
-                    fontSize: "10px",
-                    padding: "2px 6px",
-                    borderRadius: "3px",
-                    background: m.role === "owner" ? "#f59e0b" : m.role === "admin" ? "#3b82f6" : "#374151",
-                    color: "#fff",
-                    fontWeight: 600,
-                  }}
+                  className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-sm text-white font-semibold",
+                    m.role === "owner"
+                      ? "bg-amber-500"
+                      : m.role === "admin"
+                        ? "bg-blue-500"
+                        : "bg-gray-700"
+                  )}
                 >
                   {m.role}
                 </span>
                 {m.role !== "owner" && (
                   <button
                     onClick={() => handleRemove(m.user_id)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#6b7280",
-                      cursor: "pointer",
-                      fontSize: "11px",
-                    }}
+                    className="bg-transparent border-none text-gray-500 cursor-pointer text-[11px]"
                   >
                     Remove
                   </button>

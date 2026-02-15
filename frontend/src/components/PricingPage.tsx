@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
   createCheckoutSession,
@@ -138,68 +139,24 @@ export default function PricingPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#111827",
-        fontFamily: "system-ui, sans-serif",
-        color: "#f3f4f6",
-        padding: "48px 24px",
-      }}
-    >
+    <div className="min-h-screen bg-gray-900 text-gray-100 px-6 py-12">
       {/* Header */}
-      <div style={{ textAlign: "center", marginBottom: "48px" }}>
-        <h1
-          style={{
-            fontSize: "32px",
-            fontWeight: "800",
-            margin: "0 0 8px",
-            color: "#f3f4f6",
-          }}
-        >
+      <div className="text-center mb-12">
+        <h1 className="text-[32px] font-extrabold mb-2 text-gray-100">
           Choose Your Plan
         </h1>
-        <p
-          style={{
-            fontSize: "15px",
-            color: "#9ca3af",
-            margin: 0,
-            maxWidth: "500px",
-            marginLeft: "auto",
-            marginRight: "auto",
-          }}
-        >
+        <p className="text-[15px] text-gray-400 max-w-[500px] mx-auto">
           Unlock the full power of VanCity Lens for your real estate investment
           decisions.
         </p>
         {subscription && subscription.is_active && (
-          <div
-            style={{
-              marginTop: "16px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "8px 16px",
-              background: "rgba(59, 130, 246, 0.1)",
-              border: "1px solid rgba(59, 130, 246, 0.2)",
-              borderRadius: "6px",
-              fontSize: "13px",
-            }}
-          >
-            <span style={{ color: "#60a5fa", fontWeight: "600" }}>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-md text-[13px]">
+            <span className="text-blue-400 font-semibold">
               Current plan: {subscription.tier}
             </span>
             <button
               onClick={handleManage}
-              style={{
-                background: "none",
-                border: "none",
-                color: "#60a5fa",
-                fontSize: "12px",
-                cursor: "pointer",
-                textDecoration: "underline",
-                fontFamily: "system-ui, sans-serif",
-              }}
+              className="bg-transparent border-none text-blue-400 text-xs cursor-pointer underline"
             >
               Manage billing
             </button>
@@ -209,33 +166,13 @@ export default function PricingPage() {
 
       {/* Error */}
       {error && (
-        <div
-          style={{
-            maxWidth: "600px",
-            margin: "0 auto 24px",
-            padding: "10px 16px",
-            background: "rgba(220, 38, 38, 0.1)",
-            border: "1px solid rgba(220, 38, 38, 0.2)",
-            borderRadius: "6px",
-            color: "#f87171",
-            fontSize: "13px",
-            textAlign: "center",
-          }}
-        >
+        <div className="max-w-[600px] mx-auto mb-6 px-4 py-2.5 bg-red-600/10 border border-red-600/20 rounded-md text-red-400 text-[13px] text-center">
           {error}
         </div>
       )}
 
       {/* Pricing Cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          gap: "20px",
-          maxWidth: "1200px",
-          margin: "0 auto",
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5 max-w-[1200px] mx-auto">
         {TIERS.map((tier) => {
           const isCurrent = isCurrentTier(tier.name);
           const isLoading = checkoutLoading === tier.priceId;
@@ -243,103 +180,39 @@ export default function PricingPage() {
           return (
             <div
               key={tier.name}
-              style={{
-                background: tier.highlighted
-                  ? "#1e293b"
-                  : "#0f172a",
-                borderRadius: "12px",
-                border: tier.highlighted
-                  ? "2px solid #3b82f6"
-                  : "1px solid #1f2937",
-                padding: "28px 24px",
-                display: "flex",
-                flexDirection: "column",
-                position: "relative",
-                transition: "transform 0.2s, box-shadow 0.2s",
-              }}
+              className={cn(
+                "rounded-xl p-7 flex flex-col relative transition-all duration-200",
+                tier.highlighted
+                  ? "bg-slate-800 border-2 border-blue-500"
+                  : "bg-slate-900 border border-gray-800"
+              )}
             >
               {tier.highlighted && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "-12px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "#3b82f6",
-                    color: "#fff",
-                    fontSize: "10px",
-                    fontWeight: "700",
-                    padding: "4px 12px",
-                    borderRadius: "10px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                  }}
-                >
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-[10px] uppercase tracking-wide">
                   Most Popular
                 </div>
               )}
 
-              <div
-                style={{
-                  fontSize: "14px",
-                  fontWeight: "700",
-                  color: "#f3f4f6",
-                  marginBottom: "4px",
-                }}
-              >
+              <div className="text-sm font-bold text-gray-100 mb-1">
                 {tier.name}
               </div>
 
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "#6b7280",
-                  marginBottom: "16px",
-                }}
-              >
+              <div className="text-[11px] text-gray-500 mb-4">
                 {tier.description}
               </div>
 
-              <div
-                style={{
-                  fontSize: "28px",
-                  fontWeight: "800",
-                  color: "#f3f4f6",
-                  marginBottom: "20px",
-                }}
-              >
+              <div className="text-[28px] font-extrabold text-gray-100 mb-5">
                 {tier.price}
               </div>
 
               {/* Features */}
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "8px",
-                  marginBottom: "24px",
-                }}
-              >
+              <div className="flex-1 flex flex-col gap-2 mb-6">
                 {tier.features.map((feature, idx) => (
                   <div
                     key={idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: "8px",
-                      fontSize: "12px",
-                      color: "#d1d5db",
-                    }}
+                    className="flex items-start gap-2 text-xs text-gray-300"
                   >
-                    <span
-                      style={{
-                        color: "#3b82f6",
-                        fontWeight: "700",
-                        flexShrink: 0,
-                        marginTop: "1px",
-                      }}
-                    >
+                    <span className="text-blue-500 font-bold shrink-0 mt-px">
                       &#10003;
                     </span>
                     <span>{feature}</span>
@@ -351,38 +224,14 @@ export default function PricingPage() {
               {tier.name === "Enterprise" ? (
                 <a
                   href="mailto:sales@vancitylens.com?subject=Enterprise%20Inquiry"
-                  style={{
-                    display: "block",
-                    padding: "12px",
-                    background: "transparent",
-                    border: "1px solid #374151",
-                    borderRadius: "6px",
-                    color: "#d1d5db",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                    textAlign: "center",
-                    textDecoration: "none",
-                    fontFamily: "system-ui, sans-serif",
-                    transition: "all 0.2s",
-                  }}
+                  className="block p-3 bg-transparent border border-gray-700 rounded-md text-gray-300 text-[13px] font-semibold cursor-pointer text-center no-underline transition-all duration-200 hover:bg-gray-700 hover:text-white"
                 >
                   Contact Sales
                 </a>
               ) : isCurrent ? (
                 <button
                   disabled
-                  style={{
-                    padding: "12px",
-                    background: "rgba(59, 130, 246, 0.1)",
-                    border: "1px solid rgba(59, 130, 246, 0.2)",
-                    borderRadius: "6px",
-                    color: "#60a5fa",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    cursor: "default",
-                    fontFamily: "system-ui, sans-serif",
-                  }}
+                  className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-400 text-[13px] font-semibold cursor-default"
                 >
                   Current Plan
                 </button>
@@ -390,55 +239,21 @@ export default function PricingPage() {
                 <button
                   onClick={() => handleSubscribe(tier.priceId!)}
                   disabled={isLoading}
-                  style={{
-                    padding: "12px",
-                    background: isLoading
-                      ? "#374151"
+                  className={cn(
+                    "p-3 rounded-md text-white text-[13px] font-semibold transition-colors duration-200",
+                    isLoading
+                      ? "bg-gray-700 cursor-not-allowed"
                       : tier.highlighted
-                        ? "#3b82f6"
-                        : "#1e293b",
-                    border: tier.highlighted
-                      ? "none"
-                      : "1px solid #374151",
-                    borderRadius: "6px",
-                    color: "#fff",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    cursor: isLoading ? "not-allowed" : "pointer",
-                    fontFamily: "system-ui, sans-serif",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) {
-                      e.currentTarget.style.background = tier.highlighted
-                        ? "#2563eb"
-                        : "#374151";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isLoading) {
-                      e.currentTarget.style.background = tier.highlighted
-                        ? "#3b82f6"
-                        : "#1e293b";
-                    }
-                  }}
+                        ? "bg-blue-500 cursor-pointer hover:bg-blue-600 border-none"
+                        : "bg-slate-800 cursor-pointer hover:bg-gray-700 border border-gray-700"
+                  )}
                 >
                   {isLoading ? "Redirecting..." : tier.cta}
                 </button>
               ) : (
                 <button
                   disabled
-                  style={{
-                    padding: "12px",
-                    background: "rgba(59, 130, 246, 0.1)",
-                    border: "1px solid rgba(59, 130, 246, 0.2)",
-                    borderRadius: "6px",
-                    color: "#60a5fa",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    cursor: "default",
-                    fontFamily: "system-ui, sans-serif",
-                  }}
+                  className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-md text-blue-400 text-[13px] font-semibold cursor-default"
                 >
                   {isCurrent ? "Current Plan" : "Free Forever"}
                 </button>
@@ -449,16 +264,7 @@ export default function PricingPage() {
       </div>
 
       {/* Footer note */}
-      <div
-        style={{
-          textAlign: "center",
-          marginTop: "40px",
-          fontSize: "12px",
-          color: "#6b7280",
-          maxWidth: "600px",
-          margin: "40px auto 0",
-        }}
-      >
+      <div className="text-center text-xs text-gray-500 max-w-[600px] mx-auto mt-10">
         All plans include access to the VanCity Lens platform. Pricing is in CAD.
         Cancel anytime from your billing portal. Enterprise plans require annual
         commitment.

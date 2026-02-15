@@ -8,8 +8,7 @@ export default function Disclaimer() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const dismissed = localStorage.getItem(STORAGE_KEY);
-    if (!dismissed) {
+    if (!localStorage.getItem(STORAGE_KEY)) {
       setVisible(true);
     }
   }, []);
@@ -22,61 +21,15 @@ export default function Disclaimer() {
   if (!visible) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 9999,
-        background: "rgba(17, 24, 39, 0.92)",
-        backdropFilter: "blur(8px)",
-        borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-        padding: "12px 20px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "16px",
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      <p
-        style={{
-          margin: 0,
-          fontSize: "12px",
-          lineHeight: "1.5",
-          color: "#9ca3af",
-          maxWidth: "900px",
-          textAlign: "center",
-        }}
-      >
+    <div className="fixed bottom-0 md:bottom-0 inset-x-0 z-[9999] bg-gray-900/92 backdrop-blur-md border-t border-white/10 px-5 py-3 flex items-center justify-center gap-4">
+      <p className="m-0 text-xs leading-relaxed text-gray-400 max-w-[900px] text-center">
         VanCity Lens is for informational purposes only. Not investment advice.
         All estimates are derived from public data and may contain inaccuracies.
         Verify independently before making any decisions.
       </p>
       <button
         onClick={handleDismiss}
-        style={{
-          flexShrink: 0,
-          padding: "6px 14px",
-          background: "rgba(59, 130, 246, 0.15)",
-          border: "1px solid rgba(59, 130, 246, 0.3)",
-          borderRadius: "4px",
-          color: "#60a5fa",
-          fontSize: "11px",
-          fontWeight: "600",
-          cursor: "pointer",
-          fontFamily: "system-ui, sans-serif",
-          transition: "all 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(59, 130, 246, 0.25)";
-          e.currentTarget.style.borderColor = "rgba(59, 130, 246, 0.5)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(59, 130, 246, 0.15)";
-          e.currentTarget.style.borderColor = "rgba(59, 130, 246, 0.3)";
-        }}
+        className="shrink-0 px-3.5 py-1.5 bg-blue-500/15 border border-blue-500/30 rounded text-blue-400 text-[11px] font-semibold cursor-pointer transition-colors hover:bg-blue-500/25 hover:border-blue-500/50"
       >
         Dismiss
       </button>

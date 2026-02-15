@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import {
   getWatchlists,
   createWatchlist,
@@ -33,7 +34,6 @@ export default function WatchlistPanel({
   const [loading, setLoading] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
 
-  // New watchlist form state
   const [newName, setNewName] = useState("");
   const [newRules, setNewRules] = useState<WatchlistRule[]>([
     { type: "NEIGHBORHOOD", value: "" },
@@ -110,136 +110,53 @@ export default function WatchlistPanel({
     );
   };
 
-  const selectStyle: React.CSSProperties = {
-    padding: "6px 8px",
-    background: "#1e293b",
-    border: "1px solid #374151",
-    borderRadius: "4px",
-    color: "#d1d5db",
-    fontSize: "12px",
-    fontFamily: "system-ui, sans-serif",
-  };
-
-  const inputStyle: React.CSSProperties = {
-    flex: 1,
-    padding: "6px 8px",
-    background: "#1e293b",
-    border: "1px solid #374151",
-    borderRadius: "4px",
-    color: "#f3f4f6",
-    fontSize: "12px",
-    fontFamily: "system-ui, sans-serif",
-  };
-
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.4)",
-            zIndex: 998,
-          }}
+          className="fixed inset-0 bg-black/40 z-[998]"
           onClick={onClose}
         />
       )}
 
       {/* Panel */}
       <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: "400px",
-          maxWidth: "100vw",
-          background: "#111827",
-          borderLeft: "1px solid #1f2937",
-          zIndex: 999,
-          transform: isOpen ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.3s ease-in-out",
-          display: "flex",
-          flexDirection: "column",
-          fontFamily: "system-ui, sans-serif",
-          color: "#f3f4f6",
-        }}
+        className={cn(
+          "fixed top-0 right-0 bottom-0 w-[400px] max-w-[100vw]",
+          "bg-gray-900 border-l border-gray-800 z-[999]",
+          "flex flex-col text-gray-100",
+          "transition-transform duration-300 ease-in-out",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
       >
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "16px 20px",
-            borderBottom: "1px solid #1f2937",
-            background: "#0f172a",
-          }}
-        >
-          <div style={{ fontSize: "15px", fontWeight: "700" }}>
-            Watchlists
-          </div>
+        <div className="flex justify-between items-center px-5 py-4 border-b border-gray-800 bg-slate-900">
+          <div className="text-[15px] font-bold">Watchlists</div>
           <button
             onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#6b7280",
-              fontSize: "20px",
-              cursor: "pointer",
-              padding: "4px 8px",
-              lineHeight: "1",
-            }}
+            className="bg-transparent border-none text-gray-500 text-xl cursor-pointer px-2 py-1 leading-none"
           >
             x
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           {!token ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "200px",
-                color: "#6b7280",
-                fontSize: "13px",
-                textAlign: "center",
-                gap: "8px",
-              }}
-            >
-              <span style={{ fontSize: "28px" }}>&#128274;</span>
+            <div className="flex flex-col items-center justify-center h-[200px] text-gray-500 text-[13px] text-center gap-2">
+              <span className="text-[28px]">&#128274;</span>
               <span>Login required to manage watchlists</span>
             </div>
           ) : loading ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100px",
-                color: "#6b7280",
-                fontSize: "13px",
-              }}
-            >
+            <div className="flex items-center justify-center h-[100px] text-gray-500 text-[13px]">
               Loading watchlists...
             </div>
           ) : (
             <>
               {/* Existing Watchlists */}
               {watchlists.length === 0 && !showNewForm && (
-                <div
-                  style={{
-                    textAlign: "center",
-                    color: "#6b7280",
-                    fontSize: "13px",
-                    padding: "24px 0",
-                  }}
-                >
+                <div className="text-center text-gray-500 text-[13px] py-6">
                   No watchlists yet. Create one to get started.
                 </div>
               )}
@@ -247,69 +164,29 @@ export default function WatchlistPanel({
               {watchlists.map((wl) => (
                 <div
                   key={wl.id}
-                  style={{
-                    padding: "12px",
-                    background: "#1e293b",
-                    borderRadius: "6px",
-                    border: "1px solid #374151",
-                    marginBottom: "10px",
-                  }}
+                  className="p-3 bg-slate-800 rounded-md border border-gray-700 mb-2.5"
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <div style={{ fontSize: "13px", fontWeight: "600" }}>
-                      {wl.name}
-                    </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-[13px] font-semibold">{wl.name}</div>
                     <button
                       onClick={() => handleDeleteWatchlist(wl.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#f87171",
-                        fontSize: "11px",
-                        cursor: "pointer",
-                        padding: "2px 6px",
-                      }}
+                      className="bg-transparent border-none text-red-400 text-[11px] cursor-pointer px-1.5 py-0.5"
                     >
                       Delete
                     </button>
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: "4px",
-                    }}
-                  >
+                  <div className="flex flex-wrap gap-1">
                     {wl.rules.map((rule, idx) => (
                       <span
                         key={idx}
-                        style={{
-                          fontSize: "10px",
-                          background: "#374151",
-                          color: "#d1d5db",
-                          padding: "2px 8px",
-                          borderRadius: "3px",
-                        }}
+                        className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-sm"
                       >
                         {rule.type}: {rule.value}
                       </span>
                     ))}
                   </div>
                   {wl.created_at && (
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: "#6b7280",
-                        marginTop: "6px",
-                      }}
-                    >
+                    <div className="text-[10px] text-gray-500 mt-1.5">
                       Created: {new Date(wl.created_at).toLocaleDateString()}
                     </div>
                   )}
@@ -318,37 +195,13 @@ export default function WatchlistPanel({
 
               {/* New Watchlist Form */}
               {showNewForm ? (
-                <div
-                  style={{
-                    padding: "14px",
-                    background: "#0f172a",
-                    borderRadius: "6px",
-                    border: "1px solid #374151",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      color: "#9ca3af",
-                      textTransform: "uppercase",
-                    }}
-                  >
+                <div className="p-3.5 bg-slate-900 rounded-md border border-gray-700 flex flex-col gap-3">
+                  <div className="text-xs font-bold text-gray-400 uppercase">
                     New Watchlist
                   </div>
 
                   <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: "11px",
-                        color: "#9ca3af",
-                        marginBottom: "4px",
-                      }}
-                    >
+                    <label className="block text-[11px] text-gray-400 mb-1">
                       Name
                     </label>
                     <input
@@ -356,41 +209,25 @@ export default function WatchlistPanel({
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
                       placeholder="My Watchlist"
-                      style={{
-                        ...inputStyle,
-                        width: "100%",
-                        flex: "unset" as any,
-                      }}
+                      className="w-full px-2 py-1.5 bg-slate-800 border border-gray-700 rounded text-gray-100 text-xs"
                     />
                   </div>
 
                   <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: "11px",
-                        color: "#9ca3af",
-                        marginBottom: "4px",
-                      }}
-                    >
+                    <label className="block text-[11px] text-gray-400 mb-1">
                       Rules
                     </label>
                     {newRules.map((rule, idx) => (
                       <div
                         key={idx}
-                        style={{
-                          display: "flex",
-                          gap: "6px",
-                          marginBottom: "6px",
-                          alignItems: "center",
-                        }}
+                        className="flex gap-1.5 mb-1.5 items-center"
                       >
                         <select
                           value={rule.type}
                           onChange={(e) =>
                             updateRule(idx, "type", e.target.value)
                           }
-                          style={selectStyle}
+                          className="px-2 py-1.5 bg-slate-800 border border-gray-700 rounded text-gray-300 text-xs"
                         >
                           {RULE_TYPES.map((t) => (
                             <option key={t} value={t}>
@@ -405,20 +242,12 @@ export default function WatchlistPanel({
                             updateRule(idx, "value", e.target.value)
                           }
                           placeholder="Value"
-                          style={inputStyle}
+                          className="flex-1 px-2 py-1.5 bg-slate-800 border border-gray-700 rounded text-gray-100 text-xs"
                         />
                         {newRules.length > 1 && (
                           <button
                             onClick={() => removeRule(idx)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "#f87171",
-                              fontSize: "14px",
-                              cursor: "pointer",
-                              padding: "0 4px",
-                              flexShrink: 0,
-                            }}
+                            className="bg-transparent border-none text-red-400 text-sm cursor-pointer px-1 shrink-0"
                           >
                             x
                           </button>
@@ -427,51 +256,28 @@ export default function WatchlistPanel({
                     ))}
                     <button
                       onClick={addRule}
-                      style={{
-                        background: "none",
-                        border: "1px dashed #374151",
-                        color: "#60a5fa",
-                        fontSize: "11px",
-                        cursor: "pointer",
-                        padding: "4px 10px",
-                        borderRadius: "4px",
-                        fontFamily: "system-ui, sans-serif",
-                      }}
+                      className="bg-transparent border border-dashed border-gray-700 text-blue-400 text-[11px] cursor-pointer px-2.5 py-1 rounded"
                     >
                       + Add Rule
                     </button>
                   </div>
 
                   {formError && (
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "#f87171",
-                        padding: "6px 8px",
-                        background: "rgba(220, 38, 38, 0.1)",
-                        borderRadius: "4px",
-                      }}
-                    >
+                    <div className="text-[11px] text-red-400 px-2 py-1.5 bg-red-900/10 rounded">
                       {formError}
                     </div>
                   )}
 
-                  <div style={{ display: "flex", gap: "8px" }}>
+                  <div className="flex gap-2">
                     <button
                       onClick={handleCreateWatchlist}
                       disabled={saving}
-                      style={{
-                        flex: 1,
-                        padding: "8px",
-                        background: saving ? "#374151" : "#3b82f6",
-                        border: "none",
-                        borderRadius: "4px",
-                        color: "#fff",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                        cursor: saving ? "not-allowed" : "pointer",
-                        fontFamily: "system-ui, sans-serif",
-                      }}
+                      className={cn(
+                        "flex-1 p-2 border-none rounded text-white text-xs font-semibold",
+                        saving
+                          ? "bg-gray-700 cursor-not-allowed"
+                          : "bg-blue-500 cursor-pointer"
+                      )}
                     >
                       {saving ? "Saving..." : "Create"}
                     </button>
@@ -480,16 +286,7 @@ export default function WatchlistPanel({
                         setShowNewForm(false);
                         setFormError(null);
                       }}
-                      style={{
-                        padding: "8px 14px",
-                        background: "transparent",
-                        border: "1px solid #374151",
-                        borderRadius: "4px",
-                        color: "#9ca3af",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                        fontFamily: "system-ui, sans-serif",
-                      }}
+                      className="px-3.5 py-2 bg-transparent border border-gray-700 rounded text-gray-400 text-xs cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -498,28 +295,7 @@ export default function WatchlistPanel({
               ) : (
                 <button
                   onClick={() => setShowNewForm(true)}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    background: "#1e293b",
-                    border: "1px dashed #374151",
-                    borderRadius: "6px",
-                    color: "#60a5fa",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                    fontFamily: "system-ui, sans-serif",
-                    transition: "all 0.2s",
-                    marginTop: "8px",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#374151";
-                    e.currentTarget.style.borderColor = "#4b5563";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#1e293b";
-                    e.currentTarget.style.borderColor = "#374151";
-                  }}
+                  className="w-full p-2.5 bg-slate-800 border border-dashed border-gray-700 rounded-md text-blue-400 text-xs font-semibold cursor-pointer transition-all duration-200 mt-2 hover:bg-gray-700 hover:border-gray-600"
                 >
                   + New Watchlist
                 </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import type { ThreeScenarioProForma, ScenarioProForma, DeveloperProForma } from "@/lib/types";
 
 function fmt(n: number): string {
@@ -12,115 +13,81 @@ function fmt(n: number): string {
 function ScenarioView({ scenario }: { scenario: ScenarioProForma }) {
   return (
     <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "4px 12px",
-          fontSize: "12px",
-        }}
-      >
-        <span style={{ color: "#6b7280" }}>Construction</span>
-        <span style={{ color: "#d1d5db", textAlign: "right" }}>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <span className="text-gray-500">Construction</span>
+        <span className="text-gray-300 text-right">
           {scenario.construction_type.replace(/_/g, " ")}
         </span>
-        <span style={{ color: "#6b7280" }}>Sellable sqft</span>
-        <span style={{ color: "#d1d5db", textAlign: "right" }}>{scenario.sellable_sqft}</span>
-        <span style={{ color: "#6b7280" }}>Revenue/sqft</span>
-        <span style={{ color: "#d1d5db", textAlign: "right" }}>{scenario.revenue_per_sqft}</span>
+        <span className="text-gray-500">Sellable sqft</span>
+        <span className="text-gray-300 text-right">{scenario.sellable_sqft}</span>
+        <span className="text-gray-500">Revenue/sqft</span>
+        <span className="text-gray-300 text-right">{scenario.revenue_per_sqft}</span>
         {parseFloat(String(scenario.absorption_discount)) > 0 && (
           <>
-            <span style={{ color: "#6b7280" }}>Absorption Disc</span>
-            <span style={{ color: "#f87171", textAlign: "right" }}>
+            <span className="text-gray-500">Absorption Disc</span>
+            <span className="text-red-400 text-right">
               -{(parseFloat(String(scenario.absorption_discount)) * 100).toFixed(0)}%
             </span>
           </>
         )}
-        <span style={{ color: "#6b7280" }}>Net Revenue</span>
-        <span style={{ color: "#d1d5db", textAlign: "right", fontWeight: 600 }}>
+        <span className="text-gray-500">Net Revenue</span>
+        <span className="text-gray-300 text-right font-semibold">
           {fmt(scenario.net_revenue)}
         </span>
-        <span style={{ color: "#6b7280" }}>Hard Costs</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(scenario.hard_cost_total)}</span>
-        <span style={{ color: "#6b7280" }}>Soft Costs</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(scenario.soft_cost_total)}</span>
+        <span className="text-gray-500">Hard Costs</span>
+        <span className="text-red-400 text-right">-{fmt(scenario.hard_cost_total)}</span>
+        <span className="text-gray-500">Soft Costs</span>
+        <span className="text-red-400 text-right">-{fmt(scenario.soft_cost_total)}</span>
         {scenario.contingency_total > 0 && (
           <>
-            <span style={{ color: "#6b7280" }}>Contingency</span>
-            <span style={{ color: "#f87171", textAlign: "right" }}>
+            <span className="text-gray-500">Contingency</span>
+            <span className="text-red-400 text-right">
               -{fmt(scenario.contingency_total)}
             </span>
           </>
         )}
         {scenario.marketing_total > 0 && (
           <>
-            <span style={{ color: "#6b7280" }}>Marketing/Sales</span>
-            <span style={{ color: "#f87171", textAlign: "right" }}>
+            <span className="text-gray-500">Marketing/Sales</span>
+            <span className="text-red-400 text-right">
               -{fmt(scenario.marketing_total)}
             </span>
           </>
         )}
-        <span style={{ color: "#6b7280" }}>CAC + DCL</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(scenario.cac_dcl_total)}</span>
+        <span className="text-gray-500">CAC + DCL</span>
+        <span className="text-red-400 text-right">-{fmt(scenario.cac_dcl_total)}</span>
         {scenario.hidden_costs_total > 0 && (
           <>
-            <span style={{ color: "#f59e0b", fontWeight: 600 }}>Hidden Costs</span>
-            <span style={{ color: "#f59e0b", textAlign: "right", fontWeight: 600 }}>
+            <span className="text-amber-400 font-semibold">Hidden Costs</span>
+            <span className="text-amber-400 text-right font-semibold">
               -{fmt(scenario.hidden_costs_total)}
             </span>
           </>
         )}
-        <span style={{ color: "#6b7280" }}>Holding ({scenario.holding_months}mo)</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(scenario.holding_cost)}</span>
-        <span style={{ color: "#6b7280" }}>Dev Profit</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(scenario.developer_profit)}</span>
+        <span className="text-gray-500">Holding ({scenario.holding_months}mo)</span>
+        <span className="text-red-400 text-right">-{fmt(scenario.holding_cost)}</span>
+        <span className="text-gray-500">Dev Profit</span>
+        <span className="text-red-400 text-right">-{fmt(scenario.developer_profit)}</span>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "8px",
-          paddingTop: "8px",
-          borderTop: "1px solid #374151",
-          fontSize: "13px",
-        }}
-      >
-        <span style={{ color: "#9ca3af", fontWeight: 600 }}>Residual Land Value</span>
-        <span style={{ color: "#f3f4f6", fontWeight: 700 }}>{fmt(scenario.residual_land_value)}</span>
+      <div className="flex justify-between mt-2 pt-2 border-t border-gray-700 text-[13px]">
+        <span className="text-gray-400 font-semibold">Residual Land Value</span>
+        <span className="text-gray-100 font-bold">{fmt(scenario.residual_land_value)}</span>
       </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "4px",
-          fontSize: "14px",
-        }}
-      >
-        <span style={{ color: "#9ca3af", fontWeight: 600 }}>True Alpha</span>
+      <div className="flex justify-between mt-1 text-sm">
+        <span className="text-gray-400 font-semibold">True Alpha</span>
         <span
-          style={{
-            color: scenario.true_alpha > 0 ? "#4ade80" : "#f87171",
-            fontWeight: 700,
-          }}
+          className={cn(
+            "font-bold",
+            scenario.true_alpha > 0 ? "text-green-400" : "text-red-400"
+          )}
         >
           {scenario.true_alpha > 0 ? "+" : ""}
           {fmt(scenario.true_alpha)}
         </span>
       </div>
       {!scenario.is_viable && (
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: "6px",
-            fontSize: "11px",
-            color: "#f87171",
-            fontWeight: 600,
-            background: "rgba(220,38,38,0.1)",
-            padding: "4px",
-            borderRadius: "4px",
-          }}
-        >
+        <div className="text-center mt-1.5 text-[11px] text-red-400 font-semibold bg-red-600/10 p-1 rounded">
           NOT VIABLE IN THIS SCENARIO
         </div>
       )}
@@ -140,52 +107,26 @@ export default function ProFormaSection({
   if (!threeScenario && !singleProForma) return null;
 
   if (threeScenario) {
-    const tabLabels = {
-      bull: "Bull",
-      base: "Base",
-      bear: "Bear",
-    };
-
     return (
       <div>
-        <div
-          style={{
-            fontSize: "13px",
-            fontWeight: 600,
-            color: "#f3f4f6",
-            marginBottom: "8px",
-          }}
-        >
+        <div className="text-[13px] font-semibold text-gray-100 mb-2">
           Three-Scenario Pro Forma
-          <span style={{ fontSize: "10px", fontWeight: 400, color: "#6b7280", marginLeft: "8px" }}>
+          <span className="text-[10px] font-normal text-gray-500 ml-2">
             Graded on BASE case
           </span>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            marginBottom: "12px",
-            borderRadius: "6px",
-            overflow: "hidden",
-            border: "1px solid #374151",
-          }}
-        >
+        <div className="flex mb-3 rounded-md overflow-hidden border border-gray-700">
           {(["bull", "base", "bear"] as const).map((sc) => (
             <button
               key={sc}
               onClick={() => setActiveScenario(sc)}
-              style={{
-                flex: 1,
-                background: activeScenario === sc ? "#1e293b" : "transparent",
-                border: "none",
-                color: activeScenario === sc ? "#f3f4f6" : "#6b7280",
-                fontSize: "11px",
-                fontWeight: 700,
-                padding: "6px 0",
-                cursor: "pointer",
-                textTransform: "uppercase",
-              }}
+              className={cn(
+                "flex-1 border-none text-[11px] font-bold py-1.5 cursor-pointer uppercase",
+                activeScenario === sc
+                  ? "bg-slate-800 text-gray-100"
+                  : "bg-transparent text-gray-500"
+              )}
             >
               {sc === "bull" ? "Bull" : sc === "base" ? "Base" : "Bear"}
             </button>
@@ -197,63 +138,39 @@ export default function ProFormaSection({
     );
   }
 
-  // Single pro forma fallback
   const pf = singleProForma!;
   return (
     <div>
-      <div style={{ fontSize: "13px", fontWeight: 600, color: "#f3f4f6", marginBottom: "8px" }}>
+      <div className="text-[13px] font-semibold text-gray-100 mb-2">
         Developer Pro Forma
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "4px 12px",
-          fontSize: "12px",
-        }}
-      >
-        <span style={{ color: "#6b7280" }}>Construction</span>
-        <span style={{ color: "#d1d5db", textAlign: "right" }}>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <span className="text-gray-500">Construction</span>
+        <span className="text-gray-300 text-right">
           {pf.construction_type.replace(/_/g, " ")}
         </span>
-        <span style={{ color: "#6b7280" }}>Gross Revenue</span>
-        <span style={{ color: "#d1d5db", textAlign: "right" }}>{fmt(pf.gross_revenue)}</span>
-        <span style={{ color: "#6b7280" }}>Hard Costs</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(pf.hard_cost_total)}</span>
-        <span style={{ color: "#6b7280" }}>Soft Costs</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(pf.soft_cost_total)}</span>
-        <span style={{ color: "#6b7280" }}>CAC + DCL</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(pf.cac_dcl_total)}</span>
-        <span style={{ color: "#6b7280" }}>Dev Profit</span>
-        <span style={{ color: "#f87171", textAlign: "right" }}>-{fmt(pf.developer_profit)}</span>
+        <span className="text-gray-500">Gross Revenue</span>
+        <span className="text-gray-300 text-right">{fmt(pf.gross_revenue)}</span>
+        <span className="text-gray-500">Hard Costs</span>
+        <span className="text-red-400 text-right">-{fmt(pf.hard_cost_total)}</span>
+        <span className="text-gray-500">Soft Costs</span>
+        <span className="text-red-400 text-right">-{fmt(pf.soft_cost_total)}</span>
+        <span className="text-gray-500">CAC + DCL</span>
+        <span className="text-red-400 text-right">-{fmt(pf.cac_dcl_total)}</span>
+        <span className="text-gray-500">Dev Profit</span>
+        <span className="text-red-400 text-right">-{fmt(pf.developer_profit)}</span>
       </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "8px",
-          paddingTop: "8px",
-          borderTop: "1px solid #374151",
-          fontSize: "13px",
-        }}
-      >
-        <span style={{ color: "#9ca3af", fontWeight: 600 }}>Residual Land Value</span>
-        <span style={{ color: "#f3f4f6", fontWeight: 700 }}>{fmt(pf.residual_land_value)}</span>
+      <div className="flex justify-between mt-2 pt-2 border-t border-gray-700 text-[13px]">
+        <span className="text-gray-400 font-semibold">Residual Land Value</span>
+        <span className="text-gray-100 font-bold">{fmt(pf.residual_land_value)}</span>
       </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: "4px",
-          fontSize: "14px",
-        }}
-      >
-        <span style={{ color: "#9ca3af", fontWeight: 600 }}>True Alpha</span>
+      <div className="flex justify-between mt-1 text-sm">
+        <span className="text-gray-400 font-semibold">True Alpha</span>
         <span
-          style={{
-            color: pf.true_alpha > 0 ? "#4ade80" : "#f87171",
-            fontWeight: 700,
-          }}
+          className={cn(
+            "font-bold",
+            pf.true_alpha > 0 ? "text-green-400" : "text-red-400"
+          )}
         >
           {pf.true_alpha > 0 ? "+" : ""}
           {fmt(pf.true_alpha)}

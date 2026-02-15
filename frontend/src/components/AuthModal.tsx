@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { cn } from "@/lib/utils";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const inputClasses =
+  "w-full px-3 py-2.5 bg-slate-800 border border-gray-700 rounded-md text-gray-100 text-[13px] font-[inherit] box-border";
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const { login, signup } = useAuth();
@@ -40,76 +44,33 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 12px",
-    background: "#1e293b",
-    border: "1px solid #374151",
-    borderRadius: "6px",
-    color: "#f3f4f6",
-    fontSize: "13px",
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-  };
-
   return (
     <div
       onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.7)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        backdropFilter: "blur(4px)",
-      }}
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-[1000] backdrop-blur-sm"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#111827",
-          border: "1px solid #1f2937",
-          borderRadius: "12px",
-          width: "100%",
-          maxWidth: "400px",
-          padding: "32px",
-          fontFamily: "system-ui, sans-serif",
-          color: "#f3f4f6",
-        }}
+        className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-[400px] p-8 text-gray-100"
       >
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <div style={{ fontSize: "20px", fontWeight: 700 }}>VanCity Lens</div>
-          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+        <div className="text-center mb-6">
+          <div className="text-xl font-bold">VanCity Lens</div>
+          <div className="text-xs text-gray-500 mt-1">
             {tab === "login" ? "Sign in to your account" : "Create your account"}
           </div>
         </div>
 
-        {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            marginBottom: "20px",
-            borderRadius: "6px",
-            overflow: "hidden",
-            border: "1px solid #374151",
-          }}
-        >
+        <div className="flex mb-5 rounded-md overflow-hidden border border-gray-700">
           {(["login", "signup"] as const).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); setError(""); }}
-              style={{
-                flex: 1,
-                padding: "8px",
-                background: tab === t ? "#1e293b" : "transparent",
-                border: "none",
-                color: tab === t ? "#f3f4f6" : "#6b7280",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
+              className={cn(
+                "flex-1 p-2 border-none text-xs font-semibold cursor-pointer",
+                tab === t
+                  ? "bg-slate-800 text-gray-100"
+                  : "bg-transparent text-gray-500"
+              )}
             >
               {t === "login" ? "Log In" : "Sign Up"}
             </button>
@@ -117,14 +78,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="flex flex-col gap-3">
             {tab === "signup" && (
               <input
                 type="text"
                 placeholder="Display name (optional)"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                style={inputStyle}
+                className={inputClasses}
               />
             )}
             <input
@@ -133,7 +94,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={inputStyle}
+              className={inputClasses}
             />
             <input
               type="password"
@@ -142,22 +103,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              style={inputStyle}
+              className={inputClasses}
             />
           </div>
 
           {error && (
-            <div
-              style={{
-                marginTop: "12px",
-                padding: "8px 12px",
-                background: "rgba(220,38,38,0.1)",
-                border: "1px solid rgba(220,38,38,0.3)",
-                borderRadius: "6px",
-                color: "#fca5a5",
-                fontSize: "12px",
-              }}
-            >
+            <div className="mt-3 px-3 py-2 bg-red-700/10 border border-red-700/30 rounded-md text-red-300 text-xs">
               {error}
             </div>
           )}
@@ -165,18 +116,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              width: "100%",
-              marginTop: "16px",
-              padding: "10px",
-              background: loading ? "#4b5563" : "#3b82f6",
-              border: "none",
-              borderRadius: "6px",
-              color: "#fff",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: loading ? "not-allowed" : "pointer",
-            }}
+            className={cn(
+              "w-full mt-4 py-2.5 border-none rounded-md text-white text-[13px] font-semibold",
+              loading
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-blue-500 cursor-pointer hover:bg-blue-600"
+            )}
           >
             {loading ? "Please wait..." : tab === "login" ? "Log In" : "Create Account"}
           </button>
@@ -184,15 +129,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         <button
           onClick={onClose}
-          style={{
-            display: "block",
-            margin: "16px auto 0",
-            background: "none",
-            border: "none",
-            color: "#6b7280",
-            fontSize: "12px",
-            cursor: "pointer",
-          }}
+          className="block mx-auto mt-4 bg-none border-none text-gray-500 text-xs cursor-pointer hover:text-gray-300"
         >
           Cancel
         </button>

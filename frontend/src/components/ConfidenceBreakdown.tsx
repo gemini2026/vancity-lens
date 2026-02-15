@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface ConfidenceFactors {
   base: number;
@@ -23,67 +24,41 @@ export default function ConfidenceBreakdown({
     <div>
       <button
         onClick={() => setExpanded(!expanded)}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#fbbf24",
-          fontSize: "11px",
-          cursor: "pointer",
-          padding: 0,
-          fontWeight: 600,
-        }}
+        className="bg-transparent border-none text-amber-400 text-[11px] cursor-pointer p-0 font-semibold"
       >
         {"★".repeat(confidenceStars)}{"☆".repeat(3 - confidenceStars)}{" "}
-        <span style={{ color: "#6b7280", fontWeight: 400 }}>
-          ({factors.final}%) {expanded ? "▲" : "▼"}
+        <span className="text-gray-500 font-normal">
+          ({factors.final}%) {expanded ? "\u25B2" : "\u25BC"}
         </span>
       </button>
 
       {expanded && (
-        <div
-          style={{
-            marginTop: "6px",
-            padding: "8px",
-            background: "rgba(255,255,255,0.02)",
-            borderRadius: "6px",
-            border: "1px solid rgba(255,255,255,0.04)",
-            fontSize: "11px",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-            <span style={{ color: "#9ca3af" }}>Base confidence</span>
-            <span style={{ color: "#d1d5db" }}>{factors.base}%</span>
+        <div className="mt-1.5 p-2 bg-white/[0.02] rounded-md border border-white/[0.04] text-[11px]">
+          <div className="flex justify-between mb-1">
+            <span className="text-gray-400">Base confidence</span>
+            <span className="text-gray-300">{factors.base}%</span>
           </div>
           {factors.factors.map((f, i) => (
             <div
               key={i}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "2px 0",
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
-              }}
+              className="flex justify-between py-0.5 border-b border-white/[0.04]"
             >
-              <span style={{ color: "#9ca3af" }} title={f.reason}>
+              <span className="text-gray-400" title={f.reason}>
                 {f.name}
               </span>
-              <span style={{ color: f.impact > 0 ? "#86efac" : "#f87171", fontWeight: 600 }}>
+              <span
+                className={cn(
+                  "font-semibold",
+                  f.impact > 0 ? "text-green-300" : "text-red-400"
+                )}
+              >
                 {f.impact > 0 ? "+" : ""}{f.impact}%
               </span>
             </div>
           ))}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "4px",
-              paddingTop: "4px",
-              borderTop: "1px solid #374151",
-              fontWeight: 600,
-            }}
-          >
-            <span style={{ color: "#d1d5db" }}>Final confidence</span>
-            <span style={{ color: "#fbbf24" }}>{factors.final}%</span>
+          <div className="flex justify-between mt-1 pt-1 border-t border-gray-700 font-semibold">
+            <span className="text-gray-300">Final confidence</span>
+            <span className="text-amber-400">{factors.final}%</span>
           </div>
         </div>
       )}

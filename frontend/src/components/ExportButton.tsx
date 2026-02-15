@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getApiBase } from "@/lib/api-base";
+import { cn } from "@/lib/utils";
 
 const API_BASE = getApiBase();
 
@@ -86,68 +87,32 @@ export default function ExportButton({
   };
 
   return (
-    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
+    <div className="inline-flex flex-col items-end">
       <button
         onClick={handleExport}
         disabled={loading}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "6px",
-          padding: "8px 14px",
-          background: loading ? "#374151" : "#1e293b",
-          border: "1px solid #374151",
-          borderRadius: "6px",
-          color: loading ? "#6b7280" : "#60a5fa",
-          fontSize: "12px",
-          fontWeight: "600",
-          cursor: loading ? "not-allowed" : "pointer",
-          fontFamily: "system-ui, sans-serif",
-          transition: "all 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          if (!loading) {
-            e.currentTarget.style.background = "#374151";
-            e.currentTarget.style.borderColor = "#4b5563";
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!loading) {
-            e.currentTarget.style.background = "#1e293b";
-            e.currentTarget.style.borderColor = "#374151";
-          }
-        }}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-md text-xs font-semibold transition-all",
+          loading
+            ? "bg-gray-700 border-gray-700 text-gray-500 cursor-not-allowed"
+            : "bg-slate-800 border-gray-700 text-blue-400 cursor-pointer hover:bg-gray-700 hover:border-gray-600"
+        )}
       >
         {loading ? (
           <>
-            <span
-              style={{
-                display: "inline-block",
-                width: "12px",
-                height: "12px",
-                border: "2px solid #4b5563",
-                borderTopColor: "#60a5fa",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
+            <span className="inline-block w-3 h-3 border-2 border-gray-600 border-t-blue-400 rounded-full animate-spin" />
             Exporting...
           </>
         ) : (
           <>
-            <span style={{ fontSize: "14px" }}>&#8615;</span>
+            <span className="text-sm">&#8615;</span>
             {label || `Export ${exportType}`}
           </>
         )}
-        <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
       </button>
 
       {error && (
-        <div style={{ marginTop: 6, maxWidth: 320, color: "#f87171", fontSize: 11, fontFamily: "system-ui, sans-serif", textAlign: "right" }}>
+        <div className="mt-1.5 max-w-[320px] text-red-400 text-[11px] text-right">
           {error}
         </div>
       )}

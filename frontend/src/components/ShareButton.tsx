@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createShareLink } from "@/lib/share-api";
+import { cn } from "@/lib/utils";
 
 export default function ShareButton({ pid }: { pid: string }) {
   const [copied, setCopied] = useState(false);
@@ -25,17 +26,11 @@ export default function ShareButton({ pid }: { pid: string }) {
     <button
       onClick={handleShare}
       disabled={loading}
-      style={{
-        background: copied ? "#22c55e" : "#374151",
-        border: "1px solid #4b5563",
-        color: "#f3f4f6",
-        fontSize: "11px",
-        fontWeight: 600,
-        padding: "6px 12px",
-        borderRadius: "6px",
-        cursor: loading ? "wait" : "pointer",
-        transition: "all 0.2s",
-      }}
+      className={cn(
+        "border border-gray-600 text-gray-100 text-[11px] font-semibold px-3 py-1.5 rounded-md transition-all",
+        copied ? "bg-green-500" : "bg-gray-700",
+        loading ? "cursor-wait" : "cursor-pointer"
+      )}
     >
       {copied ? "Copied!" : loading ? "Creating..." : "Share Link"}
     </button>

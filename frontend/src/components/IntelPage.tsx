@@ -1,49 +1,28 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Send, Brain, Radio } from "lucide-react";
 import {
-  chatWithIntel,
-  getSignalFeed,
-  getSignalDocument,
-  getIntelStats,
-  getNeighborhoods,
+  chatWithIntel, getSignalFeed, getSignalDocument, getIntelStats, getNeighborhoods,
 } from "@/lib/intel-api";
 import type {
-  ChatMessage,
-  IntelSignal,
-  SignalDocument,
-  SourceCitation,
-  IntelStats,
-  SignalType,
-  Severity,
+  ChatMessage, IntelSignal, SignalDocument, SourceCitation, IntelStats, SignalType, Severity,
 } from "@/lib/intel-types";
 import ExportButton from "./ExportButton";
+import { cn } from "@/lib/utils";
 import { getApiBase } from "@/lib/api-base";
 
 const API_BASE = getApiBase();
 
 const SIGNAL_TYPE_LABELS: Record<SignalType, string> = {
-  rezoning_decision: "REZONING DECISION",
-  permit_approval: "PERMIT APPROVAL",
-  policy_change: "POLICY CHANGE",
-  community_opposition: "COMMUNITY OPPOSITION",
-  density_change: "DENSITY CHANGE",
-  development_proposal: "DEVELOPMENT PROPOSAL",
+  rezoning_decision: "REZONING DECISION", permit_approval: "PERMIT APPROVAL",
+  policy_change: "POLICY CHANGE", community_opposition: "COMMUNITY OPPOSITION",
+  density_change: "DENSITY CHANGE", development_proposal: "DEVELOPMENT PROPOSAL",
   infrastructure_investment: "INFRASTRUCTURE INVESTMENT",
 };
 
-const SEVERITY_COLORS: Record<Severity, string> = {
-  critical: "#dc2626",
-  high: "#ea580c",
-  medium: "#f59e0b",
-  low: "#10b981",
-};
-
 const SEVERITY_DOT: Record<Severity, string> = {
-  critical: "🔴",
-  high: "🟠",
-  medium: "🟡",
-  low: "🟢",
+  critical: "🔴", high: "🟠", medium: "🟡", low: "🟢",
 };
 
 function formatDate(dateStr: string): string {
@@ -51,133 +30,77 @@ function formatDate(dateStr: string): string {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-
   if (date.toDateString() === today.toDateString()) return "Today";
   if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-
-  const days = Math.floor(
-    (today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const days = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
   if (days < 30) return `${days}d ago`;
   if (days < 365) return `${Math.floor(days / 30)}mo ago`;
   return date.toLocaleDateString();
 }
 
-interface ChatMessageWithId extends ChatMessage {
-  id: string;
-}
+interface ChatMessageWithId extends ChatMessage { id: string; }
 
 export default function IntelPage() {
-  // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessageWithId[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Signal feed state
   const [signals, setSignals] = useState<IntelSignal[]>([]);
   const [signalsLoading, setSignalsLoading] = useState(false);
   const [signalOffset, setSignalOffset] = useState(0);
   const [signalsHasMore, setSignalsHasMore] = useState(false);
 
-  // Filter state
   const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string>("");
-  const [selectedSignalType, setSelectedSignalType] = useState<
-    SignalType | ""
-  >("");
-  const [selectedDateRange, setSelectedDateRange] = useState<
-    "7d" | "30d" | "90d" | "all"
-  >("90d");
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState("");
+  const [selectedSignalType, setSelectedSignalType] = useState<SignalType | "">("");
+  const [selectedDateRange, setSelectedDateRange] = useState<"7d" | "30d" | "90d" | "all">("90d");
 
-  // Stats state
   const [stats, setStats] = useState<IntelStats | null>(null);
-
-  // Expanded signal document state
   const [expandedSignalId, setExpandedSignalId] = useState<string | null>(null);
   const [expandedDoc, setExpandedDoc] = useState<SignalDocument | null>(null);
   const [expandedLoading, setExpandedLoading] = useState(false);
 
-  const handleToggleExpand = useCallback(
-    async (signalId: string) => {
-      if (expandedSignalId === signalId) {
-        setExpandedSignalId(null);
-        setExpandedDoc(null);
-        return;
-      }
-      setExpandedSignalId(signalId);
-      setExpandedDoc(null);
-      setExpandedLoading(true);
-      try {
-        const doc = await getSignalDocument(signalId);
-        setExpandedDoc(doc);
-      } catch (err) {
-        console.error("Failed to load document:", err);
-      } finally {
-        setExpandedLoading(false);
-      }
-    },
-    [expandedSignalId]
-  );
+  // Mobile panel toggle: "chat" or "feed"
+  const [mobilePanel, setMobilePanel] = useState<"chat" | "feed">("chat");
 
-  // Auto-scroll chat to bottom
+  const handleToggleExpand = useCallback(async (signalId: string) => {
+    if (expandedSignalId === signalId) { setExpandedSignalId(null); setExpandedDoc(null); return; }
+    setExpandedSignalId(signalId); setExpandedDoc(null); setExpandedLoading(true);
+    try { setExpandedDoc(await getSignalDocument(signalId)); }
+    catch (err) { console.error("Failed to load document:", err); }
+    finally { setExpandedLoading(false); }
+  }, [expandedSignalId]);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatMessages]);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
-  // Load initial data
-  useEffect(() => {
-    const loadInitialData = async () => {
+    (async () => {
       try {
-        const [statsData, neighborhoodsData] = await Promise.all([
-          getIntelStats(),
-          getNeighborhoods(),
-        ]);
-        setStats(statsData);
-        setNeighborhoods(neighborhoodsData);
-
-        // Load initial signals
-        const feedData = await getSignalFeed({
-          limit: 20,
-          date_range: "90d",
-        });
-        setSignals(feedData.signals);
-        setSignalsHasMore(feedData.has_more);
-      } catch (err) {
-        console.error("Failed to load initial data:", err);
-      }
-    };
-
-    loadInitialData();
+        const [statsData, neighborhoodsData] = await Promise.all([getIntelStats(), getNeighborhoods()]);
+        setStats(statsData); setNeighborhoods(neighborhoodsData);
+        const feedData = await getSignalFeed({ limit: 20, date_range: "90d" });
+        setSignals(feedData.signals); setSignalsHasMore(feedData.has_more);
+      } catch (err) { console.error("Failed to load initial data:", err); }
+    })();
   }, []);
 
-  // Load signals when filters change
   useEffect(() => {
-    const loadSignals = async () => {
+    (async () => {
       setSignalsLoading(true);
       try {
         const feedData = await getSignalFeed({
           neighborhood: selectedNeighborhood || undefined,
           signal_type: selectedSignalType || undefined,
-          date_range: selectedDateRange,
-          limit: 20,
-          offset: 0,
+          date_range: selectedDateRange, limit: 20, offset: 0,
         });
-        setSignals(feedData.signals);
-        setSignalsHasMore(feedData.has_more);
-        setSignalOffset(0);
-      } catch (err) {
-        console.error("Failed to load signals:", err);
-      } finally {
-        setSignalsLoading(false);
-      }
-    };
-
-    loadSignals();
+        setSignals(feedData.signals); setSignalsHasMore(feedData.has_more); setSignalOffset(0);
+      } catch (err) { console.error("Failed to load signals:", err); }
+      finally { setSignalsLoading(false); }
+    })();
   }, [selectedNeighborhood, selectedSignalType, selectedDateRange]);
 
-  // Load more signals
   const handleLoadMoreSignals = async () => {
     const nextOffset = signalOffset + 20;
     setSignalsLoading(true);
@@ -185,63 +108,31 @@ export default function IntelPage() {
       const feedData = await getSignalFeed({
         neighborhood: selectedNeighborhood || undefined,
         signal_type: selectedSignalType || undefined,
-        date_range: selectedDateRange,
-        limit: 20,
-        offset: nextOffset,
+        date_range: selectedDateRange, limit: 20, offset: nextOffset,
       });
       setSignals((prev) => [...prev, ...feedData.signals]);
-      setSignalsHasMore(feedData.has_more);
-      setSignalOffset(nextOffset);
-    } catch (err) {
-      console.error("Failed to load more signals:", err);
-    } finally {
-      setSignalsLoading(false);
-    }
+      setSignalsHasMore(feedData.has_more); setSignalOffset(nextOffset);
+    } catch (err) { console.error("Failed to load more signals:", err); }
+    finally { setSignalsLoading(false); }
   };
 
-  // Handle chat submission
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
-
-    const userMessage: ChatMessageWithId = {
-      id: `msg-${Date.now()}`,
-      role: "user",
-      content: inputValue,
-    };
-
-    setChatMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setChatLoading(true);
-
+    const userMessage: ChatMessageWithId = { id: `msg-${Date.now()}`, role: "user", content: inputValue };
+    setChatMessages((prev) => [...prev, userMessage]); setInputValue(""); setChatLoading(true);
     try {
-      const response = await chatWithIntel(inputValue, {
-        session_id: sessionId || undefined,
-        include_signals: true,
-      });
-
+      const response = await chatWithIntel(inputValue, { session_id: sessionId || undefined, include_signals: true });
       if (!sessionId) setSessionId(response.session_id);
-
-      const assistantMessage: ChatMessageWithId = {
-        id: `msg-${Date.now()}-assistant`,
-        role: "assistant",
-        content: response.answer,
-        citations: response.citations,
-        related_signals: response.related_signals.map((s) => s.id),
-      };
-
-      setChatMessages((prev) => [...prev, assistantMessage]);
-    } catch (err) {
-      console.error("Chat failed:", err);
-      const errorMessage: ChatMessageWithId = {
-        id: `msg-${Date.now()}-error`,
-        role: "assistant",
-        content:
-          "Sorry, I encountered an error processing your question. Please try again.",
-      };
-      setChatMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setChatLoading(false);
-    }
+      setChatMessages((prev) => [...prev, {
+        id: `msg-${Date.now()}-assistant`, role: "assistant", content: response.answer,
+        citations: response.citations, related_signals: response.related_signals.map((s) => s.id),
+      }]);
+    } catch {
+      setChatMessages((prev) => [...prev, {
+        id: `msg-${Date.now()}-error`, role: "assistant",
+        content: "Sorry, I encountered an error processing your question. Please try again.",
+      }]);
+    } finally { setChatLoading(false); }
   };
 
   const starterQueries = [
@@ -251,112 +142,58 @@ export default function IntelPage() {
     "Any community opposition to new developments?",
   ];
 
+  const selectClasses = "w-full px-2.5 py-2 bg-slate-800 border border-gray-700 rounded text-gray-300 text-xs";
+
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100%",
-        background: "#0a0a0a",
-        fontFamily: "system-ui, sans-serif",
-        color: "#f3f4f6",
-      }}
-    >
-      {/* Left Column: Chat Panel */}
-      <div
-        style={{
-          flex: "0 0 60%",
-          display: "flex",
-          flexDirection: "column",
-          borderRight: "1px solid #1f2937",
-          background: "#111827",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: "1px solid #1f2937",
-            background: "#0f172a",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
+    <div className="flex flex-col md:flex-row h-full bg-[#0a0a0a] text-gray-100">
+      {/* Mobile panel tabs */}
+      <div className="md:hidden flex border-b border-gray-800">
+        <button
+          onClick={() => setMobilePanel("chat")}
+          className={cn("flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors",
+            mobilePanel === "chat" ? "text-blue-400 border-b-2 border-blue-400 bg-gray-900" : "text-gray-500"
+          )}
         >
-          <span style={{ fontSize: "20px" }}>🧠</span>
+          <Brain className="w-4 h-4" /> Ask
+        </button>
+        <button
+          onClick={() => setMobilePanel("feed")}
+          className={cn("flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors",
+            mobilePanel === "feed" ? "text-blue-400 border-b-2 border-blue-400 bg-gray-900" : "text-gray-500"
+          )}
+        >
+          <Radio className="w-4 h-4" /> Feed
+        </button>
+      </div>
+
+      {/* Left: Chat Panel */}
+      <div className={cn(
+        "flex-1 md:flex-[0_0_60%] flex flex-col border-r border-gray-800 bg-gray-900",
+        mobilePanel !== "chat" && "hidden md:flex"
+      )}>
+        {/* Chat header */}
+        <div className="px-5 py-4 border-b border-gray-800 bg-slate-950 flex items-center gap-2">
+          <Brain className="w-5 h-5 text-blue-400" />
           <div>
-            <div style={{ fontSize: "14px", fontWeight: "600" }}>
-              Ask VanCity Lens
-            </div>
-            <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
-              Intelligence for real estate development
-            </div>
+            <div className="text-sm font-semibold">Ask VanCity Lens</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">Intelligence for real estate development</div>
           </div>
         </div>
 
-        {/* Messages List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
           {chatMessages.length === 0 ? (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "20px",
-              }}
-            >
-              <div style={{ fontSize: "28px" }}>💡</div>
-              <div style={{ fontSize: "13px", color: "#6b7280", textAlign: "center" }}>
+            <div className="flex-1 flex flex-col items-center justify-center gap-5">
+              <div className="text-3xl">💡</div>
+              <div className="text-[13px] text-gray-500 text-center">
                 Ask about rezoning decisions, permits, community feedback, and more
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "8px",
-                  width: "100%",
-                  maxWidth: "400px",
-                }}
-              >
+              <div className="flex flex-col gap-2 w-full max-w-[400px]">
                 {starterQueries.map((query, idx) => (
                   <button
                     key={idx}
-                    onClick={() => {
-                      setInputValue(query);
-                    }}
-                    style={{
-                      padding: "10px 12px",
-                      background: "#1e293b",
-                      border: "1px solid #374151",
-                      color: "#d1d5db",
-                      borderRadius: "6px",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background =
-                        "#374151";
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        "#4b5563";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.background =
-                        "#1e293b";
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        "#374151";
-                    }}
+                    onClick={() => setInputValue(query)}
+                    className="px-3 py-2.5 bg-slate-800 border border-gray-700 text-gray-300 rounded-md text-xs text-left cursor-pointer transition-colors hover:bg-gray-700 hover:border-gray-600"
                   >
                     {query}
                   </button>
@@ -366,99 +203,37 @@ export default function IntelPage() {
           ) : (
             <>
               {chatMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      msg.role === "user" ? "flex-end" : "flex-start",
-                  }}
-                >
-                  <div
-                    style={{
-                      maxWidth: "85%",
-                      padding: "12px 14px",
-                      borderRadius: "8px",
-                      background:
-                        msg.role === "user" ? "#3b82f6" : "#1e293b",
-                      color: msg.role === "user" ? "#ffffff" : "#d1d5db",
-                      fontSize: "13px",
-                      lineHeight: "1.5",
-                      wordWrap: "break-word",
-                    }}
-                  >
+                <div key={msg.id} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                  <div className={cn(
+                    "max-w-[85%] px-3.5 py-3 rounded-lg text-[13px] leading-relaxed break-words",
+                    msg.role === "user" ? "bg-blue-500 text-white" : "bg-slate-800 text-gray-300"
+                  )}>
                     <div>{msg.content}</div>
                     {msg.citations && msg.citations.length > 0 && (
-                      <div
-                        style={{
-                          marginTop: "8px",
-                          paddingTop: "8px",
-                          borderTop:
-                            msg.role === "user"
-                              ? "1px solid rgba(255,255,255,0.2)"
-                              : "1px solid #374151",
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: "6px",
-                        }}
-                      >
-                        {msg.citations.map((citation, idx) => {
-                          const citationHref = citation.document_id
-                            ? `${API_BASE}/api/v1/intel/documents/${citation.document_id}/page`
-                            : citation.document_url;
-                          return (
-                            <a
-                              key={idx}
-                              href={citationHref}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                display: "inline-block",
-                                padding: "4px 8px",
-                                background:
-                                  msg.role === "user"
-                                    ? "rgba(255,255,255,0.15)"
-                                    : "#374151",
-                                borderRadius: "4px",
-                                fontSize: "11px",
-                                color:
-                                  msg.role === "user"
-                                    ? "#f3f4f6"
-                                    : "#60a5fa",
-                                textDecoration: "none",
-                                whiteSpace: "nowrap",
-                              }}
-                              title={`${citation.document_title}${citation.published_date ? ` (${citation.published_date})` : ""}`}
-                            >
-                              {citation.document_title.slice(0, 25)}…
-                            </a>
-                          );
-                        })}
+                      <div className={cn("mt-2 pt-2 flex flex-wrap gap-1.5",
+                        msg.role === "user" ? "border-t border-white/20" : "border-t border-gray-700"
+                      )}>
+                        {msg.citations.map((citation, idx) => (
+                          <a
+                            key={idx}
+                            href={citation.document_id ? `${API_BASE}/api/v1/intel/documents/${citation.document_id}/page` : citation.document_url}
+                            target="_blank" rel="noopener noreferrer"
+                            className={cn("inline-block px-2 py-1 rounded text-[11px] no-underline whitespace-nowrap",
+                              msg.role === "user" ? "bg-white/15 text-gray-100" : "bg-gray-700 text-blue-400"
+                            )}
+                            title={`${citation.document_title}${citation.published_date ? ` (${citation.published_date})` : ""}`}
+                          >
+                            {citation.document_title.slice(0, 25)}…
+                          </a>
+                        ))}
                       </div>
                     )}
                   </div>
                 </div>
               ))}
               {chatLoading && (
-                <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                  <div
-                    style={{
-                      padding: "12px 14px",
-                      borderRadius: "8px",
-                      background: "#1e293b",
-                      color: "#6b7280",
-                      fontSize: "13px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "inline-block",
-                        animation: "pulse 1.5s infinite",
-                      }}
-                    >
-                      ●●●
-                    </span>
-                  </div>
+                <div className="flex justify-start">
+                  <div className="px-3.5 py-3 rounded-lg bg-slate-800 text-gray-500 text-[13px] animate-pulse">●●●</div>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -466,181 +241,54 @@ export default function IntelPage() {
           )}
         </div>
 
-        {/* Input Area */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderTop: "1px solid #1f2937",
-            background: "#0f172a",
-            display: "flex",
-            gap: "8px",
-          }}
-        >
+        {/* Input */}
+        <div className="px-5 py-4 border-t border-gray-800 bg-slate-950 flex gap-2">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
             placeholder="Ask about developments, permits, zoning..."
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              background: "#1e293b",
-              border: "1px solid #374151",
-              borderRadius: "6px",
-              color: "#f3f4f6",
-              fontSize: "13px",
-              fontFamily: "inherit",
-            }}
+            className="flex-1 px-3 py-2.5 bg-slate-800 border border-gray-700 rounded-md text-gray-100 text-[13px] font-[inherit] focus:outline-none focus:border-blue-500"
           />
           <button
             onClick={handleSendMessage}
             disabled={chatLoading || !inputValue.trim()}
-            style={{
-              padding: "10px 16px",
-              background: chatLoading ? "#4b5563" : "#3b82f6",
-              border: "none",
-              borderRadius: "6px",
-              color: "#ffffff",
-              fontSize: "13px",
-              fontWeight: "600",
-              cursor: chatLoading ? "not-allowed" : "pointer",
-              transition: "background 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              if (!chatLoading) {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "#2563eb";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!chatLoading) {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "#3b82f6";
-              }
-            }}
+            className={cn(
+              "px-4 py-2.5 rounded-md text-white text-[13px] font-semibold transition-colors",
+              chatLoading ? "bg-gray-600 cursor-not-allowed" : "bg-blue-500 cursor-pointer hover:bg-blue-600"
+            )}
           >
-            →
+            <Send className="w-4 h-4" />
           </button>
         </div>
-
-        <style>{`
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-          }
-        `}</style>
       </div>
 
-      {/* Right Column: Signal Feed */}
-      <div
-        style={{
-          flex: "0 0 40%",
-          display: "flex",
-          flexDirection: "column",
-          background: "#0a0a0a",
-          borderLeft: "1px solid #1f2937",
-        }}
-      >
-        {/* Header with Stats */}
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #1f2937" }}>
-          <div
-            style={{
-              display: "flex",
-              gap: "16px",
-              marginBottom: "14px",
-              fontSize: "12px",
-              color: "#9ca3af",
-            }}
-          >
+      {/* Right: Signal Feed */}
+      <div className={cn(
+        "flex-1 md:flex-[0_0_40%] flex flex-col bg-[#0a0a0a] border-l border-gray-800",
+        mobilePanel !== "feed" && "hidden md:flex"
+      )}>
+        {/* Header + filters */}
+        <div className="px-5 py-4 border-b border-gray-800">
+          <div className="flex gap-4 mb-3.5 text-xs text-gray-400">
             {stats && (
               <>
-                <div>
-                  <span style={{ fontWeight: "600", color: "#f3f4f6" }}>
-                    {stats.total_signals}
-                  </span>{" "}
-                  signals
-                </div>
-                <div>
-                  <span style={{ fontWeight: "600", color: "#f3f4f6" }}>
-                    {Object.keys(stats.by_neighborhood).length}
-                  </span>{" "}
-                  neighborhoods
-                </div>
-                <div>
-                  Last updated: <span style={{ color: "#6b7280" }}>2h ago</span>
-                </div>
+                <div><span className="font-semibold text-gray-100">{stats.total_signals}</span> signals</div>
+                <div><span className="font-semibold text-gray-100">{Object.keys(stats.by_neighborhood).length}</span> neighborhoods</div>
               </>
             )}
           </div>
-
-          {/* Filters */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-            }}
-          >
-            <select
-              value={selectedNeighborhood}
-              onChange={(e) => setSelectedNeighborhood(e.target.value)}
-              style={{
-                padding: "8px 10px",
-                background: "#1e293b",
-                border: "1px solid #374151",
-                borderRadius: "4px",
-                color: "#d1d5db",
-                fontSize: "12px",
-              }}
-            >
+          <div className="flex flex-col gap-2">
+            <select value={selectedNeighborhood} onChange={(e) => setSelectedNeighborhood(e.target.value)} className={selectClasses}>
               <option value="">All neighborhoods</option>
-              {neighborhoods.map((neighborhood) => (
-                <option key={neighborhood} value={neighborhood}>
-                  {neighborhood}
-                </option>
-              ))}
+              {neighborhoods.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
-
-            <select
-              value={selectedSignalType}
-              onChange={(e) => setSelectedSignalType(e.target.value as SignalType | "")}
-              style={{
-                padding: "8px 10px",
-                background: "#1e293b",
-                border: "1px solid #374151",
-                borderRadius: "4px",
-                color: "#d1d5db",
-                fontSize: "12px",
-              }}
-            >
+            <select value={selectedSignalType} onChange={(e) => setSelectedSignalType(e.target.value as SignalType | "")} className={selectClasses}>
               <option value="">All signal types</option>
-              {Object.entries(SIGNAL_TYPE_LABELS).map(([type, label]) => (
-                <option key={type} value={type}>
-                  {label}
-                </option>
-              ))}
+              {Object.entries(SIGNAL_TYPE_LABELS).map(([t, l]) => <option key={t} value={t}>{l}</option>)}
             </select>
-
-            <select
-              value={selectedDateRange}
-              onChange={(e) =>
-                setSelectedDateRange(e.target.value as "7d" | "30d" | "90d" | "all")
-              }
-              style={{
-                padding: "8px 10px",
-                background: "#1e293b",
-                border: "1px solid #374151",
-                borderRadius: "4px",
-                color: "#d1d5db",
-                fontSize: "12px",
-              }}
-            >
+            <select value={selectedDateRange} onChange={(e) => setSelectedDateRange(e.target.value as any)} className={selectClasses}>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
               <option value="90d">Last 90 days</option>
@@ -654,387 +302,126 @@ export default function IntelPage() {
           }} label="Export CSV" />
         </div>
 
-        {/* Signals List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
+        {/* Signal cards */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
           {signals.length === 0 ? (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#6b7280",
-                fontSize: "13px",
-              }}
-            >
-              No signals found
-            </div>
+            <div className="flex-1 flex items-center justify-center text-gray-500 text-[13px]">No signals found</div>
           ) : (
             <>
               {signals.map((signal) => (
                 <div
                   key={signal.id}
-                  style={{
-                    padding: "12px",
-                    background:
-                      expandedSignalId === signal.id
-                        ? "#1a2744"
-                        : "#1e293b",
-                    borderRadius: "6px",
-                    border:
-                      expandedSignalId === signal.id
-                        ? "1px solid #3b82f6"
-                        : "1px solid #374151",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
                   onClick={() => handleToggleExpand(signal.id)}
+                  className={cn(
+                    "p-3 rounded-md text-xs cursor-pointer transition-all",
+                    expandedSignalId === signal.id
+                      ? "bg-[#1a2744] border border-blue-500"
+                      : "bg-slate-800 border border-gray-700 hover:border-gray-600"
+                  )}
                 >
-                  {/* Top row: Severity + Type */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    <span style={{ fontSize: "16px" }}>
-                      {SEVERITY_DOT[signal.severity]}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        fontWeight: "600",
-                        color: "#9ca3af",
-                        background: "#374151",
-                        padding: "2px 6px",
-                        borderRadius: "3px",
-                      }}
-                    >
-                      {SIGNAL_TYPE_LABELS[signal.signal_type]}
-                    </span>
+                  {/* Severity + type */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-base">{SEVERITY_DOT[signal.severity]}</span>
+                    <span className="text-[10px] font-semibold text-gray-400 bg-gray-700 px-1.5 py-0.5 rounded">{SIGNAL_TYPE_LABELS[signal.signal_type]}</span>
                     {signal.decision && (
-                      <span
-                        style={{
-                          fontSize: "10px",
-                          fontWeight: "600",
-                          color:
-                            signal.decision.toUpperCase() === "APPROVED"
-                              ? "#f3f4f6"
-                              : "#f87171",
-                          background:
-                            signal.decision.toUpperCase() === "APPROVED"
-                              ? "#10b981"
-                              : "#dc2626",
-                          padding: "2px 6px",
-                          borderRadius: "3px",
-                        }}
-                      >
+                      <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                        signal.decision.toUpperCase() === "APPROVED" ? "bg-emerald-500 text-gray-100" : "bg-red-600 text-red-100"
+                      )}>
                         {signal.decision.toUpperCase()}
                       </span>
                     )}
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        fontSize: "10px",
-                        color: "#6b7280",
-                      }}
-                    >
-                      {expandedSignalId === signal.id ? "▲" : "▼"}
-                    </span>
+                    <span className="ml-auto text-[10px] text-gray-500">{expandedSignalId === signal.id ? "▲" : "▼"}</span>
                   </div>
 
                   {/* Headline */}
-                  <div
-                    style={{
-                      fontWeight: "600",
-                      color: "#f3f4f6",
-                      marginBottom: "4px",
-                      lineHeight: "1.4",
-                    }}
-                  >
-                    {signal.headline}
-                  </div>
+                  <div className="font-semibold text-gray-100 mb-1 leading-snug">{signal.headline}</div>
 
                   {/* Summary */}
-                  <div
-                    style={{
-                      color: "#9ca3af",
-                      fontSize: "11px",
-                      marginBottom: "6px",
-                      lineHeight: "1.4",
-                      ...(expandedSignalId === signal.id
-                        ? {}
-                        : {
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical" as const,
-                            overflow: "hidden",
-                          }),
-                    }}
-                  >
+                  <div className={cn("text-gray-400 text-[11px] mb-1.5 leading-snug",
+                    expandedSignalId !== signal.id && "line-clamp-2"
+                  )}>
                     {signal.summary}
                   </div>
 
                   {/* Addresses */}
-                  {signal.addresses && signal.addresses.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: "4px",
-                        marginBottom: "6px",
-                      }}
-                    >
+                  {signal.addresses?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
                       {signal.addresses.slice(0, 2).map((addr, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            fontSize: "10px",
-                            background: "#374151",
-                            color: "#d1d5db",
-                            padding: "2px 6px",
-                            borderRadius: "3px",
-                          }}
-                        >
-                          📍 {addr}
-                        </span>
+                        <span key={idx} className="text-[10px] bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">📍 {addr}</span>
                       ))}
-                      {signal.addresses.length > 2 && (
-                        <span
-                          style={{
-                            fontSize: "10px",
-                            color: "#6b7280",
-                            padding: "2px 6px",
-                          }}
-                        >
-                          +{signal.addresses.length - 2} more
-                        </span>
-                      )}
+                      {signal.addresses.length > 2 && <span className="text-[10px] text-gray-500 px-1.5">+{signal.addresses.length - 2} more</span>}
                     </div>
                   )}
 
-                  {/* Date + Source */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: "10px",
-                      color: "#6b7280",
-                      paddingTop: "6px",
-                      borderTop: "1px solid #374151",
-                    }}
-                  >
+                  {/* Date + source */}
+                  <div className="flex justify-between items-center text-[10px] text-gray-500 pt-1.5 border-t border-gray-700">
                     <span>{formatDate(signal.event_date)}</span>
                     <a
                       href={`${API_BASE}/api/v1/intel/documents/${signal.document_id}/page`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target="_blank" rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      style={{
-                        color: "#60a5fa",
-                        cursor: "pointer",
-                        textDecoration: "none",
-                      }}
+                      className="text-blue-400 no-underline hover:underline"
                     >
                       {signal.source_title} ↗
                     </a>
                   </div>
 
-                  {/* Expanded Document View */}
+                  {/* Expanded doc */}
                   {expandedSignalId === signal.id && (
-                    <div
-                      style={{
-                        marginTop: "10px",
-                        paddingTop: "10px",
-                        borderTop: "1px solid #374151",
-                      }}
-                    >
+                    <div className="mt-2.5 pt-2.5 border-t border-gray-700">
                       {expandedLoading ? (
-                        <div
-                          style={{
-                            color: "#6b7280",
-                            fontSize: "11px",
-                            padding: "8px 0",
-                          }}
-                        >
-                          Loading document...
-                        </div>
+                        <div className="text-gray-500 text-[11px] py-2">Loading document...</div>
                       ) : expandedDoc ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {/* Document header */}
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              fontSize: "11px",
-                              fontWeight: "600",
-                              color: "#93c5fd",
-                            }}
-                          >
-                            <span>📄</span>
-                            <span>Source Document</span>
-                          </div>
-
-                          {/* Document title */}
-                          <div style={{ fontSize: "11px", color: "#e5e7eb", fontWeight: "500" }}>
-                            {expandedDoc.document.title}
-                          </div>
-
-                          {/* Document metadata row */}
-                          <div
-                            style={{
-                              display: "flex",
-                              flexWrap: "wrap",
-                              gap: "12px",
-                              fontSize: "10px",
-                              color: "#6b7280",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span>
-                              Type: {expandedDoc.document.source_type.replace(/_/g, " ")}
-                            </span>
-                            {expandedDoc.document.published_date && (
-                              <span>Published: {expandedDoc.document.published_date}</span>
-                            )}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-300">📄 Source Document</div>
+                          <div className="text-[11px] text-gray-200 font-medium">{expandedDoc.document.title}</div>
+                          <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 items-center">
+                            <span>Type: {expandedDoc.document.source_type.replace(/_/g, " ")}</span>
+                            {expandedDoc.document.published_date && <span>Published: {expandedDoc.document.published_date}</span>}
                             <a
                               href={`${API_BASE}/api/v1/intel/documents/${expandedDoc.document.id}/page`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#60a5fa", textDecoration: "none" }}
+                              target="_blank" rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
+                              className="text-blue-400 no-underline"
                             >
                               View full document {expandedDoc.document.url_status === "dead" ? "(cached)" : ""}
                             </a>
                           </div>
-
-                          {/* Extracted details */}
                           {(expandedDoc.signal.zoning_from || expandedDoc.signal.zoning_to || expandedDoc.signal.unit_count) && (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexWrap: "wrap",
-                                gap: "6px",
-                                fontSize: "10px",
-                              }}
-                            >
+                            <div className="flex flex-wrap gap-1.5 text-[10px]">
                               {expandedDoc.signal.zoning_from && expandedDoc.signal.zoning_to && (
-                                <span
-                                  style={{
-                                    background: "#374151",
-                                    color: "#d1d5db",
-                                    padding: "2px 6px",
-                                    borderRadius: "3px",
-                                  }}
-                                >
-                                  Zoning: {expandedDoc.signal.zoning_from} → {expandedDoc.signal.zoning_to}
-                                </span>
+                                <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">Zoning: {expandedDoc.signal.zoning_from} → {expandedDoc.signal.zoning_to}</span>
                               )}
                               {expandedDoc.signal.unit_count && (
-                                <span
-                                  style={{
-                                    background: "#374151",
-                                    color: "#d1d5db",
-                                    padding: "2px 6px",
-                                    borderRadius: "3px",
-                                  }}
-                                >
-                                  {expandedDoc.signal.unit_count} units
-                                </span>
+                                <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">{expandedDoc.signal.unit_count} units</span>
                               )}
                               {expandedDoc.signal.vote_for != null && expandedDoc.signal.vote_against != null && (
-                                <span
-                                  style={{
-                                    background: "#374151",
-                                    color: "#d1d5db",
-                                    padding: "2px 6px",
-                                    borderRadius: "3px",
-                                  }}
-                                >
-                                  Vote: {expandedDoc.signal.vote_for}-{expandedDoc.signal.vote_against}
-                                </span>
+                                <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">Vote: {expandedDoc.signal.vote_for}-{expandedDoc.signal.vote_against}</span>
                               )}
                             </div>
                           )}
-
-                          {/* Document raw text */}
                           {expandedDoc.document.raw_text && (
-                            <div
-                              style={{
-                                background: "#0f172a",
-                                border: "1px solid #374151",
-                                borderRadius: "4px",
-                                padding: "8px",
-                                fontSize: "11px",
-                                color: "#9ca3af",
-                                lineHeight: "1.5",
-                                maxHeight: "200px",
-                                overflowY: "auto",
-                                whiteSpace: "pre-wrap",
-                              }}
-                            >
+                            <div className="bg-slate-950 border border-gray-700 rounded p-2 text-[11px] text-gray-400 leading-relaxed max-h-[200px] overflow-y-auto whitespace-pre-wrap">
                               {expandedDoc.document.raw_text}
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div
-                          style={{
-                            color: "#6b7280",
-                            fontSize: "11px",
-                            padding: "8px 0",
-                          }}
-                        >
-                          Document not available
-                        </div>
+                        <div className="text-gray-500 text-[11px] py-2">Document not available</div>
                       )}
                     </div>
                   )}
                 </div>
               ))}
 
-              {/* Load More Button */}
               {signalsHasMore && (
                 <button
                   onClick={handleLoadMoreSignals}
                   disabled={signalsLoading}
-                  style={{
-                    padding: "10px",
-                    background: "#1e293b",
-                    border: "1px solid #374151",
-                    borderRadius: "6px",
-                    color: "#60a5fa",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    cursor: signalsLoading ? "not-allowed" : "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!signalsLoading) {
-                      (e.currentTarget as HTMLButtonElement).style.background =
-                        "#374151";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!signalsLoading) {
-                      (e.currentTarget as HTMLButtonElement).style.background =
-                        "#1e293b";
-                    }
-                  }}
+                  className={cn(
+                    "py-2.5 bg-slate-800 border border-gray-700 rounded-md text-blue-400 text-xs font-semibold transition-colors",
+                    signalsLoading ? "cursor-not-allowed" : "cursor-pointer hover:bg-gray-700"
+                  )}
                 >
                   {signalsLoading ? "Loading..." : "Load more signals"}
                 </button>

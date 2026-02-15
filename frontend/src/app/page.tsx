@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Map, Brain, Building2, Sun, Moon, Monitor } from "lucide-react";
 import MapView from "@/components/MapView";
 import IntelPage from "@/components/IntelPage";
 import NeighborhoodPage from "@/components/NeighborhoodPage";
 import ThemeToggle from "@/components/ThemeToggle";
 import AlertsFeed from "@/components/AlertsFeed";
+import BottomTabBar, { type Tab } from "@/components/BottomTabBar";
 import Disclaimer from "@/components/Disclaimer";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-
-type Tab = "map" | "intel" | "hoods";
+import { cn } from "@/lib/utils";
 
 const VALID_TABS: Tab[] = ["map", "intel", "hoods"];
 
@@ -18,6 +19,12 @@ function getTabFromHash(): Tab {
   const hash = window.location.hash.replace("#", "");
   return VALID_TABS.includes(hash as Tab) ? (hash as Tab) : "map";
 }
+
+const desktopTabs = [
+  { id: "map" as Tab, label: "Map", icon: Map },
+  { id: "intel" as Tab, label: "Intelligence", icon: Brain },
+  { id: "hoods" as Tab, label: "Neighborhoods", icon: Building2 },
+];
 
 function AppContent() {
   const { token } = useAuth();
@@ -34,135 +41,83 @@ function AppContent() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-  const tabStyle = (tab: string) => ({
-    padding: "14px 20px",
-    background: activeTab === tab ? "#1e293b" : "transparent",
-    border: "none",
-    borderBottom:
-      activeTab === tab ? "2px solid #3b82f6" : "2px solid transparent",
-    color: activeTab === tab ? "#f3f4f6" : "#9ca3af",
-    fontSize: "13px",
-    fontWeight: "600" as const,
-    cursor: "pointer" as const,
-    fontFamily: "system-ui, sans-serif",
-    transition: "all 0.2s",
-  });
-
-  const handleHover = (tab: string, entering: boolean) => (
-    e: React.MouseEvent<HTMLButtonElement>
-  ) => {
-    if (activeTab !== tab) {
-      e.currentTarget.style.color = entering ? "#d1d5db" : "#9ca3af";
-    }
-  };
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "map", label: "Map" },
-    { key: "intel", label: "Intelligence" },
-    { key: "hoods", label: "Neighborhoods" },
-  ];
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* Navigation Bar */}
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          background: "rgba(15, 23, 42, 0.95)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-          backdropFilter: "blur(8px)",
-          zIndex: 50,
-          padding: "0 16px",
-        }}
-      >
+    <div className="flex flex-col h-dvh">
+      {/* Desktop top nav — hidden on mobile */}
+      <nav className="hidden md:flex items-center bg-gray-900/95 backdrop-blur-md border-b border-white/10 z-50 px-4">
         {/* Logo */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            marginRight: "auto",
-            paddingRight: "32px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "20px",
-              fontWeight: "700",
-              color: "#f3f4f6",
-              fontFamily: "system-ui, sans-serif",
-            }}
-          >
+        <div className="flex items-center gap-2 mr-auto pr-8">
+          <span className="text-xl font-bold text-gray-100 font-sans">
             VanCity Lens
-          </div>
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#6b7280",
-              fontFamily: "system-ui, sans-serif",
-            }}
-          >
-            V2
-          </div>
+          </span>
+          <span className="text-[11px] text-gray-500">V2</span>
         </div>
 
-        {/* Tab Navigation */}
-        <div style={{ display: "flex", gap: "0" }}>
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => handleSetTab(t.key)}
-              style={tabStyle(t.key)}
-              onMouseEnter={handleHover(t.key, true)}
-              onMouseLeave={handleHover(t.key, false)}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Desktop tabs */}
+        <div className="flex">
+          {desktopTabs.map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => handleSetTab(t.id)}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-3.5 text-[13px] font-semibold border-b-2 transition-colors",
+                  isActive
+                    ? "bg-gray-800 border-blue-500 text-gray-100"
+                    : "border-transparent text-gray-400 hover:text-gray-200"
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Right side: Theme Toggle */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px", paddingRight: "16px" }}>
+        {/* Right side */}
+        <div className="ml-auto flex items-center gap-3 pr-4">
           <AlertsFeed token={token} />
           <ThemeToggle />
         </div>
       </nav>
 
-      {/* Content Area */}
-      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+      {/* Content area */}
+      <main className="relative flex-1 overflow-hidden">
+        {/* Map — always rendered, shown/hidden to preserve GL state */}
         <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            display: activeTab === "map" ? "block" : "none",
-          }}
+          className={cn(
+            "absolute inset-0",
+            activeTab === "map" ? "block" : "hidden"
+          )}
         >
           <MapView />
         </div>
 
         <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            display: activeTab === "intel" ? "block" : "none",
-          }}
+          className={cn(
+            "absolute inset-0",
+            activeTab === "intel" ? "block" : "hidden"
+          )}
         >
           <IntelPage />
         </div>
 
         <div
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            display: activeTab === "hoods" ? "block" : "none",
-          }}
+          className={cn(
+            "absolute inset-0",
+            activeTab === "hoods" ? "block" : "hidden"
+          )}
         >
           <NeighborhoodPage />
         </div>
+      </main>
 
-      </div>
+      {/* Mobile bottom tab bar */}
+      <BottomTabBar activeTab={activeTab} onTabChange={handleSetTab} />
 
+      {/* Disclaimer banner */}
       <Disclaimer />
     </div>
   );

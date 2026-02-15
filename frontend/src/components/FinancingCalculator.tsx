@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import {
   calculateFinancing,
   type FinancingRequest,
@@ -32,11 +33,20 @@ function pct(n: number): string {
   return `${(n * 100).toFixed(2)}%`;
 }
 
+const inputClasses =
+  "w-full px-2.5 py-2 bg-slate-800 border border-gray-700 rounded text-gray-100 text-[13px]";
+
+const labelClasses = "block text-[11px] text-gray-400 mb-1 font-semibold";
+
+const sectionHeadingClasses =
+  "text-xs font-bold text-gray-400 uppercase tracking-wide mb-2";
+
+const gridClasses = "grid grid-cols-2 gap-x-3 gap-y-1 text-xs";
+
 export default function FinancingCalculator({
   parcelData,
   onClose,
 }: FinancingCalculatorProps) {
-  // Form fields
   const [acquisitionCost, setAcquisitionCost] = useState(
     parcelData?.asking_price || parcelData?.acquisition_cost || 0
   );
@@ -52,13 +62,11 @@ export default function FinancingCalculator({
     parcelData?.buildable_sqft || 0
   );
 
-  // Results
   const [result, setResult] = useState<FinancingResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeScenario, setActiveScenario] = useState<string>("base");
 
-  // Pre-populate from parcelData
   useEffect(() => {
     if (parcelData) {
       if (parcelData.asking_price)
@@ -100,137 +108,65 @@ export default function FinancingCalculator({
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    background: "#1e293b",
-    border: "1px solid #374151",
-    borderRadius: "4px",
-    color: "#f3f4f6",
-    fontSize: "13px",
-    fontFamily: "system-ui, sans-serif",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: "block",
-    fontSize: "11px",
-    color: "#9ca3af",
-    marginBottom: "4px",
-    fontWeight: "600",
-  };
-
-  const sliderContainerStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  };
-
-  const renderScenario = (scenario: ScenarioResult) => (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: "4px 12px",
-        fontSize: "12px",
-      }}
-    >
-      <span style={{ color: "#9ca3af" }}>Gross Revenue</span>
-      <span style={{ color: "#d1d5db", textAlign: "right" }}>
-        {fmt(scenario.gross_revenue)}
-      </span>
-      <span style={{ color: "#9ca3af" }}>Total Project Cost</span>
-      <span style={{ color: "#d1d5db", textAlign: "right" }}>
-        {fmt(scenario.total_project_cost)}
-      </span>
-      <span style={{ color: "#9ca3af" }}>Net Profit</span>
-      <span
-        style={{
-          color: scenario.net_profit >= 0 ? "#4ade80" : "#f87171",
-          textAlign: "right",
-          fontWeight: "600",
-        }}
-      >
-        {scenario.net_profit >= 0 ? "+" : ""}
-        {fmt(scenario.net_profit)}
-      </span>
-      <span style={{ color: "#9ca3af" }}>ROI</span>
-      <span style={{ color: "#d1d5db", textAlign: "right" }}>
-        {pct(scenario.roi)}
-      </span>
-      <span style={{ color: "#9ca3af" }}>ROE</span>
-      <span style={{ color: "#d1d5db", textAlign: "right" }}>
-        {pct(scenario.roe)}
-      </span>
-      <div
-        style={{
-          gridColumn: "1 / -1",
-          marginTop: "6px",
-          padding: "6px",
-          borderRadius: "4px",
-          textAlign: "center",
-          fontSize: "11px",
-          fontWeight: "700",
-          background: scenario.is_viable
-            ? "rgba(34, 197, 94, 0.1)"
-            : "rgba(220, 38, 38, 0.1)",
-          color: scenario.is_viable ? "#4ade80" : "#f87171",
-          border: scenario.is_viable
-            ? "1px solid rgba(34, 197, 94, 0.2)"
-            : "1px solid rgba(220, 38, 38, 0.2)",
-        }}
-      >
-        {scenario.is_viable ? "VIABLE" : "NOT VIABLE"}
+  function renderScenario(scenario: ScenarioResult): React.ReactNode {
+    return (
+      <div className={gridClasses}>
+        <span className="text-gray-400">Gross Revenue</span>
+        <span className="text-gray-300 text-right">
+          {fmt(scenario.gross_revenue)}
+        </span>
+        <span className="text-gray-400">Total Project Cost</span>
+        <span className="text-gray-300 text-right">
+          {fmt(scenario.total_project_cost)}
+        </span>
+        <span className="text-gray-400">Net Profit</span>
+        <span
+          className={cn(
+            "text-right font-semibold",
+            scenario.net_profit >= 0 ? "text-green-400" : "text-red-400"
+          )}
+        >
+          {scenario.net_profit >= 0 ? "+" : ""}
+          {fmt(scenario.net_profit)}
+        </span>
+        <span className="text-gray-400">ROI</span>
+        <span className="text-gray-300 text-right">
+          {pct(scenario.roi)}
+        </span>
+        <span className="text-gray-400">ROE</span>
+        <span className="text-gray-300 text-right">
+          {pct(scenario.roe)}
+        </span>
+        <div
+          className={cn(
+            "col-span-2 mt-1.5 p-1.5 rounded text-center text-[11px] font-bold border",
+            scenario.is_viable
+              ? "bg-green-500/10 text-green-400 border-green-500/20"
+              : "bg-red-600/10 text-red-400 border-red-600/20"
+          )}
+        >
+          {scenario.is_viable ? "VIABLE" : "NOT VIABLE"}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.6)",
-        backdropFilter: "blur(4px)",
-      }}
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "600px",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          background: "#111827",
-          borderRadius: "12px",
-          border: "1px solid #1f2937",
-          fontFamily: "system-ui, sans-serif",
-          color: "#f3f4f6",
-        }}
-      >
+      <div className="w-full max-w-[600px] max-h-[90vh] overflow-y-auto bg-gray-900 rounded-xl border border-gray-800 text-gray-100">
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "16px 20px",
-            borderBottom: "1px solid #1f2937",
-            background: "#0f172a",
-            borderRadius: "12px 12px 0 0",
-          }}
-        >
+        <div className="flex justify-between items-center px-5 py-4 border-b border-gray-800 bg-slate-900 rounded-t-xl">
           <div>
-            <div style={{ fontSize: "15px", fontWeight: "700" }}>
+            <div className="text-[15px] font-bold">
               Deal Model Calculator
             </div>
             {parcelData && (
-              <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>
+              <div className="text-[11px] text-gray-500 mt-0.5">
                 PID: {parcelData.pid}
                 {parcelData.construction_type &&
                   ` | ${parcelData.construction_type.replace(/_/g, " ")}`}
@@ -239,151 +175,134 @@ export default function FinancingCalculator({
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#6b7280",
-              fontSize: "20px",
-              cursor: "pointer",
-              padding: "4px 8px",
-              lineHeight: "1",
-            }}
+            className="bg-none border-none text-gray-500 text-xl cursor-pointer px-2 py-1 leading-none hover:text-gray-300"
           >
             x
           </button>
         </div>
 
         {/* Form */}
-        <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div className="p-5 flex flex-col gap-4">
           {/* Acquisition Cost */}
           <div>
-            <label style={labelStyle}>Acquisition Cost ($)</label>
+            <label className={labelClasses}>Acquisition Cost ($)</label>
             <input
               type="number"
               value={acquisitionCost || ""}
               onChange={(e) => setAcquisitionCost(Number(e.target.value))}
               placeholder="e.g. 2500000"
-              style={inputStyle}
+              className={inputClasses}
             />
           </div>
 
           {/* Equity % Slider */}
           <div>
-            <label style={labelStyle}>
+            <label className={labelClasses}>
               Equity: {equityPct}%
             </label>
-            <div style={sliderContainerStyle}>
-              <span style={{ fontSize: "10px", color: "#6b7280" }}>0%</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] text-gray-500">0%</span>
               <input
                 type="range"
                 min={0}
                 max={100}
                 value={equityPct}
                 onChange={(e) => setEquityPct(Number(e.target.value))}
-                style={{ flex: 1, accentColor: "#3b82f6" }}
+                className="flex-1 accent-blue-500"
               />
-              <span style={{ fontSize: "10px", color: "#6b7280" }}>100%</span>
+              <span className="text-[10px] text-gray-500">100%</span>
             </div>
           </div>
 
           {/* Interest Rate Slider */}
           <div>
-            <label style={labelStyle}>
+            <label className={labelClasses}>
               Interest Rate: {interestRate.toFixed(1)}%
             </label>
-            <div style={sliderContainerStyle}>
-              <span style={{ fontSize: "10px", color: "#6b7280" }}>0%</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] text-gray-500">0%</span>
               <input
                 type="range"
                 min={0}
                 max={200}
                 value={interestRate * 10}
                 onChange={(e) => setInterestRate(Number(e.target.value) / 10)}
-                style={{ flex: 1, accentColor: "#3b82f6" }}
+                className="flex-1 accent-blue-500"
               />
-              <span style={{ fontSize: "10px", color: "#6b7280" }}>20%</span>
+              <span className="text-[10px] text-gray-500">20%</span>
             </div>
           </div>
 
           {/* Hold Period Slider */}
           <div>
-            <label style={labelStyle}>
+            <label className={labelClasses}>
               Hold Period: {holdPeriodMonths} months
             </label>
-            <div style={sliderContainerStyle}>
-              <span style={{ fontSize: "10px", color: "#6b7280" }}>6</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] text-gray-500">6</span>
               <input
                 type="range"
                 min={6}
                 max={60}
                 value={holdPeriodMonths}
                 onChange={(e) => setHoldPeriodMonths(Number(e.target.value))}
-                style={{ flex: 1, accentColor: "#3b82f6" }}
+                className="flex-1 accent-blue-500"
               />
-              <span style={{ fontSize: "10px", color: "#6b7280" }}>60</span>
+              <span className="text-[10px] text-gray-500">60</span>
             </div>
           </div>
 
           {/* Construction Cost + Gross Revenue row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={labelStyle}>Construction Cost ($)</label>
+              <label className={labelClasses}>Construction Cost ($)</label>
               <input
                 type="number"
                 value={constructionCost || ""}
                 onChange={(e) => setConstructionCost(Number(e.target.value))}
                 placeholder="e.g. 5000000"
-                style={inputStyle}
+                className={inputClasses}
               />
             </div>
             <div>
-              <label style={labelStyle}>Gross Revenue ($)</label>
+              <label className={labelClasses}>Gross Revenue ($)</label>
               <input
                 type="number"
                 value={grossRevenue || ""}
                 onChange={(e) => setGrossRevenue(Number(e.target.value))}
                 placeholder="e.g. 12000000"
-                style={inputStyle}
+                className={inputClasses}
               />
             </div>
           </div>
 
           {/* Soft Cost % + Sellable Sqft row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={labelStyle}>Soft Cost % (of hard costs)</label>
+              <label className={labelClasses}>Soft Cost % (of hard costs)</label>
               <input
                 type="number"
                 value={softCostPct || ""}
                 onChange={(e) => setSoftCostPct(Number(e.target.value))}
                 placeholder="18"
-                style={inputStyle}
+                className={inputClasses}
               />
             </div>
             <div>
-              <label style={labelStyle}>Sellable Sqft</label>
+              <label className={labelClasses}>Sellable Sqft</label>
               <input
                 type="number"
                 value={sellableSqft || ""}
                 onChange={(e) => setSellableSqft(Number(e.target.value))}
                 placeholder="e.g. 8000"
-                style={inputStyle}
+                className={inputClasses}
               />
             </div>
           </div>
 
           {/* Error */}
           {error && (
-            <div
-              style={{
-                padding: "8px 12px",
-                background: "rgba(220, 38, 38, 0.1)",
-                border: "1px solid rgba(220, 38, 38, 0.2)",
-                borderRadius: "4px",
-                color: "#f87171",
-                fontSize: "12px",
-              }}
-            >
+            <div className="px-3 py-2 bg-red-600/10 border border-red-600/20 rounded text-red-400 text-xs">
               {error}
             </div>
           )}
@@ -392,26 +311,12 @@ export default function FinancingCalculator({
           <button
             onClick={handleSubmit}
             disabled={loading}
-            style={{
-              padding: "12px",
-              background: loading ? "#374151" : "#3b82f6",
-              border: "none",
-              borderRadius: "6px",
-              color: "#ffffff",
-              fontSize: "14px",
-              fontWeight: "700",
-              cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "system-ui, sans-serif",
-              transition: "background 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading)
-                e.currentTarget.style.background = "#2563eb";
-            }}
-            onMouseLeave={(e) => {
-              if (!loading)
-                e.currentTarget.style.background = "#3b82f6";
-            }}
+            className={cn(
+              "py-3 border-none rounded-md text-white text-sm font-bold transition-colors",
+              loading
+                ? "bg-gray-700 cursor-not-allowed"
+                : "bg-blue-500 cursor-pointer hover:bg-blue-600"
+            )}
           >
             {loading ? "Calculating..." : "Calculate Deal"}
           </button>
@@ -419,133 +324,75 @@ export default function FinancingCalculator({
 
         {/* Results */}
         {result && (
-          <div
-            style={{
-              padding: "0 20px 20px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-            }}
-          >
-            <div
-              style={{
-                borderTop: "1px solid #1f2937",
-                paddingTop: "16px",
-              }}
-            >
+          <div className="px-5 pb-5 flex flex-col gap-4">
+            <div className="border-t border-gray-800 pt-4">
               {/* Capital Structure */}
-              <div style={{ marginBottom: "16px" }}>
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    color: "#9ca3af",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    marginBottom: "8px",
-                  }}
-                >
+              <div className="mb-4">
+                <div className={sectionHeadingClasses}>
                   Capital Structure
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "4px 12px",
-                    fontSize: "12px",
-                  }}
-                >
-                  <span style={{ color: "#9ca3af" }}>Equity Required</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                <div className={gridClasses}>
+                  <span className="text-gray-400">Equity Required</span>
+                  <span className="text-gray-300 text-right">
                     {fmt(result.equity_required)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>Debt Amount</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">Debt Amount</span>
+                  <span className="text-gray-300 text-right">
                     {fmt(result.debt_amount)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>Soft Costs</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">Soft Costs</span>
+                  <span className="text-gray-300 text-right">
                     {fmt(result.soft_costs)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>Total Interest</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">Total Interest</span>
+                  <span className="text-gray-300 text-right">
                     {fmt(result.total_interest_cost)}
                   </span>
-                  <span style={{ color: "#9ca3af", fontWeight: "600" }}>
+                  <span className="text-gray-400 font-semibold">
                     Total Project Cost
                   </span>
-                  <span
-                    style={{
-                      color: "#f3f4f6",
-                      textAlign: "right",
-                      fontWeight: "700",
-                    }}
-                  >
+                  <span className="text-gray-100 text-right font-bold">
                     {fmt(result.total_project_cost)}
                   </span>
                 </div>
               </div>
 
               {/* Return Metrics */}
-              <div style={{ marginBottom: "16px" }}>
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: "700",
-                    color: "#9ca3af",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    marginBottom: "8px",
-                  }}
-                >
+              <div className="mb-4">
+                <div className={sectionHeadingClasses}>
                   Return Metrics
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "4px 12px",
-                    fontSize: "12px",
-                  }}
-                >
-                  <span style={{ color: "#9ca3af" }}>Net Profit</span>
+                <div className={gridClasses}>
+                  <span className="text-gray-400">Net Profit</span>
                   <span
-                    style={{
-                      color:
-                        result.net_profit >= 0 ? "#4ade80" : "#f87171",
-                      textAlign: "right",
-                      fontWeight: "700",
-                    }}
+                    className={cn(
+                      "text-right font-bold",
+                      result.net_profit >= 0 ? "text-green-400" : "text-red-400"
+                    )}
                   >
                     {result.net_profit >= 0 ? "+" : ""}
                     {fmt(result.net_profit)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>ROI</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">ROI</span>
+                  <span className="text-gray-300 text-right">
                     {pct(result.roi)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>ROE</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">ROE</span>
+                  <span className="text-gray-300 text-right">
                     {pct(result.roe)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>Cash-on-Cash</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">Cash-on-Cash</span>
+                  <span className="text-gray-300 text-right">
                     {pct(result.cash_on_cash)}
                   </span>
-                  <span style={{ color: "#9ca3af" }}>IRR Estimate</span>
-                  <span style={{ color: "#d1d5db", textAlign: "right" }}>
+                  <span className="text-gray-400">IRR Estimate</span>
+                  <span className="text-gray-300 text-right">
                     {pct(result.irr_estimate)}
                   </span>
                   {result.breakeven_price_psf != null && (
                     <>
-                      <span style={{ color: "#9ca3af" }}>Breakeven PSF</span>
-                      <span
-                        style={{
-                          color: "#f59e0b",
-                          textAlign: "right",
-                          fontWeight: "600",
-                        }}
-                      >
+                      <span className="text-gray-400">Breakeven PSF</span>
+                      <span className="text-amber-500 text-right font-semibold">
                         ${result.breakeven_price_psf.toFixed(0)}/sqft
                       </span>
                     </>
@@ -555,21 +402,12 @@ export default function FinancingCalculator({
 
               {/* Viability Badge */}
               <div
-                style={{
-                  padding: "10px",
-                  borderRadius: "6px",
-                  textAlign: "center",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  marginBottom: "16px",
-                  background: result.is_viable
-                    ? "rgba(34, 197, 94, 0.1)"
-                    : "rgba(220, 38, 38, 0.1)",
-                  color: result.is_viable ? "#4ade80" : "#f87171",
-                  border: result.is_viable
-                    ? "1px solid rgba(34, 197, 94, 0.25)"
-                    : "1px solid rgba(220, 38, 38, 0.25)",
-                }}
+                className={cn(
+                  "p-2.5 rounded-md text-center text-[13px] font-bold mb-4 border",
+                  result.is_viable
+                    ? "bg-green-500/10 text-green-400 border-green-500/25"
+                    : "bg-red-600/10 text-red-400 border-red-600/25"
+                )}
               >
                 {result.is_viable
                   ? "DEAL IS VIABLE"
@@ -579,51 +417,20 @@ export default function FinancingCalculator({
               {/* Scenario Tabs */}
               {result.scenarios && Object.keys(result.scenarios).length > 0 && (
                 <div>
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      color: "#9ca3af",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      marginBottom: "8px",
-                    }}
-                  >
+                  <div className={sectionHeadingClasses}>
                     Scenarios
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "0",
-                      marginBottom: "12px",
-                      borderRadius: "6px",
-                      overflow: "hidden",
-                      border: "1px solid #374151",
-                    }}
-                  >
+                  <div className="flex mb-3 rounded-md overflow-hidden border border-gray-700">
                     {["bull", "base", "bear"].map((sc) => (
                       <button
                         key={sc}
                         onClick={() => setActiveScenario(sc)}
-                        style={{
-                          flex: 1,
-                          padding: "8px 0",
-                          background:
-                            activeScenario === sc
-                              ? "#1e293b"
-                              : "transparent",
-                          border: "none",
-                          color:
-                            activeScenario === sc
-                              ? "#f3f4f6"
-                              : "#6b7280",
-                          fontSize: "11px",
-                          fontWeight: "700",
-                          cursor: "pointer",
-                          textTransform: "uppercase",
-                          fontFamily: "system-ui, sans-serif",
-                          transition: "all 0.2s",
-                        }}
+                        className={cn(
+                          "flex-1 py-2 border-none text-[11px] font-bold cursor-pointer uppercase transition-all",
+                          activeScenario === sc
+                            ? "bg-slate-800 text-gray-100"
+                            : "bg-transparent text-gray-500"
+                        )}
                       >
                         {sc === "bull"
                           ? "Bull"

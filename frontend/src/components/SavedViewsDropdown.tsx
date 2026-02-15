@@ -45,110 +45,56 @@ export default function SavedViewsDropdown({
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        style={{
-          background: "#1e293b",
-          border: "1px solid #374151",
-          borderRadius: "4px",
-          color: "#d1d5db",
-          fontSize: "12px",
-          padding: "8px 10px",
-          cursor: "pointer",
-          width: "100%",
-          textAlign: "left",
-        }}
+        className="bg-slate-800 border border-gray-700 rounded text-gray-300 text-xs px-2.5 py-2 cursor-pointer w-full text-left"
       >
-        Saved Views ({views.length}) {open ? "▲" : "▼"}
+        Saved Views ({views.length}) {open ? "\u25B2" : "\u25BC"}
       </button>
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            background: "#1e293b",
-            border: "1px solid #374151",
-            borderRadius: "0 0 6px 6px",
-            zIndex: 50,
-            maxHeight: "300px",
-            overflowY: "auto",
-          }}
-        >
+        <div className="absolute top-full left-0 right-0 bg-slate-800 border border-gray-700 rounded-b-md z-50 max-h-[300px] overflow-y-auto">
           {/* Save current */}
-          <div style={{ padding: "8px", borderBottom: "1px solid #374151", display: "flex", gap: "4px" }}>
+          <div className="p-2 border-b border-gray-700 flex gap-1">
             <input
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
               placeholder="Save current filters as..."
-              style={{
-                flex: 1,
-                background: "#0f172a",
-                border: "1px solid #374151",
-                borderRadius: "4px",
-                color: "#f3f4f6",
-                fontSize: "11px",
-                padding: "4px 8px",
-              }}
+              className="flex-1 bg-slate-900 border border-gray-700 rounded text-gray-100 text-[11px] px-2 py-1"
             />
             <button
               onClick={handleSave}
               disabled={saving || !saveName.trim()}
-              style={{
-                background: "#3b82f6",
-                border: "none",
-                borderRadius: "4px",
-                color: "#fff",
-                fontSize: "11px",
-                padding: "4px 8px",
-                cursor: "pointer",
-              }}
+              className="bg-blue-500 border-none rounded text-white text-[11px] px-2 py-1 cursor-pointer"
             >
               Save
             </button>
           </div>
 
           {views.length === 0 ? (
-            <div style={{ padding: "12px", textAlign: "center", color: "#6b7280", fontSize: "11px" }}>
+            <div className="p-3 text-center text-gray-500 text-[11px]">
               No saved views yet
             </div>
           ) : (
             views.map((v) => (
               <div
                 key={v.id}
-                style={{
-                  padding: "8px",
-                  borderBottom: "1px solid #374151",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  cursor: "pointer",
-                }}
+                className="p-2 border-b border-gray-700 flex items-center gap-2 cursor-pointer hover:bg-gray-700"
                 onClick={() => {
                   onLoadView(v.filters);
                   setOpen(false);
                 }}
               >
-                <span style={{ flex: 1, fontSize: "12px", color: "#d1d5db" }}>
-                  {v.name}
-                </span>
+                <span className="flex-1 text-xs text-gray-300">{v.name}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(v.id);
                   }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#6b7280",
-                    cursor: "pointer",
-                    fontSize: "11px",
-                  }}
+                  className="bg-transparent border-none text-gray-500 cursor-pointer text-[11px] hover:text-gray-300"
                 >
-                  ✕
+                  &#10005;
                 </button>
               </div>
             ))
