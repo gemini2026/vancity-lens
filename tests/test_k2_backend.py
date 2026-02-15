@@ -149,6 +149,20 @@ class TestK2SearchNormalization:
         assert chunks[0]["document_title"] == "Resolved Doc"
 
 
+class TestK2DefaultBackend:
+    """K2 should be the default backend when RAG_BACKEND is not set."""
+
+    def test_default_backend_is_k2(self, monkeypatch):
+        monkeypatch.delenv("RAG_BACKEND", raising=False)
+        from api.intelligence.retrieval_backend import get_rag_backend
+        assert get_rag_backend() == "k2"
+
+    def test_explicit_local_still_works(self, monkeypatch):
+        monkeypatch.setenv("RAG_BACKEND", "local")
+        from api.intelligence.retrieval_backend import get_rag_backend
+        assert get_rag_backend() == "local"
+
+
 class TestRetrievalBackend:
     @pytest.mark.asyncio
     async def test_retrieve_document_chunks_uses_k2_when_enabled(self, monkeypatch):
@@ -163,13 +177,12 @@ class TestRetrievalBackend:
                 db_pool=AsyncMock(),
                 query="q",
                 search_mode="demo",
-                cohere_api_key=None,
             )
         assert result == expected
         assert mock_tt.await_count == 1
 
     @pytest.mark.asyncio
-    async def test_retrieve_document_chunks_falls_back_to_local_on_k2_error(self, monkeypatch):
+    async def test_retrieve_document_chunks_falls_back_to_bm25_on_k2_error(self, monkeypatch):
         from api.intelligence.retrieval_backend import retrieve_document_chunks
 
         monkeypatch.setenv("RAG_BACKEND", "k2")
@@ -183,64 +196,17 @@ class TestRetrievalBackend:
             new=AsyncMock(side_effect=Exception("boom")),
         ):
             with patch(
-                "api.intelligence.retrieval_backend.sparse_search",
+                "api.intelligence.local_rag.embeddings.sparse_search",
                 new=AsyncMock(return_value=fallback_chunks),
             ) as mock_sparse:
                 result = await retrieve_document_chunks(
                     db_pool=AsyncMock(),
                     query="q",
                     search_mode="demo",
-                    cohere_api_key=None,
                 )
 
         assert result == fallback_chunks
         assert mock_sparse.await_count == 1
-
-    @pytest.mark.asyncio
-    async def test_retrieve_document_chunks_shadow_validation_does_not_change_result(self, monkeypatch, caplog):
-        from api.intelligence import retrieval_backend as rb
-
-        caplog.set_level("INFO")
-
-        monkeypatch.setenv("RAG_BACKEND", "k2")
-        monkeypatch.setenv("K2_SHADOW_VALIDATE", "true")
-        monkeypatch.setenv("K2_SHADOW_VALIDATE_SAMPLE_RATE", "1.0")
-        monkeypatch.setenv("K2_SHADOW_VALIDATE_LOCAL_MODE", "sparse")
-        _set_required_k2_env(monkeypatch)
-
-        k2_chunks = [{"chunk_text": "k2", "source_url": "https://k2.example/doc"}]
-        local_chunks = [{"chunk_text": "local", "source_url": "https://local.example/doc"}]
-
-        tasks: list[asyncio.Task] = []
-        real_create_task = asyncio.create_task
-
-        def _capture_task(coro):
-            task = real_create_task(coro)
-            tasks.append(task)
-            return task
-
-        monkeypatch.setattr(rb.asyncio, "create_task", _capture_task)
-
-        with patch("api.intelligence.retrieval_backend.asyncio.to_thread", new=AsyncMock(return_value=k2_chunks)):
-            with patch(
-                "api.intelligence.retrieval_backend.sparse_search",
-                new=AsyncMock(return_value=local_chunks),
-            ) as mock_sparse:
-                result = await rb.retrieve_document_chunks(
-                    db_pool=AsyncMock(),
-                    query="q",
-                    search_mode="demo",
-                    cohere_api_key=None,
-                )
-
-                assert result == k2_chunks
-
-                # Ensure the shadow task ran (and was responsible for local retrieval).
-                assert tasks
-                await asyncio.gather(*tasks)
-                assert mock_sparse.await_count == 1
-
-        assert any(r.message == "k2_shadow_validate" for r in caplog.records)
 
     @pytest.mark.asyncio
     async def test_retrieve_document_chunks_raises_when_fallback_disabled(self, monkeypatch):
@@ -254,12 +220,9 @@ class TestRetrievalBackend:
             "api.intelligence.retrieval_backend.asyncio.to_thread",
             new=AsyncMock(side_effect=Exception("boom")),
         ):
-            with patch("api.intelligence.retrieval_backend.sparse_search", new=AsyncMock()) as mock_sparse:
-                with pytest.raises(Exception, match="boom"):
-                    await retrieve_document_chunks(
-                        db_pool=AsyncMock(),
-                        query="q",
-                        search_mode="demo",
-                        cohere_api_key=None,
-                    )
-        assert mock_sparse.await_count == 0
+            with pytest.raises(Exception, match="boom"):
+                await retrieve_document_chunks(
+                    db_pool=AsyncMock(),
+                    query="q",
+                    search_mode="demo",
+                )
