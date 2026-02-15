@@ -5,7 +5,7 @@ metadata:
   namespace: vancity-lens
 spec:
   rules:
-    - host: "api.vancitylense.com"
+    - host: "api.vancitylens.com"
       http:
         paths:
           - path: /

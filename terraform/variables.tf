@@ -186,7 +186,7 @@ variable "cloudflare_api_token" {
 }
 
 variable "cloudflare_zone_id" {
-  description = "Cloudflare Zone ID for vancitylense.com"
+  description = "Cloudflare Zone ID for vancitylens.com"
   type        = string
   default     = ""
 }
@@ -194,7 +194,7 @@ variable "cloudflare_zone_id" {
 variable "domain_name" {
   description = "Primary root domain for production"
   type        = string
-  default     = "vancitylense.com"
+  default     = "vancitylens.com"
 }
 
 variable "cloudflare_app_origin" {

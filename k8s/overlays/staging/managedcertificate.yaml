@@ -5,4 +5,5 @@ metadata:
   namespace: vancity-lens
 spec:
   domains:
+    - staging.vancitylens.com
     - staging.vancitylense.com

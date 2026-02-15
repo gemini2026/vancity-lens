@@ -4,7 +4,7 @@ metadata:
   name: vancity-lens-config
   namespace: vancity-lens
 data:
-  cors-origins: "https://app.vancitylense.com"
+  cors-origins: "https://app.vancitylens.com"
   rag-backend: "k2"
   k2-fallback-to-local: "false"
   k2-shadow-validate: "true"

@@ -5,7 +5,7 @@ metadata:
   namespace: vancity-lens
 spec:
   rules:
-    - host: "staging.vancitylense.com"
+    - host: "staging.vancitylens.com"
       http:
         paths:
           # API routes are already namespaced under /api/* in the backend.

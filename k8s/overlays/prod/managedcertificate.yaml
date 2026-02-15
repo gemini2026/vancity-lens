@@ -5,4 +5,4 @@ metadata:
   namespace: vancity-lens
 spec:
   domains:
-    - api.vancitylense.com
+    - api.vancitylens.com
