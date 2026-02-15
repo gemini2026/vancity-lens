@@ -148,6 +148,30 @@ variable "monitoring_api_host" {
   default     = ""
 }
 
+variable "runner_machine_type" {
+  description = "GCE machine type for the GitHub Actions runner"
+  type        = string
+  default     = "e2-medium"
+}
+
+variable "runner_disk_size_gb" {
+  description = "Boot disk size in GB for the GitHub Actions runner"
+  type        = number
+  default     = 50
+}
+
+variable "github_repo" {
+  description = "GitHub repository in owner/repo format for the runner"
+  type        = string
+  default     = "gemini2026/vancity-lens"
+}
+
+variable "github_runner_token_secret_id" {
+  description = "Secret Manager secret ID containing the GitHub PAT for runner registration"
+  type        = string
+  default     = "github-runner-token"
+}
+
 variable "enable_cloudflare" {
   description = "Enable Cloudflare resources management in Terraform"
   type        = bool

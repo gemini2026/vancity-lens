@@ -199,6 +199,26 @@ module "observability" {
   ]
 }
 
+# GitHub Actions Self-Hosted Runner (GCE VM in VPC)
+module "gh_runner" {
+  source = "./modules/gh-runner"
+
+  project_id                    = var.project_id
+  region                        = var.region
+  zone                          = "${var.region}-b"
+  network_id                    = module.network.vpc_id
+  subnet_id                     = module.network.subnet_id
+  machine_type                  = var.runner_machine_type
+  disk_size_gb                  = var.runner_disk_size_gb
+  github_repo                   = var.github_repo
+  github_runner_token_secret_id = var.github_runner_token_secret_id
+
+  depends_on = [
+    google_project_service.required_apis,
+    module.network
+  ]
+}
+
 # Cloudflare edge resources (optional; disabled by default until configured).
 module "cloudflare" {
   count  = var.enable_cloudflare ? 1 : 0

@@ -160,6 +160,21 @@ output "observability_api_uptime_check_id" {
   value       = module.observability.api_uptime_check_id
 }
 
+output "runner_instance_name" {
+  description = "GitHub Actions runner GCE instance name"
+  value       = module.gh_runner.runner_instance_name
+}
+
+output "runner_internal_ip" {
+  description = "GitHub Actions runner internal IP address"
+  value       = module.gh_runner.runner_internal_ip
+}
+
+output "runner_service_account_email" {
+  description = "GitHub Actions runner service account email"
+  value       = module.gh_runner.runner_service_account_email
+}
+
 output "cloudrun_service_name" {
   description = "Cloud Run service name"
   value       = try(google_cloud_run_service.api[0].name, null)
