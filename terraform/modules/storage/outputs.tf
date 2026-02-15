@@ -8,6 +8,16 @@ output "archive_bucket_url" {
   value       = google_storage_bucket.archive.url
 }
 
+output "seed_data_bucket_name" {
+  description = "Seed data bucket name"
+  value       = google_storage_bucket.seed_data.name
+}
+
+output "seed_data_bucket_url" {
+  description = "Seed data bucket URL"
+  value       = google_storage_bucket.seed_data.url
+}
+
 output "long_term_bucket_name" {
   description = "Long-term retention bucket name"
   value       = google_storage_bucket.long_term.name

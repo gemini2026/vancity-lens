@@ -45,6 +45,33 @@ resource "google_storage_bucket" "archive" {
   }
 }
 
+resource "google_storage_bucket" "seed_data" {
+  name                        = "${local.sanitized_project}-seed-data"
+  project                     = var.project_id
+  location                    = var.region
+  storage_class               = "STANDARD"
+  force_destroy               = true
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  versioning {
+    enabled = true
+  }
+
+  labels = {
+    app         = "vancity-lens"
+    environment = var.environment_name
+    data_class  = "seed"
+  }
+}
+
+resource "google_storage_bucket_iam_member" "seed_data_gke_reader" {
+  count  = var.gke_service_account != "" ? 1 : 0
+  bucket = google_storage_bucket.seed_data.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${var.gke_service_account}"
+}
+
 resource "google_storage_bucket" "long_term" {
   name                        = local.effective_long_term_bucket_name
   project                     = var.project_id

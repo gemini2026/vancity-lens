@@ -173,8 +173,12 @@ module "storage" {
   archive_transition_to_nearline_days = var.archive_transition_to_nearline_days
   archive_transition_to_coldline_days = var.archive_transition_to_coldline_days
   long_term_retention_days            = var.long_term_retention_days
+  gke_service_account                 = google_service_account.gke_sa.email
 
-  depends_on = [google_project_service.required_apis]
+  depends_on = [
+    google_project_service.required_apis,
+    google_service_account.gke_sa
+  ]
 }
 
 # Logging and monitoring baseline.

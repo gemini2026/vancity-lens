@@ -34,7 +34,7 @@ spec:
           
           containers:
           - name: scraper
-            image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens/vancity-lens-api:latest
+            image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api:latest
             imagePullPolicy: Always
             
             command:

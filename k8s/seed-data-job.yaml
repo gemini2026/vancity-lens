@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-data-loader
+  namespace: vancity-lens
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: vancity-lens-api
+      restartPolicy: OnFailure
+      containers:
+        - name: loader
+          image: python:3.12-slim
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              pip install asyncpg google-cloud-storage --quiet
+              python3 -c "
+              from google.cloud import storage
+              import os
+              client = storage.Client()
+              bucket = client.bucket('openclaw-antonmishel-03460-seed-data')
+              os.makedirs('/tmp/seed', exist_ok=True)
+              bucket.blob('load_seed.py').download_to_filename('/tmp/load_seed.py')
+              print('Downloaded load_seed.py')
+              for blob in client.list_blobs(bucket, prefix='seed/'):
+                  if blob.name.endswith('.json'):
+                      local_path = f'/tmp/{blob.name}'
+                      blob.download_to_filename(local_path)
+                      print(f'Downloaded {blob.name}')
+              print('All files downloaded')
+              "
+              cd /tmp
+              python3 load_seed.py
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: database-url
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"

@@ -15,6 +15,12 @@ variable "environment_name" {
   default     = "dev"
 }
 
+variable "gke_service_account" {
+  description = "GKE service account email for bucket access"
+  type        = string
+  default     = ""
+}
+
 variable "archive_bucket_name" {
   description = "Override for the document archive bucket name"
   type        = string
