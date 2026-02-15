@@ -493,7 +493,7 @@ class TestTopOpportunitiesEndpoint:
     """Tests for GET /api/v1/opportunities endpoint."""
 
     def _mock_db_pool(self, fetch_return=None):
-        """Set up mock db_pool on app.state for opportunities route."""
+        """Create mock pool for opportunities route (uses db.pool)."""
         pool = MagicMock()
         conn = AsyncMock()
         acm = AsyncMock()
@@ -516,59 +516,49 @@ class TestTopOpportunitiesEndpoint:
                 "civic_address": "1 Main", "current_zoning": "RS-1",
             }
         ])
-        app.state.db_pool = pool
-        try:
+        with patch("api.intelligence.undervalued_routes.db") as mock_db:
+            mock_db.pool = pool
             response = client.get("/api/v1/opportunities")
             assert response.status_code == 200
             data = response.json()
             assert "opportunities" in data
             assert isinstance(data["opportunities"], list)
-        finally:
-            del app.state.db_pool
 
     def test_opportunities_accepts_top_param(self, client):
         """Top opportunities accepts top query parameter."""
         pool, conn = self._mock_db_pool()
-        app.state.db_pool = pool
-        try:
+        with patch("api.intelligence.undervalued_routes.db") as mock_db:
+            mock_db.pool = pool
             response = client.get("/api/v1/opportunities?top=10")
             assert response.status_code == 200
-        finally:
-            del app.state.db_pool
 
     def test_opportunities_top_param_capped_at_50(self, client):
         """Top opportunities top parameter is capped at 50."""
         pool, conn = self._mock_db_pool()
-        app.state.db_pool = pool
-        try:
+        with patch("api.intelligence.undervalued_routes.db") as mock_db:
+            mock_db.pool = pool
             response = client.get("/api/v1/opportunities?top=100")
             assert response.status_code == 200
-        finally:
-            del app.state.db_pool
 
     def test_opportunities_default_top(self, client):
         """Top opportunities defaults to top 20."""
         pool, conn = self._mock_db_pool()
-        app.state.db_pool = pool
-        try:
+        with patch("api.intelligence.undervalued_routes.db") as mock_db:
+            mock_db.pool = pool
             response = client.get("/api/v1/opportunities")
             assert response.status_code == 200
             data = response.json()
             assert "count" in data
-        finally:
-            del app.state.db_pool
 
     def test_opportunities_returns_empty_list_when_none(self, client):
         """Top opportunities returns empty list when no results."""
         pool, conn = self._mock_db_pool()
-        app.state.db_pool = pool
-        try:
+        with patch("api.intelligence.undervalued_routes.db") as mock_db:
+            mock_db.pool = pool
             response = client.get("/api/v1/opportunities")
             data = response.json()
             assert data["opportunities"] == []
             assert data["count"] == 0
-        finally:
-            del app.state.db_pool
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -825,13 +815,11 @@ class TestCorsHeaders:
         acm.__aexit__ = AsyncMock(return_value=False)
         pool.acquire.return_value = acm
         conn.fetch = AsyncMock(return_value=[])
-        app.state.db_pool = pool
-        try:
+        with patch("api.intelligence.undervalued_routes.db") as mock_db:
+            mock_db.pool = pool
             response = client.get("/api/v1/opportunities")
             assert response.status_code == 200
             assert len(response.headers) > 0
-        finally:
-            del app.state.db_pool
 
     def test_health_returns_with_standard_headers(self, client):
         """Health endpoint returns standard HTTP headers."""
