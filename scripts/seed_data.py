@@ -112,7 +112,7 @@ async def process(pool: asyncpg.Pool, batch_size: int):
         return
 
     # Import and run processing
-    from api.intelligence.embeddings import process_document_chunks
+    from api.intelligence.local_rag.embeddings import process_document_chunks
     from api.intelligence.extractor import process_all_unprocessed
 
     # Get unprocessed doc IDs

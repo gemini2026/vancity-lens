@@ -333,7 +333,7 @@ class TestHybridSearchSignature:
     def test_hybrid_search_accepts_filter_params(self):
         """Verify the function signature includes metadata filter parameters."""
         import inspect
-        from api.intelligence.embeddings import hybrid_search
+        from api.intelligence.local_rag.embeddings import hybrid_search
 
         sig = inspect.signature(hybrid_search)
         params = list(sig.parameters.keys())
@@ -345,7 +345,7 @@ class TestHybridSearchSignature:
 
     def test_hybrid_search_filter_defaults_are_none(self):
         import inspect
-        from api.intelligence.embeddings import hybrid_search
+        from api.intelligence.local_rag.embeddings import hybrid_search
 
         sig = inspect.signature(hybrid_search)
 
@@ -424,10 +424,10 @@ class TestRouteImports:
 
 
 class TestQueryPlanner:
-    """Tests for api.intelligence.query_planner module."""
+    """Tests for api.intelligence.local_rag.query_planner module."""
 
     def test_is_multi_hop_compare(self):
-        from api.intelligence.query_planner import is_multi_hop
+        from api.intelligence.local_rag.query_planner import is_multi_hop
 
         assert is_multi_hop("Compare the rezoning at 123 Main to the one at 456 Oak")
         assert is_multi_hop("What is the difference between Broadway Plan and Cambie?")
@@ -436,33 +436,33 @@ class TestQueryPlanner:
         assert is_multi_hop("Contrast the permit activity in Marpole and Kerrisdale")
 
     def test_is_multi_hop_single(self):
-        from api.intelligence.query_planner import is_multi_hop
+        from api.intelligence.local_rag.query_planner import is_multi_hop
 
         assert not is_multi_hop("What is the latest rezoning decision at 123 Main?")
         assert not is_multi_hop("Tell me about the Broadway Plan")
         assert not is_multi_hop("How many permits in Kitsilano?")
 
     def test_decompose_compare_to(self):
-        from api.intelligence.query_planner import decompose_query
+        from api.intelligence.local_rag.query_planner import decompose_query
 
         result = decompose_query("Compare the rezoning at 123 Main to the one at 456 Oak")
         assert len(result) == 2
         assert "123 main" in result[0].lower() or "123 main" in result[1].lower()
 
     def test_decompose_difference_between(self):
-        from api.intelligence.query_planner import decompose_query
+        from api.intelligence.local_rag.query_planner import decompose_query
 
         result = decompose_query("difference between Broadway Plan and Cambie Corridor Plan")
         assert len(result) == 2
 
     def test_decompose_vs(self):
-        from api.intelligence.query_planner import decompose_query
+        from api.intelligence.local_rag.query_planner import decompose_query
 
         result = decompose_query("Kitsilano vs Mount Pleasant density changes")
         assert len(result) == 2
 
     def test_decompose_single_query(self):
-        from api.intelligence.query_planner import decompose_query
+        from api.intelligence.local_rag.query_planner import decompose_query
 
         result = decompose_query("What is the latest rezoning decision?")
         assert len(result) == 1
@@ -471,7 +471,7 @@ class TestQueryPlanner:
     @pytest.mark.asyncio
     async def test_multi_hop_search_single_query(self):
         """When query is not multi-hop, multi_hop_search delegates to search_fn directly."""
-        from api.intelligence.query_planner import multi_hop_search
+        from api.intelligence.local_rag.query_planner import multi_hop_search
 
         mock_search = AsyncMock(return_value=[{"chunk_id": 1, "final_score": 0.9}])
         mock_pool = MagicMock()
@@ -487,7 +487,7 @@ class TestQueryPlanner:
     @pytest.mark.asyncio
     async def test_multi_hop_search_deduplicates(self):
         """Multi-hop search should deduplicate chunks by chunk_id."""
-        from api.intelligence.query_planner import multi_hop_search
+        from api.intelligence.local_rag.query_planner import multi_hop_search
 
         # Same chunk_id returned by both sub-queries
         async def mock_search(pool, query, key, **kwargs):

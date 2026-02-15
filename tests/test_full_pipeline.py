@@ -31,10 +31,12 @@ import asyncpg
 
 from api.intelligence import (
     parser,
-    chunker,
-    embeddings,
     signals,
     chat,
+)
+from api.intelligence.local_rag import (
+    chunker,
+    embeddings,
 )
 from api.intelligence.models import (
     SignalType,
@@ -346,7 +348,7 @@ class TestPipelineEmbedding:
     @pytest.mark.e2e_pipeline
     async def test_generate_embedding_returns_vector(self):
         """Integration: Embedding generation returns correct dimension vector."""
-        with patch('api.intelligence.embeddings.cohere.AsyncClient') as mock_cohere:
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient') as mock_cohere:
             mock_client = AsyncMock()
             mock_cohere.return_value.__aenter__.return_value = mock_client
 
@@ -355,7 +357,7 @@ class TestPipelineEmbedding:
             mock_response.embeddings.float_ = [[0.1] * 1024]
             mock_client.embed = AsyncMock(return_value=mock_response)
 
-            with patch('api.intelligence.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
+            with patch('api.intelligence.local_rag.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
                     embedding = await embeddings.generate_embedding(
                         "Test text to embed",
@@ -375,7 +377,7 @@ class TestPipelineEmbedding:
             "Third chunk regarding infrastructure"
         ]
 
-        with patch('api.intelligence.embeddings.cohere.AsyncClient') as mock_cohere:
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient') as mock_cohere:
             mock_client = AsyncMock()
             mock_cohere.return_value.__aenter__.return_value = mock_client
 
@@ -388,7 +390,7 @@ class TestPipelineEmbedding:
             ]
             mock_client.embed = AsyncMock(return_value=mock_response)
 
-            with patch('api.intelligence.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
+            with patch('api.intelligence.local_rag.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
                     embeddings_list = await embeddings.batch_embed(
                         texts,
@@ -434,7 +436,7 @@ class TestPipelineEmbedding:
         assert embedding_dim == 1024
 
         # Verify this through batch processing
-        with patch('api.intelligence.embeddings.cohere.AsyncClient') as mock_cohere:
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient') as mock_cohere:
             mock_client = AsyncMock()
             mock_cohere.return_value.__aenter__.return_value = mock_client
 
@@ -442,7 +444,7 @@ class TestPipelineEmbedding:
             mock_response.embeddings.float_ = [[0.5] * 1024]
             mock_client.embed = AsyncMock(return_value=mock_response)
 
-            with patch('api.intelligence.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
+            with patch('api.intelligence.local_rag.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
                     result = await embeddings.batch_embed(
                         ["Test"],
@@ -902,7 +904,7 @@ class TestPipelineEndToEnd:
         assert doc_id == 1
 
         # Step 4-6: Generate embeddings and store chunks (mocked)
-        with patch('api.intelligence.embeddings.cohere.AsyncClient'):
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient'):
             chunk_ids = []
             for i, chunk in enumerate(chunks):
                 cid = await conn.fetchval(

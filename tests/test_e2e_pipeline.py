@@ -4,7 +4,7 @@ from datetime import date, datetime
 import json
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from api.intelligence.chunker import chunk_document
+from api.intelligence.local_rag.chunker import chunk_document
 from api.intelligence.models import ExtractedSignal, SignalType, Decision, Sentiment, Severity
 
 

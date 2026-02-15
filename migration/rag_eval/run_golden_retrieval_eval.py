@@ -29,7 +29,7 @@ if str(REPO_ROOT) not in sys.path:
 from sdk import Knowledge2  # noqa: E402
 from sdk.errors import Knowledge2Error  # noqa: E402
 
-from api.intelligence.embeddings import hybrid_search, sparse_search  # noqa: E402
+from api.intelligence.local_rag.embeddings import hybrid_search, sparse_search  # noqa: E402
 
 
 def _now_ts() -> str:

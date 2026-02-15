@@ -618,7 +618,7 @@ async def _ingest_docs(
         raise RuntimeError("COHERE_API_KEY and ANTHROPIC_API_KEY must be set to run --process")
 
     if process:
-        from api.intelligence.embeddings import process_document_chunks
+        from api.intelligence.local_rag.embeddings import process_document_chunks
         from api.intelligence.extractor import process_document
 
     stats = {

@@ -102,7 +102,7 @@ class TestSparseSearch:
     @pytest.mark.asyncio
     async def test_sparse_search_empty_results(self):
         """sparse_search returns empty list when no matches."""
-        from api.intelligence.embeddings import sparse_search
+        from api.intelligence.local_rag.embeddings import sparse_search
 
         mock_pool, conn = _make_mock_pool()
         conn.fetch.return_value = []
@@ -113,7 +113,7 @@ class TestSparseSearch:
     @pytest.mark.asyncio
     async def test_sparse_search_returns_correct_format(self):
         """sparse_search returns dicts with final_score key."""
-        from api.intelligence.embeddings import sparse_search
+        from api.intelligence.local_rag.embeddings import sparse_search
 
         mock_pool, conn = _make_mock_pool()
         conn.fetch.return_value = [
@@ -143,7 +143,7 @@ class TestSparseSearch:
     @pytest.mark.asyncio
     async def test_sparse_search_no_api_key_needed(self):
         """sparse_search does not require any API key parameter."""
-        from api.intelligence.embeddings import sparse_search
+        from api.intelligence.local_rag.embeddings import sparse_search
         import inspect
 
         sig = inspect.signature(sparse_search)
@@ -153,7 +153,7 @@ class TestSparseSearch:
     @pytest.mark.asyncio
     async def test_sparse_search_with_neighborhood_filter(self):
         """sparse_search accepts and uses neighborhood filter."""
-        from api.intelligence.embeddings import sparse_search
+        from api.intelligence.local_rag.embeddings import sparse_search
 
         mock_pool, conn = _make_mock_pool()
         conn.fetch.return_value = []
@@ -435,18 +435,18 @@ class TestSeedChunksImport:
 
     def test_import_chunker(self):
         """chunk_document can be imported."""
-        from api.intelligence.chunker import chunk_document
+        from api.intelligence.local_rag.chunker import chunk_document
         assert callable(chunk_document)
 
     def test_chunk_document_empty(self):
         """chunk_document returns empty list for empty/null input."""
-        from api.intelligence.chunker import chunk_document
+        from api.intelligence.local_rag.chunker import chunk_document
         assert chunk_document("") == []
         assert chunk_document(None) == []
 
     def test_chunk_document_short_text(self):
         """chunk_document handles short text."""
-        from api.intelligence.chunker import chunk_document
+        from api.intelligence.local_rag.chunker import chunk_document
         result = chunk_document("Hello world, this is a test document.")
         assert len(result) >= 1
         assert "chunk_text" in result[0]
@@ -454,7 +454,7 @@ class TestSeedChunksImport:
 
     def test_chunk_document_returns_section_headers(self):
         """chunk_document detects section headers."""
-        from api.intelligence.chunker import chunk_document
+        from api.intelligence.local_rag.chunker import chunk_document
         text = """SECTION 1: Introduction
 
 This is the introduction to the document.

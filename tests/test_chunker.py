@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from api.intelligence.chunker import (
+from api.intelligence.local_rag.chunker import (
     detect_section_header,
     chunk_document,
     _count_tokens,
@@ -279,7 +279,7 @@ class TestChunkerIntegration:
 
     def test_semchunk_fallback(self):
         """Test that chunker works even when semchunk is unavailable."""
-        import api.intelligence.chunker as chunker_mod
+        import api.intelligence.local_rag.chunker as chunker_mod
 
         # Save original state
         original_chunker = chunker_mod._chunker

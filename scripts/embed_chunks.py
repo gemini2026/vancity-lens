@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncpg
 
-from api.intelligence.embeddings import batch_embed, EMBEDDING_DIMENSION
+from api.intelligence.local_rag.embeddings import batch_embed, EMBEDDING_DIMENSION
 
 logging.basicConfig(
     level=logging.INFO,
