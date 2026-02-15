@@ -531,7 +531,7 @@ async def get_document_page(request: Request, document_id: int):
     <div class="meta">
       <span class="badge badge-type">{source_type}</span>
       {"" if not signal_count else f' <span class="badge badge-signals">{signal_count} signal{"s" if signal_count != 1 else ""} extracted</span>'}
-      {f' <span class="badge badge-status">Source offline</span>' if url_status == "dead" else ""}
+      {' <span class="badge badge-status">Source offline</span>' if url_status == "dead" else ""}
       <h1>{title}</h1>
       <div class="pub-info">
         {"Published " + pub_date + " &middot; " if pub_date else ""}Document ID {document_id}

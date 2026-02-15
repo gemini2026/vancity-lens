@@ -13,7 +13,7 @@ Examples of multi-hop queries:
 
 import logging
 import re
-from typing import List, Optional, Any, Dict
+from typing import List, Any, Dict
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,8 @@
 """Share link endpoints for public parcel report access."""
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from .db import db
 from .user_auth import get_current_user_from_request

@@ -4,7 +4,6 @@ import json
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from .db import db
 from .user_auth import get_current_user_from_request
 from . import saved_views
 
