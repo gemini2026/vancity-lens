@@ -31,10 +31,12 @@ import asyncpg
 
 from api.intelligence import (
     parser,
-    chunker,
-    embeddings,
     signals,
     chat,
+)
+from api.intelligence.local_rag import (
+    chunker,
+    embeddings,
 )
 from api.intelligence.models import (
     SignalType,
@@ -346,7 +348,7 @@ class TestPipelineEmbedding:
     @pytest.mark.e2e_pipeline
     async def test_generate_embedding_returns_vector(self):
         """Integration: Embedding generation returns correct dimension vector."""
-        with patch('api.intelligence.embeddings.cohere.AsyncClient') as mock_cohere:
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient') as mock_cohere:
             mock_client = AsyncMock()
             mock_cohere.return_value.__aenter__.return_value = mock_client
 
@@ -355,7 +357,7 @@ class TestPipelineEmbedding:
             mock_response.embeddings.float_ = [[0.1] * 1024]
             mock_client.embed = AsyncMock(return_value=mock_response)
 
-            with patch('api.intelligence.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
+            with patch('api.intelligence.local_rag.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
                     embedding = await embeddings.generate_embedding(
                         "Test text to embed",
@@ -375,7 +377,7 @@ class TestPipelineEmbedding:
             "Third chunk regarding infrastructure"
         ]
 
-        with patch('api.intelligence.embeddings.cohere.AsyncClient') as mock_cohere:
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient') as mock_cohere:
             mock_client = AsyncMock()
             mock_cohere.return_value.__aenter__.return_value = mock_client
 
@@ -388,7 +390,7 @@ class TestPipelineEmbedding:
             ]
             mock_client.embed = AsyncMock(return_value=mock_response)
 
-            with patch('api.intelligence.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
+            with patch('api.intelligence.local_rag.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
                     embeddings_list = await embeddings.batch_embed(
                         texts,
@@ -434,7 +436,7 @@ class TestPipelineEmbedding:
         assert embedding_dim == 1024
 
         # Verify this through batch processing
-        with patch('api.intelligence.embeddings.cohere.AsyncClient') as mock_cohere:
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient') as mock_cohere:
             mock_client = AsyncMock()
             mock_cohere.return_value.__aenter__.return_value = mock_client
 
@@ -442,7 +444,7 @@ class TestPipelineEmbedding:
             mock_response.embeddings.float_ = [[0.5] * 1024]
             mock_client.embed = AsyncMock(return_value=mock_response)
 
-            with patch('api.intelligence.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
+            with patch('api.intelligence.local_rag.embeddings.COHERE_SEMAPHORE', new_callable=MagicMock):
                 with patch('asyncio.wait_for', return_value=mock_response):
                     result = await embeddings.batch_embed(
                         ["Test"],
@@ -683,13 +685,14 @@ class TestPipelineChatQuery:
 
         from api.intelligence.retrieval_backend import retrieve_document_chunks
 
-        with patch("api.intelligence.retrieval_backend.hybrid_search", return_value=mock_chunks) as mock_search:
-            chunks = await retrieve_document_chunks(
-                db_pool=mock_db_pool,
-                query="What rezoning happened in Downtown?",
-                search_mode="full",
-                cohere_api_key="test-key",
-            )
+        with patch("api.intelligence.local_rag.embeddings.hybrid_search", return_value=mock_chunks) as mock_search:
+            with patch.dict("os.environ", {"RAG_BACKEND": "local"}):
+                chunks = await retrieve_document_chunks(
+                    db_pool=mock_db_pool,
+                    query="What rezoning happened in Downtown?",
+                    search_mode="full",
+                    cohere_api_key="test-key",
+                )
 
         mock_search.assert_called_once()
         assert len(chunks) > 0
@@ -719,7 +722,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "What rezoning decisions were made?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             assert isinstance(result, ChatResponse)
@@ -760,7 +762,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "What rezoning decisions?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             assert len(result.citations) > 0
@@ -809,7 +810,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "Rezoning?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             assert len(result.related_signals) > 0
@@ -850,7 +850,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "Tell me about the rezoning",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             # Citation should match retrieved chunk
@@ -902,7 +901,7 @@ class TestPipelineEndToEnd:
         assert doc_id == 1
 
         # Step 4-6: Generate embeddings and store chunks (mocked)
-        with patch('api.intelligence.embeddings.cohere.AsyncClient'):
+        with patch('api.intelligence.local_rag.embeddings.cohere.AsyncClient'):
             chunk_ids = []
             for i, chunk in enumerate(chunks):
                 cid = await conn.fetchval(
@@ -948,7 +947,6 @@ class TestPipelineEndToEnd:
                                 mock_db_pool,
                                 "What rezoning happened?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
         assert result is not None

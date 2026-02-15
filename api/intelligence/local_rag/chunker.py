@@ -18,11 +18,11 @@ from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Configuration ─────────────────────────────────────────────
+# -- Configuration -------------------------------------------------------------
 CHUNK_SIZE = 800       # tokens per chunk (sweet spot for retrieval)
 TOKENIZER_MODEL = "gpt-4"  # tiktoken encoding name
 
-# ── Lazy-loaded chunker singleton ─────────────────────────────
+# -- Lazy-loaded chunker singleton ---------------------------------------------
 
 _chunker = None
 _use_semchunk = True
@@ -40,11 +40,11 @@ def _get_chunker():
         _use_semchunk = True
         logger.info(f"semchunk initialized: model={TOKENIZER_MODEL}, chunk_size={CHUNK_SIZE}")
     except ImportError:
-        logger.warning("semchunk not installed — falling back to simple splitter")
+        logger.warning("semchunk not installed -- falling back to simple splitter")
         _use_semchunk = False
         _chunker = _simple_chunker
     except Exception as e:
-        logger.warning(f"semchunk init failed ({e}) — falling back to simple splitter")
+        logger.warning(f"semchunk init failed ({e}) -- falling back to simple splitter")
         _use_semchunk = False
         _chunker = _simple_chunker
 
@@ -73,7 +73,7 @@ def _count_tokens(text: str) -> int:
         return len(text) // 4
 
 
-# ── Fallback simple chunker ──────────────────────────────────
+# -- Fallback simple chunker ---------------------------------------------------
 
 def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
     """
@@ -108,7 +108,7 @@ def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
     return chunks
 
 
-# ── Section header detection ─────────────────────────────────
+# -- Section header detection --------------------------------------------------
 
 # Patterns for government document section headers
 _HEADER_PATTERNS = [
@@ -154,7 +154,7 @@ def detect_section_header(text: str) -> Optional[str]:
     return None
 
 
-# ── Main chunking pipeline ───────────────────────────────────
+# -- Main chunking pipeline ----------------------------------------------------
 
 def chunk_document(
     text: str,

@@ -100,7 +100,7 @@ services:
       RATE_LIMIT_LLM: "${RATE_LIMIT_LLM:-30}"
       SCRAPER_SCHEDULER_ENABLED: "${SCRAPER_SCHEDULER_ENABLED:-true}"
       # RAG backend selection (local vs K2)
-      RAG_BACKEND: "${RAG_BACKEND:-local}"
+      RAG_BACKEND: "${RAG_BACKEND:-k2}"
       K2_API_HOST: "${K2_API_HOST:-}"
       K2_API_KEY: "${K2_API_KEY:-}"
       K2_CORPUS_ID: "${K2_CORPUS_ID:-}"

@@ -3,8 +3,8 @@ Hybrid search engine for VanCity Lens intelligence layer.
 
 Architecture:
   Stage 1: Parallel retrieval
-    - Dense: Cohere embed-english-v3.0 → pgvector cosine similarity
-    - Sparse: PostgreSQL tsvector/tsquery → GIN index full-text search
+    - Dense: Cohere embed-english-v3.0 -> pgvector cosine similarity
+    - Sparse: PostgreSQL tsvector/tsquery -> GIN index full-text search
   Stage 2: Reciprocal Rank Fusion (RRF) with k=60
   Stage 3: Optional Cohere Rerank v3.5 for final ordering
 
@@ -22,11 +22,11 @@ from typing import List, Dict, Optional, Any
 import asyncpg
 import cohere
 
-from .external_clients import COHERE_SEMAPHORE, COHERE_TIMEOUT_SECONDS
+from .external_clients_cohere import COHERE_SEMAPHORE, COHERE_TIMEOUT_SECONDS
 
 logger = logging.getLogger(__name__)
 
-# ── Cohere configuration ─────────────────────────────────────
+# -- Cohere configuration -----------------------------------------------------
 EMBEDDING_MODEL = "embed-english-v3.0"
 EMBEDDING_DIMENSION = 1024  # embed-english-v3.0 outputs 1024 dims
 RERANK_MODEL = "rerank-english-v3.0"
@@ -42,7 +42,7 @@ class EmbeddingError(Exception):
     pass
 
 
-# ── Embedding generation ─────────────────────────────────────
+# -- Embedding generation ------------------------------------------------------
 
 async def generate_embedding(
     text: str,
@@ -183,7 +183,7 @@ async def batch_embed(
     return all_embeddings
 
 
-# ── Reranking ────────────────────────────────────────────────
+# -- Reranking -----------------------------------------------------------------
 
 async def rerank_results(
     query: str,
@@ -224,7 +224,7 @@ async def rerank_results(
             for r in response.results
         ]
 
-        logger.info(f"Reranked {len(documents)} documents → top {len(results)}")
+        logger.info(f"Reranked {len(documents)} documents -> top {len(results)}")
         return results
 
     except Exception as e:
@@ -233,7 +233,7 @@ async def rerank_results(
         return [{"index": i, "relevance_score": 1.0 - (i * 0.01)} for i in range(min(top_n, len(documents)))]
 
 
-# ── Chunk storage ────────────────────────────────────────────
+# -- Chunk storage -------------------------------------------------------------
 
 async def store_chunk_with_embedding(
     db_pool: asyncpg.Pool,
@@ -277,7 +277,7 @@ async def store_chunk_with_embedding(
             raise
 
 
-# ── Full document processing ─────────────────────────────────
+# -- Full document processing --------------------------------------------------
 
 async def process_document_chunks(
     db_pool: asyncpg.Pool,
@@ -285,7 +285,7 @@ async def process_document_chunks(
     api_key: str
 ) -> int:
     """
-    Full pipeline: chunk document → embed with Cohere → store with tsvector.
+    Full pipeline: chunk document -> embed with Cohere -> store with tsvector.
 
     Args:
         db_pool: AsyncPG connection pool
@@ -359,7 +359,7 @@ async def process_document_chunks(
     return stored
 
 
-# ── Hybrid search ────────────────────────────────────────────
+# -- Hybrid search -------------------------------------------------------------
 
 async def hybrid_search(
     db_pool: asyncpg.Pool,
@@ -389,10 +389,10 @@ async def hybrid_search(
         use_rerank: Whether to apply Cohere reranking
         vector_weight: RRF weight for vector results (default 0.5)
         text_weight: RRF weight for text results (default 0.5)
-        neighborhood: RAG-008 — pre-filter by neighborhood
-        date_from: RAG-008 — pre-filter documents published on/after this date
-        date_to: RAG-008 — pre-filter documents published on/before this date
-        signal_type: RAG-008 — pre-filter by signal_type (via chunk metadata)
+        neighborhood: RAG-008 -- pre-filter by neighborhood
+        date_from: RAG-008 -- pre-filter documents published on/after this date
+        date_to: RAG-008 -- pre-filter documents published on/before this date
+        signal_type: RAG-008 -- pre-filter by signal_type (via chunk metadata)
 
     Returns:
         List of result dicts with chunk_text, document_id, score, metadata
@@ -540,7 +540,7 @@ async def hybrid_search(
         logger.info(f"Hybrid search: {len(reranked)} final results (reranked)")
         return reranked
 
-    # No reranking — use RRF scores directly
+    # No reranking -- use RRF scores directly
     results = candidates[:limit]
     for r in results:
         r['final_score'] = r['rrf_score']
@@ -549,7 +549,7 @@ async def hybrid_search(
     return results
 
 
-# ── Sparse (BM25-only) search ─────────────────────────────────
+# -- Sparse (BM25-only) search ------------------------------------------------
 
 
 async def sparse_search(
@@ -562,7 +562,7 @@ async def sparse_search(
     signal_type: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    BM25-only text search — no API keys required.
+    BM25-only text search -- no API keys required.
 
     Uses PostgreSQL tsvector/tsquery full-text search on document_chunks.
     Returns the same dict format as hybrid_search() for drop-in compatibility.
@@ -660,7 +660,7 @@ async def sparse_search(
     return results
 
 
-# ── Legacy compatibility alias ───────────────────────────────
+# -- Legacy compatibility alias ------------------------------------------------
 
 async def semantic_search(
     db_pool: asyncpg.Pool,

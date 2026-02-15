@@ -43,7 +43,6 @@ class TestHandleChat:
                 mock_pool,
                 "",
                 "test-key",
-                "test-cohere-key"
             )
 
     @pytest.mark.asyncio
@@ -85,7 +84,6 @@ class TestHandleChat:
                                 mock_pool,
                                 "Test query",
                                 "test-key",
-                                "test-cohere-key"
                             )
 
                             assert response.session_id is not None
@@ -119,7 +117,6 @@ class TestHandleChat:
                                     mock_pool,
                                     "Test query",
                                     "test-key",
-                                    "test-cohere-key",
                                     session_id=provided_id
                                 )
 
@@ -176,7 +173,6 @@ class TestHandleChat:
                                 mock_pool,
                                 "What rezoning decisions were made?",
                                 "test-key",
-                                "test-cohere-key"
                             )
 
                             # Should have citations
@@ -219,7 +215,6 @@ class TestHandleChat:
                                 mock_pool,
                                 "Query",
                                 "test-key",
-                                "test-cohere-key",
                                 neighborhood_filter="Downtown"
                             )
 
@@ -263,7 +258,6 @@ class TestHandleChat:
                                 mock_pool,
                                 "Test query",
                                 "test-key",
-                                "test-cohere-key"
                             )
 
                             assert isinstance(response, ChatResponse)
@@ -393,7 +387,6 @@ class TestChatIntegration:
                                 mock_pool,
                                 "What rezoning decisions were made?",
                                 "test-key",
-                                "test-cohere-key"
                             )
 
                             assert isinstance(response, ChatResponse)

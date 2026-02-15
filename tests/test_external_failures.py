@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
 from api.intelligence.chat import handle_chat, get_relevant_signals
-from api.intelligence.embeddings import (
+from api.intelligence.local_rag.embeddings import (
     generate_embedding,
     batch_embed,
     rerank_results,
@@ -28,8 +28,10 @@ from api.intelligence.embeddings import (
 from api.intelligence.extractor import extract_signals_from_chunk
 from api.intelligence.external_clients import (
     ANTHROPIC_SEMAPHORE,
-    COHERE_SEMAPHORE,
     ANTHROPIC_CHAT_TIMEOUT_SECONDS,
+)
+from api.intelligence.local_rag.external_clients_cohere import (
+    COHERE_SEMAPHORE,
     COHERE_TIMEOUT_SECONDS,
 )
 
@@ -338,7 +340,7 @@ class TestCohereAPIFailures:
 
         Verifies asyncio.TimeoutError during embedding generation.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -356,7 +358,7 @@ class TestCohereAPIFailures:
 
         Verifies validation of empty input text.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -376,7 +378,7 @@ class TestCohereAPIFailures:
 
         Verifies that reranking failures return original order.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -404,7 +406,7 @@ class TestCohereAPIFailures:
 
         Verifies error isolation when one batch fails.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -428,7 +430,7 @@ class TestCohereAPIFailures:
 
         Verifies authentication error handling.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -446,7 +448,7 @@ class TestCohereAPIFailures:
 
         Verifies rate limit error handling.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -464,7 +466,7 @@ class TestCohereAPIFailures:
 
         Verifies clean error when connection is refused.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -482,7 +484,7 @@ class TestCohereAPIFailures:
 
         Verifies validation of embedding dimensions.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -501,7 +503,7 @@ class TestCohereAPIFailures:
 
         Verifies detection of inconsistent batch responses.
         """
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -789,7 +791,7 @@ class TestCombinedFailureScenarios:
         mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("api.intelligence.embeddings.generate_embedding") as mock_embed:
+        with patch("api.intelligence.local_rag.embeddings.generate_embedding") as mock_embed:
             mock_embed.side_effect = EmbeddingError("Embedding generation failed")
 
             with pytest.raises(EmbeddingError):
@@ -878,7 +880,7 @@ class TestErrorLogging:
         import logging
         caplog.set_level(logging.ERROR)
 
-        with patch("api.intelligence.embeddings.cohere.AsyncClient") as mock_cohere:
+        with patch("api.intelligence.local_rag.embeddings.cohere.AsyncClient") as mock_cohere:
             mock_client = MagicMock()
             mock_cohere.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere.return_value.__aexit__ = AsyncMock(return_value=None)

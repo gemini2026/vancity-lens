@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from api.intelligence.embeddings import (
+from api.intelligence.local_rag.embeddings import (
     generate_embedding,
     batch_embed,
     rerank_results,
@@ -50,7 +50,7 @@ class TestGenerateEmbedding:
         """Test successful single embedding generation."""
         mock_embedding = [0.1] * 1024
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -70,7 +70,7 @@ class TestGenerateEmbedding:
         """Test that input_type is passed correctly."""
         mock_embedding = [0.1] * 1024
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -91,7 +91,7 @@ class TestGenerateEmbedding:
         long_text = "x" * 10000
         mock_embedding = [0.1] * 1024
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -111,7 +111,7 @@ class TestGenerateEmbedding:
         """Test that wrong embedding dimension raises EmbeddingError."""
         wrong_embedding = [0.1] * 512  # Wrong dimension
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -128,8 +128,8 @@ class TestGenerateEmbedding:
         """Test retry logic with exponential backoff."""
         mock_embedding = [0.1] * 1024
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
-            with patch("api.intelligence.embeddings.asyncio.sleep") as mock_sleep:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
+            with patch("api.intelligence.local_rag.embeddings.asyncio.sleep") as mock_sleep:
                 mock_client = MagicMock()
                 mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
                 mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -165,7 +165,7 @@ class TestBatchEmbed:
         texts = ["text 1", "text 2", "text 3"]
         mock_embeddings = [[0.1] * 1024] * 3
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -184,7 +184,7 @@ class TestBatchEmbed:
         """Test error when API returns wrong number of embeddings."""
         texts = ["text 1", "text 2"]
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -213,7 +213,7 @@ class TestRerankResults:
         """Test successful reranking."""
         docs = ["doc 1 content", "doc 2 content", "doc 3 content"]
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -236,7 +236,7 @@ class TestRerankResults:
         """Test fallback to original order when reranking fails."""
         docs = ["doc 1", "doc 2", "doc 3"]
 
-        with patch("api.intelligence.embeddings.cohere") as mock_cohere_mod:
+        with patch("api.intelligence.local_rag.embeddings.cohere") as mock_cohere_mod:
             mock_client = MagicMock()
             mock_cohere_mod.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_cohere_mod.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -265,7 +265,7 @@ class TestHybridSearch:
         mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
         conn.fetch.return_value = []
 
-        with patch("api.intelligence.embeddings.generate_embedding") as mock_embed:
+        with patch("api.intelligence.local_rag.embeddings.generate_embedding") as mock_embed:
             mock_embed.return_value = [0.1] * 1024
 
             result = await hybrid_search(mock_pool, "test query", "key")
@@ -296,7 +296,7 @@ class TestHybridSearch:
         }
         conn.fetch.return_value = [mock_row]
 
-        with patch("api.intelligence.embeddings.generate_embedding") as mock_embed:
+        with patch("api.intelligence.local_rag.embeddings.generate_embedding") as mock_embed:
             mock_embed.return_value = [0.1] * 1024
 
             result = await hybrid_search(
@@ -335,10 +335,10 @@ class TestHybridSearch:
         ]
         conn.fetch.return_value = mock_rows
 
-        with patch("api.intelligence.embeddings.generate_embedding") as mock_embed:
+        with patch("api.intelligence.local_rag.embeddings.generate_embedding") as mock_embed:
             mock_embed.return_value = [0.1] * 1024
 
-            with patch("api.intelligence.embeddings.rerank_results") as mock_rerank:
+            with patch("api.intelligence.local_rag.embeddings.rerank_results") as mock_rerank:
                 mock_rerank.return_value = [
                     {"index": 2, "relevance_score": 0.99},
                     {"index": 0, "relevance_score": 0.85},
@@ -363,7 +363,7 @@ class TestSemanticSearchAlias:
     @pytest.mark.asyncio
     async def test_alias_calls_hybrid_search(self):
         """Test that semantic_search delegates to hybrid_search."""
-        with patch("api.intelligence.embeddings.hybrid_search") as mock_hybrid:
+        with patch("api.intelligence.local_rag.embeddings.hybrid_search") as mock_hybrid:
             mock_hybrid.return_value = [{"chunk_text": "result"}]
 
             mock_pool = AsyncMock()
@@ -463,7 +463,7 @@ class TestProcessDocumentChunks:
         conn.fetchrow.return_value = {"id": 1, "raw_text": "Test document content here."}
         conn.fetchval.return_value = 42  # chunk ID
 
-        with patch("api.intelligence.embeddings.batch_embed") as mock_batch:
+        with patch("api.intelligence.local_rag.embeddings.batch_embed") as mock_batch:
             mock_batch.return_value = [[0.1] * 1024]  # 1 chunk → 1 embedding
 
             result = await process_document_chunks(mock_pool, 1, "key")

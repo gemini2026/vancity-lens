@@ -1,5 +1,6 @@
-"""Shared limits and timeouts for external AI services (Anthropic).
+"""Shared limits and timeouts for Cohere API calls.
 
+Extracted from api/intelligence/external_clients.py for the local RAG pipeline.
 These calls are high-latency and quota-limited. To keep the API responsive under
 load, we:
 - bound concurrent in-flight vendor requests with process-wide semaphores
@@ -46,12 +47,9 @@ def _env_float(name: str, default: float) -> float:
 
 
 # Concurrency limits (process-wide)
-ANTHROPIC_MAX_CONCURRENT_REQUESTS = _env_int("ANTHROPIC_MAX_CONCURRENT_REQUESTS", 3)
+COHERE_MAX_CONCURRENT_REQUESTS = _env_int("COHERE_MAX_CONCURRENT_REQUESTS", 3)
 
-ANTHROPIC_SEMAPHORE = asyncio.Semaphore(ANTHROPIC_MAX_CONCURRENT_REQUESTS)
-
+COHERE_SEMAPHORE = asyncio.Semaphore(COHERE_MAX_CONCURRENT_REQUESTS)
 
 # Timeouts (seconds)
-ANTHROPIC_CHAT_TIMEOUT_SECONDS = _env_float("ANTHROPIC_CHAT_TIMEOUT_SECONDS", 30.0)
-ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS = _env_float("ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS", 45.0)
-
+COHERE_TIMEOUT_SECONDS = _env_float("COHERE_TIMEOUT_SECONDS", 10.0)

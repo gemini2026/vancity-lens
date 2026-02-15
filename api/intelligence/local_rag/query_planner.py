@@ -82,7 +82,7 @@ def decompose_query(query: str) -> List[str]:
                     logger.info(f"Decomposed query into {len(sub_queries)} sub-queries: {sub_queries}")
                     return sub_queries
 
-    # No decomposition possible — return original
+    # No decomposition possible -- return original
     return [query]
 
 
@@ -96,7 +96,7 @@ async def multi_hop_search(
     **search_kwargs,
 ) -> List[Dict[str, Any]]:
     """
-    Run multi-hop retrieval: decompose → parallel search → merge → deduplicate.
+    Run multi-hop retrieval: decompose -> parallel search -> merge -> deduplicate.
 
     Args:
         db_pool: AsyncPG connection pool
@@ -115,7 +115,7 @@ async def multi_hop_search(
     sub_queries = decompose_query(query)
 
     if len(sub_queries) <= 1:
-        # Single query — just run normal search
+        # Single query -- just run normal search
         return await search_fn(
             db_pool, query, api_key, limit=final_limit, **search_kwargs
         )
@@ -155,6 +155,6 @@ async def multi_hop_search(
     final = merged[:final_limit]
     logger.info(
         f"Multi-hop search: {sum(len(r) for r in results_per_hop)} total results "
-        f"→ {len(merged)} after dedup → {len(final)} final"
+        f"-> {len(merged)} after dedup -> {len(final)} final"
     )
     return final

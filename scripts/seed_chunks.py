@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncpg
 
-from api.intelligence.chunker import chunk_document
+from api.intelligence.local_rag.chunker import chunk_document
 
 logging.basicConfig(
     level=logging.INFO,

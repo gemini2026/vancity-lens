@@ -46,6 +46,8 @@ from .tasks.routes import router as jobs_router
 from .share_routes import router as share_router
 from .saved_views_routes import router as saved_views_router
 from .org_routes import router as org_router
+from .saved_parcels_routes import router as saved_parcels_router
+from .case_studies_routes import router as case_studies_router
 from .rate_limit import rate_limit_general
 from .json_logging import setup_json_logging
 from .versioning import APIVersionMiddleware, get_api_versions
@@ -332,6 +334,8 @@ app.include_router(jobs_router)
 app.include_router(share_router)
 app.include_router(saved_views_router)
 app.include_router(org_router)
+app.include_router(saved_parcels_router)
+app.include_router(case_studies_router)
 
 
 # ── Routes ───────────────────────────────────────────────────
@@ -372,7 +376,7 @@ async def ready(response: Response):
 
     # External keys: required for the intelligence endpoints to function.
     checks["anthropic_key"] = bool(os.getenv("ANTHROPIC_API_KEY"))
-    checks["cohere_key"] = bool(os.getenv("COHERE_API_KEY"))
+    checks["k2_key"] = bool(os.getenv("K2_API_KEY"))
 
     # Cache health check (PERF-005)
     try:
@@ -403,7 +407,7 @@ async def ready(response: Response):
     is_ready = (
         checks.get("database") is True
         and checks.get("anthropic_key") is True
-        and checks.get("cohere_key") is True
+        and checks.get("k2_key") is True
     )
 
     response.status_code = 200 if is_ready else 503
