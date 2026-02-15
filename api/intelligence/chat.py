@@ -7,7 +7,7 @@ This module handles:
 - Citation extraction and tracking
 - Chat message persistence
 
-Search pipeline uses Cohere embeddings + BM25 hybrid search with RRF fusion.
+Search pipeline uses K2 search (with local BM25 fallback).
 """
 
 import asyncio
@@ -62,7 +62,6 @@ async def handle_chat(
     db_pool: asyncpg.Pool,
     query: str,
     anthropic_api_key: Optional[str] = None,
-    cohere_api_key: Optional[str] = None,
     session_id: Optional[str] = None,
     neighborhood_filter: Optional[str] = None,
     date_from: Optional[date] = None,
@@ -71,16 +70,14 @@ async def handle_chat(
     """
     Handle a chat query using RAG (Retrieval-Augmented Generation).
 
-    Operates in three tiers based on available API keys:
-    - FULL:    Anthropic + Cohere → hybrid search + Claude RAG
-    - PARTIAL: Anthropic only    → sparse (BM25) search + Claude RAG
-    - DEMO:    No keys           → sparse (BM25) search + formatted results
+    Operates in two tiers based on available API keys:
+    - FULL: Anthropic key present → K2 search + Claude RAG
+    - DEMO: No keys               → K2/BM25 search + formatted results
 
     Args:
         db_pool: AsyncPG connection pool
         query: User's question
         anthropic_api_key: Anthropic API key for Claude (optional)
-        cohere_api_key: Cohere API key for embeddings + reranking (optional)
         session_id: Optional session ID for grouping messages
         neighborhood_filter: Optional neighborhood to filter results
         date_from: Optional start date for document filtering
@@ -92,16 +89,8 @@ async def handle_chat(
 
     # Determine search mode
     has_anthropic = bool(anthropic_api_key)
-    has_cohere = bool(cohere_api_key)
-
-    if has_anthropic and has_cohere:
-        search_mode = "full"
-    elif has_anthropic:
-        search_mode = "partial"
-    else:
-        search_mode = "demo"
-
-    logger.info(f"Chat mode: {search_mode} (anthropic={has_anthropic}, cohere={has_cohere})")
+    search_mode = "full" if has_anthropic else "demo"
+    logger.info(f"Chat mode: {search_mode} (anthropic={has_anthropic})")
 
     # Create or retrieve session
     if not session_id:
@@ -131,7 +120,6 @@ async def handle_chat(
             db_pool=db_pool,
             query=query,
             search_mode=search_mode,
-            cohere_api_key=cohere_api_key,
             neighborhood_filter=neighborhood_filter,
             date_from=date_from,
             date_to=date_to,
