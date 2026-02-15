@@ -21,7 +21,7 @@ export default function Disclaimer() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 md:bottom-0 inset-x-0 z-[9999] bg-gray-900/92 backdrop-blur-md border-t border-white/10 px-5 py-3 flex items-center justify-center gap-4">
+    <div className="fixed bottom-16 md:bottom-0 inset-x-0 z-40 bg-gray-900/92 backdrop-blur-md border-t border-white/10 px-5 py-3 flex items-center justify-center gap-4">
       <p className="m-0 text-xs leading-relaxed text-gray-400 max-w-[900px] text-center">
         VanCity Lens is for informational purposes only. Not investment advice.
         All estimates are derived from public data and may contain inaccuracies.

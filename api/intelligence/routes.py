@@ -485,6 +485,17 @@ async def get_document_page(request: Request, document_id: int):
         url_status = row["url_status"] or "unchecked"
         signal_count = row["signal_count"] or 0
 
+        # Build source-box link/label based on URL health status
+        if url_status == "dead":
+            source_link_html = f'<span style="color: #64748b; word-break: break-all;">{source_url}</span>'
+            status_html = "Content served from VanCity Lens intelligence archive"
+        elif url_status == "alive":
+            source_link_html = f'<a href="{source_url}" target="_blank" rel="noopener">{source_url}</a>'
+            status_html = f'<a href="{source_url}" target="_blank" rel="noopener" style="color: #86efac;">Live — visit original source &rarr;</a>'
+        else:
+            source_link_html = f'<a href="{source_url}" target="_blank" rel="noopener">{source_url}</a>'
+            status_html = f'<a href="{source_url}" target="_blank" rel="noopener" style="color: #94a3b8;">Visit original source (unverified) &rarr;</a>'
+
         # Convert plain text paragraphs to HTML
         paragraphs = raw_text.split("\n")
         body_html = "\n".join(f"<p>{p.strip()}</p>" for p in paragraphs if p.strip())
@@ -530,8 +541,8 @@ async def get_document_page(request: Request, document_id: int):
       {body_html}
     </div>
     <div class="source-box">
-      <strong>Original source:</strong> {f'<a href="{source_url}" target="_blank" rel="noopener">{source_url}</a>' if url_status != "dead" else f'<span style="color: #64748b; word-break: break-all;">{source_url}</span>'}
-      <br><strong>Status:</strong> {f'Content served from VanCity Lens intelligence archive' if url_status == "dead" else f'<a href="{source_url}" target="_blank" rel="noopener" style="color: #86efac;">Live — visit original source &rarr;</a>'}
+      <strong>Original source:</strong> {source_link_html}
+      <br><strong>Status:</strong> {status_html}
     </div>
     <div class="footer">VanCity Lens &mdash; Intelligence for Vancouver Real Estate Development</div>
   </div>
@@ -799,7 +810,7 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
                 signals_stored = await process_document(db_pool, doc_id, anthropic_key)
                 logger.info(f"Doc {doc_id}: {signals_stored} signals extracted")
             except Exception as e:
-                logger.error(f"Failed to process document {doc_id}: {e}")
+                logger.error(f"Failed to process document {doc_id}: {e}", exc_info=True)
 
         tasks = [_process_one(row["id"]) for row in doc_ids]
         await asyncio.gather(*tasks)

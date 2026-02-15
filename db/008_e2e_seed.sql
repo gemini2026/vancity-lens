@@ -8,31 +8,31 @@
 -- Seed intelligence documents (id is SERIAL, use explicit integer IDs)
 INSERT INTO documents (id, source_type, source_url, title, raw_text, scraped_at, processed_at, metadata)
 VALUES
-  (10001, 'council_minutes', 'https://council.vancouver.ca/e2e-test-1',
+  (10001, 'council_minutes', 'https://vancouver.ca/your-government/council-minutes-2026-01-15.aspx',
    'Council Meeting — January 2026 Regular Session',
    'The Council approved the rezoning application for 1234 Main Street from RS-1 to RM-4, allowing construction of a 6-storey mixed-use building with 120 rental units. The vote passed 7-4 with conditions including 20% below-market rental units and ground-floor commercial space. Council also discussed the Broadway Plan implementation timeline and transit-oriented area density bonuses near SkyTrain stations.',
    NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days',
    '{"meeting_date": "2026-01-15", "session_type": "regular"}'::jsonb),
 
-  (10002, 'rezoning_application', 'https://rezoning.vancouver.ca/e2e-test-2',
+  (10002, 'rezoning_application', 'https://rezoning.vancouver.ca/applications/2026-555-w-broadway/index.htm',
    'Rezoning Application — 555 West Broadway',
    'Application to rezone 555 West Broadway from C-3A to CD-1, proposing a 28-storey mixed-use tower with 350 residential units, 15,000 sq ft of commercial space, and underground parking for 200 vehicles. The proposal includes a community amenity contribution of $3.2 million toward affordable housing and park improvements in Mount Pleasant.',
    NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days',
    '{"application_number": "RZ-2026-001", "applicant": "Westbank Corp"}'::jsonb),
 
-  (10003, 'dpb_minutes', 'https://vancouver.ca/dpb/e2e-test-3',
+  (10003, 'dpb_minutes', 'https://vancouver.ca/home-property-development/dpb-decision-2025-12-18-2100-commercial.aspx',
    'Development Permit Board Meeting — December 2025',
    'The Board approved the development permit for 2100 Commercial Drive, a 4-storey residential building with 48 units. Community members raised concerns about shadowing and parking, but the Board found the proposal consistent with the Grandview-Woodland Community Plan. The applicant agreed to additional landscaping requirements along the lane.',
    NOW() - INTERVAL '10 days', NOW() - INTERVAL '10 days',
    '{"meeting_date": "2025-12-18"}'::jsonb),
 
-  (10004, 'news', 'https://vancouversun.com/e2e-test-4',
+  (10004, 'news', 'https://vancouversun.com/news/local-news/vancouver-approves-tod-near-renfrew-station',
    'Vancouver approves new transit-oriented development near Renfrew Station',
    'The City of Vancouver has given the green light to a major transit-oriented development near Renfrew SkyTrain station. The project will include 500 residential units, a community center, and retail space. The development is part of the broader Transit-Oriented Areas (TOA) framework under Bill 47, which allows increased density within 800 meters of rapid transit stations.',
    NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day',
    '{"source": "Vancouver Sun", "author": "Jane Reporter"}'::jsonb),
 
-  (10005, 'news', 'https://biv.com/e2e-test-5',
+  (10005, 'news', 'https://biv.com/article/2026/02/mount-pleasant-condo-prices-surge-rezoning-wave',
    'Mount Pleasant condo prices surge amid rezoning wave',
    'Real estate prices in Mount Pleasant have jumped 12% year-over-year as multiple rezoning applications transform the neighborhood. Developers are betting on the area''s proximity to transit and the Broadway Plan''s allowance for increased density. Analysts note that the pipeline of approved projects could add over 2,000 new units to the area by 2028.',
    NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days',

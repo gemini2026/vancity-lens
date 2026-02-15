@@ -59,7 +59,6 @@ jobs:
       - name: Build and Push Images (API + Frontend)
         env:
           PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
           IMAGE_TAG: ${{ steps.tag.outputs.sha }}
         run: |
           API_IMAGE_URL="${REGISTRY_HOST}/${PROJECT_ID}/${IMAGE_REPOSITORY}/${API_IMAGE_NAME}"
@@ -71,7 +70,6 @@ jobs:
 
           docker build -t "${FRONTEND_IMAGE_URL}:${IMAGE_TAG}" -t "${FRONTEND_IMAGE_URL}:latest" \
             -f frontend/Dockerfile \
-            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN="${NEXT_PUBLIC_MAPBOX_TOKEN}" \
             frontend
           docker push "${FRONTEND_IMAGE_URL}:${IMAGE_TAG}"
           docker push "${FRONTEND_IMAGE_URL}:latest"
