@@ -84,7 +84,7 @@ function AppContent() {
       </nav>
 
       {/* Content area */}
-      <main className="relative flex-1 overflow-hidden">
+      <main className="relative flex-1 overflow-hidden mb-16 md:mb-0">
         {/* Map — always rendered, shown/hidden to preserve GL state */}
         <div
           className={cn(

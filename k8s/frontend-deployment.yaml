@@ -24,6 +24,12 @@ spec:
           ports:
             - containerPort: 3000
               name: http
+          env:
+            - name: NEXT_PUBLIC_MAPBOX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: mapbox-token
           resources:
             requests:
               memory: "256Mi"

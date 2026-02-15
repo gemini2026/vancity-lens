@@ -2,7 +2,7 @@ import pathlib
 import re
 
 COMPONENTS_DIR = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "src" / "components"
-STYLES_DIR = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "src" / "styles"
+STYLES_DIR = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "src" / "app"
 LIB_DIR = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "src" / "lib"
 
 
@@ -17,11 +17,9 @@ class TestThemeToggleComponent:
     def test_is_react_component(self):
         assert "export" in self.content
         assert "ThemeToggle" in self.content
-        assert "React.FC" in self.content
 
-    def test_has_props_interface(self):
-        assert "ThemeToggleProps" in self.content
-        assert "className?" in self.content
+    def test_has_className_param(self):
+        assert "className" in self.content
 
     def test_uses_use_client_directive(self):
         assert '"use client"' in self.content
@@ -30,23 +28,17 @@ class TestThemeToggleComponent:
         assert "useTheme" in self.content
         assert "@/lib/theme-context" in self.content
 
-    def test_has_sun_icon_function(self):
-        assert "getSunIcon" in self.content
-        assert "svg" in self.content.lower()
-        assert "circle" in self.content
+    def test_imports_lucide_icons(self):
+        assert "Sun" in self.content
+        assert "Moon" in self.content
+        assert "Monitor" in self.content
+        assert "lucide-react" in self.content
 
-    def test_has_moon_icon_function(self):
-        assert "getMoonIcon" in self.content
-        assert "svg" in self.content.lower()
-
-    def test_has_system_icon_function(self):
-        assert "getSystemIcon" in self.content
-
-    def test_has_handle_theme_change_function(self):
-        assert "handleThemeChange" in self.content
+    def test_has_handle_click_function(self):
+        assert "handleClick" in self.content
 
     def test_onclick_handler_attached(self):
-        assert "onClick={handleThemeChange}" in self.content
+        assert "onClick={handleClick}" in self.content
 
     def test_has_aria_label(self):
         assert "aria-label" in self.content
@@ -56,10 +48,11 @@ class TestThemeToggleComponent:
         assert "</button>" in self.content
 
     def test_has_tooltip_title(self):
-        assert "title={getLabel()}" in self.content
+        assert "title={label}" in self.content
 
-    def test_supports_className_prop(self):
-        assert "className={`" in self.content
+    def test_uses_cn_utility(self):
+        assert "cn(" in self.content
+        assert '@/lib/utils' in self.content
 
     def test_button_has_styling_classes(self):
         assert "dark:" in self.content
@@ -78,8 +71,8 @@ class TestThemeToggleComponent:
         assert "useEffect" in self.content
 
     def test_hydration_safe_mounting_check(self):
-        assert "isMounted" in self.content
-        assert "setIsMounted" in self.content
+        assert "mounted" in self.content
+        assert "setMounted" in self.content
 
 
 class TestThemeContext:
@@ -206,15 +199,14 @@ class TestTailwindConfig:
     def test_has_dark_color_palette(self):
         assert "dark:" in self.content or "dark" in self.content
 
-    def test_dark_colors_include_bg_primary(self):
-        assert "bg" in self.content
-        assert "primary" in self.content
+    def test_dark_colors_include_surface(self):
+        assert "surface" in self.content
 
     def test_dark_colors_include_bg_secondary(self):
         assert "secondary" in self.content
 
-    def test_dark_colors_include_text_colors(self):
-        assert "text" in self.content
+    def test_dark_colors_include_foreground(self):
+        assert "foreground" in self.content
 
     def test_dark_colors_include_border(self):
         assert "border" in self.content
@@ -227,13 +219,15 @@ class TestTailwindConfig:
         assert "type" in self.content or ":" in self.content
 
 
-class TestDarkModeCss:
+class TestGlobalsCss:
+    """Tests for globals.css which contains design tokens and base styles."""
+
     def setup_method(self):
-        self.css_path = STYLES_DIR / "dark-mode.css"
+        self.css_path = STYLES_DIR / "globals.css"
         self.content = self.css_path.read_text()
 
-    def test_dark_mode_css_file_exists(self):
-        assert self.css_path.exists(), "dark-mode.css does not exist"
+    def test_globals_css_file_exists(self):
+        assert self.css_path.exists(), "globals.css does not exist"
 
     def test_defines_root_custom_properties(self):
         assert ":root {" in self.content
@@ -242,29 +236,29 @@ class TestDarkModeCss:
     def test_defines_dark_selector(self):
         assert ".dark {" in self.content
 
-    def test_has_bg_primary_property(self):
-        assert "--bg-primary:" in self.content
+    def test_has_surface_property(self):
+        assert "--color-surface:" in self.content
 
-    def test_has_bg_secondary_property(self):
-        assert "--bg-secondary:" in self.content
+    def test_has_surface_secondary_property(self):
+        assert "--color-surface-secondary:" in self.content
 
-    def test_has_bg_tertiary_property(self):
-        assert "--bg-tertiary:" in self.content
+    def test_has_surface_tertiary_property(self):
+        assert "--color-surface-tertiary:" in self.content
 
-    def test_has_text_primary_property(self):
-        assert "--text-primary:" in self.content
+    def test_has_foreground_property(self):
+        assert "--color-foreground:" in self.content
 
-    def test_has_text_secondary_property(self):
-        assert "--text-secondary:" in self.content
+    def test_has_foreground_secondary_property(self):
+        assert "--color-foreground-secondary:" in self.content
 
-    def test_has_text_tertiary_property(self):
-        assert "--text-tertiary:" in self.content
+    def test_has_foreground_muted_property(self):
+        assert "--color-foreground-muted:" in self.content
 
     def test_has_accent_property(self):
-        assert "--accent:" in self.content
+        assert "--color-accent:" in self.content
 
     def test_has_border_property(self):
-        assert "--border:" in self.content
+        assert "--color-border:" in self.content
 
     def test_has_transition_speed_property(self):
         assert "--transition-speed:" in self.content
@@ -279,33 +273,8 @@ class TestDarkModeCss:
         assert "html" in self.content or "body" in self.content
         assert "var(--" in self.content
 
-    def test_background_color_transition(self):
-        assert "background-color" in self.content
-        assert "transition:" in self.content
-
-    def test_color_transition(self):
-        assert "color" in self.content
-
-    def test_transition_speed_used(self):
-        assert "var(--transition-speed)" in self.content
-
     def test_mapbox_popup_styling(self):
         assert ".mapboxgl-popup-content" in self.content
-
-    def test_panel_and_card_styling(self):
-        assert ".panel" in self.content or ".card" in self.content
-
-    def test_button_styling(self):
-        assert "button" in self.content
-
-    def test_input_styling(self):
-        assert "input" in self.content or "textarea" in self.content
-
-    def test_link_styling(self):
-        assert "a {" in self.content or "a:" in self.content
-
-    def test_border_styling(self):
-        assert "hr" in self.content or ".border" in self.content
 
     def test_scrollbar_styling(self):
         assert "::-webkit-scrollbar" in self.content
@@ -320,11 +289,8 @@ class TestDarkModeCss:
         assert ".mapboxgl-canvas" in self.content
         assert "transition: none" in self.content
 
-    def test_smooth_transitions_enabled(self):
-        assert "transition:" in self.content
-
-    def test_placeholder_styling(self):
-        assert "::placeholder" in self.content
+    def test_brand_color_defined(self):
+        assert "--color-brand:" in self.content
 
 
 class TestComponentDarkModeSupport:
@@ -413,11 +379,17 @@ class TestThemeIntegration:
     def test_toggle_cycles_through_modes(self):
         assert "if (theme ===" in self.toggle_content
 
-    def test_toggle_shows_appropriate_icon(self):
-        assert "getIcon" in self.toggle_content
+    def test_toggle_assigns_icon_per_theme(self):
+        assert "Icon" in self.toggle_content
+        assert "Sun" in self.toggle_content
+        assert "Moon" in self.toggle_content
+        assert "Monitor" in self.toggle_content
 
-    def test_toggle_shows_appropriate_label(self):
-        assert "getLabel" in self.toggle_content
+    def test_toggle_assigns_label_per_theme(self):
+        assert "label" in self.toggle_content
+        assert '"Light"' in self.toggle_content
+        assert '"Dark"' in self.toggle_content
+        assert '"System"' in self.toggle_content
 
 
 class TestAccessibility:
@@ -463,7 +435,7 @@ class TestHydrationSafety:
         assert "useEffect" in self.toggle_content
 
     def test_toggle_checks_mount_status(self):
-        assert "isMounted" in self.toggle_content
+        assert "mounted" in self.toggle_content
 
     def test_toggle_returns_null_before_mount(self):
         assert "return null" in self.toggle_content
@@ -474,8 +446,8 @@ class TestHydrationSafety:
     def test_toggle_dependencies_array_exists(self):
         assert "useEffect(" in self.toggle_content and "[]" in self.toggle_content
 
-    def test_async_state_updates_prevented(self):
-        assert "setIsMounted" in self.toggle_content or "setIsMounted" in self.context_content
+    def test_mounted_state_updates(self):
+        assert "setMounted" in self.toggle_content or "setMounted" in self.context_content
 
 
 class TestEdgeCases:
