@@ -35,24 +35,22 @@ class TestChatEndpoint:
 
         with patch("api.intelligence.routes.get_db_pool") as mock_get_pool:
             with patch("api.intelligence.routes.get_anthropic_api_key_optional") as mock_anth_key:
-                with patch("api.intelligence.routes.get_cohere_api_key_optional") as mock_cohere_key:
-                    with patch("api.intelligence.routes.handle_chat") as mock_handle:
-                        mock_get_pool.return_value = AsyncMock()
-                        mock_anth_key.return_value = "test-key"
-                        mock_cohere_key.return_value = "test-cohere-key"
+                with patch("api.intelligence.routes.handle_chat") as mock_handle:
+                    mock_get_pool.return_value = AsyncMock()
+                    mock_anth_key.return_value = "test-key"
 
-                        mock_response = MagicMock()
-                        mock_response.answer = "Test answer"
-                        mock_response.citations = []
-                        mock_response.related_signals = []
-                        mock_response.session_id = "test-session"
-                        mock_response.mode = "full"
+                    mock_response = MagicMock()
+                    mock_response.answer = "Test answer"
+                    mock_response.citations = []
+                    mock_response.related_signals = []
+                    mock_response.session_id = "test-session"
+                    mock_response.mode = "full"
 
-                        mock_handle.return_value = mock_response
+                    mock_handle.return_value = mock_response
 
-                        response = client.post("/api/v1/intel/chat", json=request_body)
+                    response = client.post("/api/v1/intel/chat", json=request_body)
 
-                        assert response.status_code == 200
+                    assert response.status_code == 200
 
     def test_post_chat_missing_api_key_falls_to_demo(self, client):
         """Test chat gracefully degrades to demo mode when API keys are missing."""
@@ -396,13 +394,12 @@ class TestErrorHandling:
 
         with patch("api.intelligence.routes.get_db_pool"):
             with patch("api.intelligence.routes.get_anthropic_api_key_optional"):
-                with patch("api.intelligence.routes.get_cohere_api_key_optional"):
-                    with patch("api.intelligence.routes.handle_chat") as mock_handle:
-                        mock_handle.side_effect = Exception("API Error")
+                with patch("api.intelligence.routes.handle_chat") as mock_handle:
+                    mock_handle.side_effect = Exception("API Error")
 
-                        response = client.post("/api/v1/intel/chat", json=request_body)
+                    response = client.post("/api/v1/intel/chat", json=request_body)
 
-                        assert response.status_code == 500
+                    assert response.status_code == 500
 
 
 class TestEndpointResponses:
@@ -414,28 +411,26 @@ class TestEndpointResponses:
 
         with patch("api.intelligence.routes.get_db_pool") as mock_pool:
             with patch("api.intelligence.routes.get_anthropic_api_key_optional") as mock_key:
-                with patch("api.intelligence.routes.get_cohere_api_key_optional") as mock_cohere:
-                    with patch("api.intelligence.routes.handle_chat") as mock_chat:
-                        mock_pool.return_value = AsyncMock()
-                        mock_key.return_value = "key"
-                        mock_cohere.return_value = "key"
+                with patch("api.intelligence.routes.handle_chat") as mock_chat:
+                    mock_pool.return_value = AsyncMock()
+                    mock_key.return_value = "key"
 
-                        mock_response = MagicMock()
-                        mock_response.answer = "Answer"
-                        mock_response.citations = []
-                        mock_response.related_signals = []
-                        mock_response.session_id = "session"
-                        mock_response.mode = "full"
-                        mock_response.model_dump.return_value = {
-                            "answer": "Answer",
-                            "citations": [],
-                            "related_signals": [],
-                            "session_id": "session",
-                            "mode": "full",
-                        }
+                    mock_response = MagicMock()
+                    mock_response.answer = "Answer"
+                    mock_response.citations = []
+                    mock_response.related_signals = []
+                    mock_response.session_id = "session"
+                    mock_response.mode = "full"
+                    mock_response.model_dump.return_value = {
+                        "answer": "Answer",
+                        "citations": [],
+                        "related_signals": [],
+                        "session_id": "session",
+                        "mode": "full",
+                    }
 
-                        mock_chat.return_value = mock_response
+                    mock_chat.return_value = mock_response
 
-                        response = client.post("/api/v1/intel/chat", json=request_body)
+                    response = client.post("/api/v1/intel/chat", json=request_body)
 
-                        assert response.status_code == 200
+                    assert response.status_code == 200

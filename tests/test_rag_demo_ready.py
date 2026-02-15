@@ -223,14 +223,13 @@ class TestHandleChatDemoMode:
         """handle_chat with no API keys returns demo mode response."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=_sample_chunks()):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=_sample_chunks()):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     response = await handle_chat(
                         mock_pool,
                         "What rezoning decisions?",
                         anthropic_api_key=None,
-                        cohere_api_key=None,
                     )
 
         assert isinstance(response, ChatResponse)
@@ -243,7 +242,7 @@ class TestHandleChatDemoMode:
         """Demo mode never calls Anthropic API."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
@@ -251,50 +250,45 @@ class TestHandleChatDemoMode:
                             mock_pool,
                             "test",
                             anthropic_api_key=None,
-                            cohere_api_key=None,
                         )
                         mock_anthropic.assert_not_called()
 
 
-class TestHandleChatPartialMode:
-    """Tests for handle_chat in partial mode (Anthropic only)."""
+class TestHandleChatFullModeWithAnthropic:
+    """Tests for handle_chat in full mode (Anthropic key present)."""
 
     @pytest.mark.asyncio
-    async def test_partial_mode_uses_sparse_search(self):
-        """Partial mode uses sparse_search, not hybrid_search."""
+    async def test_full_mode_with_anthropic_key(self):
+        """Full mode with Anthropic key calls Claude and returns full mode."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=[]) as mock_sparse:
-            with patch("api.intelligence.retrieval_backend.hybrid_search") as mock_hybrid:
-                with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                    with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
-                        with patch("api.intelligence.chat.build_context_window", return_value=""):
-                            with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                                mock_client = MagicMock()
-                                mock_anthropic.return_value = mock_client
-                                mock_response = MagicMock()
-                                mock_response.content = [MagicMock()]
-                                mock_response.content[0].text = "AI answer"
-                                mock_client.messages.create = AsyncMock(return_value=mock_response)
-                                mock_client.close = AsyncMock()
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
+            with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
+                with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "AI answer"
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
 
-                                response = await handle_chat(
-                                    mock_pool,
-                                    "test query",
-                                    anthropic_api_key="sk-ant-test",
-                                    cohere_api_key=None,
-                                )
+                            response = await handle_chat(
+                                mock_pool,
+                                "test query",
+                                anthropic_api_key="sk-ant-test",
+                            )
 
-        assert response.mode == "partial"
-        mock_sparse.assert_called_once()
-        mock_hybrid.assert_not_called()
+        assert response.mode == "full"
 
     @pytest.mark.asyncio
-    async def test_partial_mode_calls_claude(self):
-        """Partial mode calls Claude API for answer generation."""
+    async def test_full_mode_calls_claude(self):
+        """Full mode calls Claude API for answer generation."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.retrieval_backend.sparse_search", return_value=[]):
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.build_context_window", return_value=""):
@@ -311,7 +305,6 @@ class TestHandleChatPartialMode:
                                 mock_pool,
                                 "test query",
                                 anthropic_api_key="sk-ant-test",
-                                cohere_api_key=None,
                             )
 
         assert response.answer == "Claude's answer"
@@ -319,37 +312,34 @@ class TestHandleChatPartialMode:
 
 
 class TestHandleChatFullMode:
-    """Tests for handle_chat in full mode (both keys)."""
+    """Tests for handle_chat in full mode (Anthropic key present)."""
 
     @pytest.mark.asyncio
-    async def test_full_mode_uses_hybrid_search(self):
-        """Full mode uses hybrid_search."""
+    async def test_full_mode_returns_answer(self):
+        """Full mode retrieves chunks and returns Claude answer."""
         mock_pool, conn = _make_mock_pool()
 
-        with patch("api.intelligence.retrieval_backend.hybrid_search", return_value=[]) as mock_hybrid:
-            with patch("api.intelligence.retrieval_backend.sparse_search") as mock_sparse:
-                with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                    with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
-                        with patch("api.intelligence.chat.build_context_window", return_value=""):
-                            with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                                mock_client = MagicMock()
-                                mock_anthropic.return_value = mock_client
-                                mock_response = MagicMock()
-                                mock_response.content = [MagicMock()]
-                                mock_response.content[0].text = "Full answer"
-                                mock_client.messages.create = AsyncMock(return_value=mock_response)
-                                mock_client.close = AsyncMock()
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
+            with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
+                with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                            mock_client = MagicMock()
+                            mock_anthropic.return_value = mock_client
+                            mock_response = MagicMock()
+                            mock_response.content = [MagicMock()]
+                            mock_response.content[0].text = "Full answer"
+                            mock_client.messages.create = AsyncMock(return_value=mock_response)
+                            mock_client.close = AsyncMock()
 
-                                response = await handle_chat(
-                                    mock_pool,
-                                    "test query",
-                                    anthropic_api_key="sk-ant-test",
-                                    cohere_api_key="co-test",
-                                )
+                            response = await handle_chat(
+                                mock_pool,
+                                "test query",
+                                anthropic_api_key="sk-ant-test",
+                            )
 
         assert response.mode == "full"
-        mock_hybrid.assert_called_once()
-        mock_sparse.assert_not_called()
+        assert response.answer == "Full answer"
 
 
 # ── ChatResponse model tests ──────────────────────────────────────
@@ -404,20 +394,6 @@ class TestOptionalKeyFunctions:
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-test-123"}):
             result = get_anthropic_api_key_optional()
             assert result == "sk-test-123"
-
-    def test_cohere_optional_returns_none(self):
-        """get_cohere_api_key_optional returns None when env var unset."""
-        from api.intelligence.routes import get_cohere_api_key_optional
-        with patch.dict("os.environ", {}, clear=True):
-            result = get_cohere_api_key_optional()
-            assert result is None
-
-    def test_cohere_optional_returns_key(self):
-        """get_cohere_api_key_optional returns key when set."""
-        from api.intelligence.routes import get_cohere_api_key_optional
-        with patch.dict("os.environ", {"COHERE_API_KEY": "co-test-456"}):
-            result = get_cohere_api_key_optional()
-            assert result == "co-test-456"
 
     def test_anthropic_optional_empty_string_returns_none(self):
         """get_anthropic_api_key_optional returns None for empty string."""

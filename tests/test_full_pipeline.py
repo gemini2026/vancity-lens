@@ -685,13 +685,14 @@ class TestPipelineChatQuery:
 
         from api.intelligence.retrieval_backend import retrieve_document_chunks
 
-        with patch("api.intelligence.retrieval_backend.hybrid_search", return_value=mock_chunks) as mock_search:
-            chunks = await retrieve_document_chunks(
-                db_pool=mock_db_pool,
-                query="What rezoning happened in Downtown?",
-                search_mode="full",
-                cohere_api_key="test-key",
-            )
+        with patch("api.intelligence.local_rag.embeddings.hybrid_search", return_value=mock_chunks) as mock_search:
+            with patch.dict("os.environ", {"RAG_BACKEND": "local"}):
+                chunks = await retrieve_document_chunks(
+                    db_pool=mock_db_pool,
+                    query="What rezoning happened in Downtown?",
+                    search_mode="full",
+                    cohere_api_key="test-key",
+                )
 
         mock_search.assert_called_once()
         assert len(chunks) > 0
@@ -721,7 +722,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "What rezoning decisions were made?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             assert isinstance(result, ChatResponse)
@@ -762,7 +762,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "What rezoning decisions?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             assert len(result.citations) > 0
@@ -811,7 +810,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "Rezoning?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             assert len(result.related_signals) > 0
@@ -852,7 +850,6 @@ class TestPipelineChatQuery:
                                 mock_db_pool,
                                 "Tell me about the rezoning",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
             # Citation should match retrieved chunk
@@ -950,7 +947,6 @@ class TestPipelineEndToEnd:
                                 mock_db_pool,
                                 "What rezoning happened?",
                                 anthropic_api_key="test-key",
-                                cohere_api_key="test-key"
                             )
 
         assert result is not None

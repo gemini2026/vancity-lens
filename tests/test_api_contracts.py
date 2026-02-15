@@ -156,7 +156,7 @@ class TestReadyEndpoint:
 
             with patch.dict(os.environ, {
                 "ANTHROPIC_API_KEY": "test-key",
-                "COHERE_API_KEY": "test-key"
+                "K2_API_KEY": "test-key"
             }):
                 response = client.get("/ready")
                 data = response.json()
@@ -174,7 +174,7 @@ class TestReadyEndpoint:
 
             with patch.dict(os.environ, {
                 "ANTHROPIC_API_KEY": "test-key",
-                "COHERE_API_KEY": "test-key"
+                "K2_API_KEY": "test-key"
             }):
                 response = client.get("/ready")
                 data = response.json()
@@ -192,7 +192,7 @@ class TestReadyEndpoint:
 
             with patch.dict(os.environ, {
                 "ANTHROPIC_API_KEY": "test-key",
-                "COHERE_API_KEY": "test-key"
+                "K2_API_KEY": "test-key"
             }):
                 response = client.get("/ready")
                 data = response.json()
@@ -201,7 +201,7 @@ class TestReadyEndpoint:
                 assert "engine" in checks
                 assert "database" in checks
                 assert "anthropic_key" in checks
-                assert "cohere_key" in checks
+                assert "k2_key" in checks
                 assert "cache" in checks
 
     def test_ready_returns_200_when_all_checks_pass(self, client):
@@ -214,7 +214,7 @@ class TestReadyEndpoint:
 
             with patch.dict(os.environ, {
                 "ANTHROPIC_API_KEY": "test-key",
-                "COHERE_API_KEY": "test-key"
+                "K2_API_KEY": "test-key"
             }):
                 response = client.get("/ready")
                 assert response.status_code == 200
@@ -229,7 +229,7 @@ class TestReadyEndpoint:
 
             with patch.dict(os.environ, {
                 "ANTHROPIC_API_KEY": "test-key",
-                "COHERE_API_KEY": "test-key"
+                "K2_API_KEY": "test-key"
             }):
                 response = client.get("/ready")
                 assert response.status_code == 503
@@ -245,7 +245,7 @@ class TestReadyEndpoint:
             with patch.dict(os.environ, {}, clear=False):
                 # Remove API keys
                 os.environ.pop("ANTHROPIC_API_KEY", None)
-                os.environ.pop("COHERE_API_KEY", None)
+                os.environ.pop("K2_API_KEY", None)
 
                 response = client.get("/ready")
                 assert response.status_code == 503
@@ -673,21 +673,20 @@ class TestChatEndpoint:
         app.state.pool = AsyncMock()
 
         with patch("api.intelligence.routes.get_anthropic_api_key", return_value="test-key"):
-            with patch("api.intelligence.routes.get_cohere_api_key", return_value="test-key"):
-                with patch("api.intelligence.routes.get_db_pool"):
-                    with patch("api.intelligence.routes.handle_chat") as mock_chat:
-                        from api.intelligence.models import ChatResponse
-                        mock_chat.return_value = ChatResponse(
-                            answer="Test answer",
-                            citations=[],
-                            related_signals=[],
-                            session_id="test-123"
-                        )
+            with patch("api.intelligence.routes.get_db_pool"):
+                with patch("api.intelligence.routes.handle_chat") as mock_chat:
+                    from api.intelligence.models import ChatResponse
+                    mock_chat.return_value = ChatResponse(
+                        answer="Test answer",
+                        citations=[],
+                        related_signals=[],
+                        session_id="test-123"
+                    )
 
-                        response = client.post("/api/v1/intel/chat", json={
-                            "query": "What are the latest rezoning decisions?"
-                        })
-                        assert response.status_code == 200
+                    response = client.post("/api/v1/intel/chat", json={
+                        "query": "What are the latest rezoning decisions?"
+                    })
+                    assert response.status_code == 200
 
     def test_chat_endpoint_validates_query_length(self, client):
         """Chat endpoint validates query max length (2000 chars)."""
@@ -703,29 +702,28 @@ class TestChatEndpoint:
         app.state.pool = AsyncMock()
 
         with patch("api.intelligence.routes.get_anthropic_api_key", return_value="test-key"):
-            with patch("api.intelligence.routes.get_cohere_api_key", return_value="test-key"):
-                with patch("api.intelligence.routes.get_db_pool"):
-                    with patch("api.intelligence.routes.handle_chat") as mock_chat:
-                        from api.intelligence.models import ChatResponse
-                        mock_chat.return_value = ChatResponse(
-                            answer="Test answer",
-                            citations=[],
-                            related_signals=[],
-                            session_id="test-123"
-                        )
+            with patch("api.intelligence.routes.get_db_pool"):
+                with patch("api.intelligence.routes.handle_chat") as mock_chat:
+                    from api.intelligence.models import ChatResponse
+                    mock_chat.return_value = ChatResponse(
+                        answer="Test answer",
+                        citations=[],
+                        related_signals=[],
+                        session_id="test-123"
+                    )
 
-                        response = client.post("/api/v1/intel/chat", json={
-                            "query": "Test query"
-                        })
-                        assert response.status_code == 200
-                        data = response.json()
+                    response = client.post("/api/v1/intel/chat", json={
+                        "query": "Test query"
+                    })
+                    assert response.status_code == 200
+                    data = response.json()
 
-                        assert "answer" in data
-                        assert "session_id" in data
-                        assert "citations" in data
-                        assert "related_signals" in data
-                        assert isinstance(data["citations"], list)
-                        assert isinstance(data["related_signals"], list)
+                    assert "answer" in data
+                    assert "session_id" in data
+                    assert "citations" in data
+                    assert "related_signals" in data
+                    assert isinstance(data["citations"], list)
+                    assert isinstance(data["related_signals"], list)
 
 
 # ────────────────────────────────────────────────────────────────────────────
