@@ -114,26 +114,9 @@ def get_anthropic_api_key() -> str:
     return key
 
 
-def get_cohere_api_key() -> str:
-    """Get Cohere API key from environment. Raises 500 if missing."""
-    key = os.environ.get("COHERE_API_KEY")
-    if not key:
-        logger.error("COHERE_API_KEY not set in environment")
-        raise HTTPException(
-            status_code=500,
-            detail="COHERE_API_KEY not configured. Please set the environment variable.",
-        )
-    return key
-
-
 def get_anthropic_api_key_optional() -> Optional[str]:
     """Get Anthropic API key from environment, or None if not set."""
     return _normalize_api_key(os.environ.get("ANTHROPIC_API_KEY"))
-
-
-def get_cohere_api_key_optional() -> Optional[str]:
-    """Get Cohere API key from environment, or None if not set."""
-    return _normalize_api_key(os.environ.get("COHERE_API_KEY"))
 
 
 def get_db_pool(request: Request) -> asyncpg.Pool:
@@ -157,7 +140,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
     summary="Chat with intelligence system",
     description=(
         "RAG-powered chat endpoint. Accepts a natural language query, retrieves "
-        "relevant document chunks via hybrid search (Cohere + BM25), and returns "
+        "relevant document chunks via K2 search, and returns "
         "an AI-generated answer with citations and related signals."
     ),
     dependencies=[Depends(rate_limit_llm)],
@@ -166,30 +149,21 @@ async def post_chat(request: Request, chat_request: ChatRequest) -> ChatResponse
     """
     Ask a question about Vancouver development, zoning, or real estate intelligence.
 
-    Operates in three tiers based on available API keys:
-    - FULL:    Anthropic + Cohere → hybrid search + Claude RAG
-    - PARTIAL: Anthropic only    → sparse (BM25) search + Claude RAG
-    - DEMO:    No keys           → sparse (BM25) search + formatted results
+    Operates in two tiers based on available API keys:
+    - FULL: Anthropic key present → K2 search + Claude RAG
+    - DEMO: No keys               → K2/BM25 search + formatted results
     """
     try:
         db_pool = get_db_pool(request)
         anthropic_key = get_anthropic_api_key_optional()
-        cohere_key = get_cohere_api_key_optional()
 
-        # Log operating mode
-        if anthropic_key and cohere_key:
-            mode = "FULL"
-        elif anthropic_key:
-            mode = "PARTIAL"
-        else:
-            mode = "DEMO"
+        mode = "FULL" if anthropic_key else "DEMO"
         logger.info(f"Chat query received ({mode} mode): {chat_request.query[:100]}...")
 
         response = await handle_chat(
             db_pool=db_pool,
             query=chat_request.query,
             anthropic_api_key=anthropic_key,
-            cohere_api_key=cohere_key,
             session_id=chat_request.session_id,
             neighborhood_filter=chat_request.neighborhood_filter,
             date_from=chat_request.date_from,
@@ -773,19 +747,16 @@ async def _background_scrape_task(
 
 async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
     """
-    Background task for document processing (chunking + embedding + extraction).
+    Background task for document processing (signal extraction).
 
-    Processes unprocessed documents through the full pipeline:
-    1. Chunk with semchunk
-    2. Embed with Cohere
-    3. Extract signals with Claude
+    Processes unprocessed documents through the pipeline:
+    1. Extract signals with Claude
+    (K2 handles ingestion/embedding externally)
     """
     logger.info(f"Background processing started: batch_size={batch_size}")
     try:
-        cohere_key = os.environ.get("COHERE_API_KEY", "")
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
-        from .embeddings import process_document_chunks
         from .extractor import process_document
 
         # Get unprocessed documents
@@ -809,8 +780,7 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
         # Process documents concurrently; vendor calls are concurrency-limited globally
         async def _process_one(doc_id: int):
             try:
-                chunks_stored = await process_document_chunks(db_pool, doc_id, cohere_key)
-                logger.info(f"Doc {doc_id}: {chunks_stored} chunks embedded")
+                logger.info(f"Doc {doc_id}: skipping local embedding (K2 handles ingestion)")
 
                 signals_stored = await process_document(db_pool, doc_id, anthropic_key)
                 logger.info(f"Doc {doc_id}: {signals_stored} signals extracted")
@@ -889,8 +859,8 @@ async def admin_trigger_scrape(
     summary="Admin: trigger AI extraction and embedding",
     dependencies=[Depends(require_admin), Depends(rate_limit_llm)],
     description=(
-        "Start a background task to process unprocessed documents: chunk with semchunk, "
-        "embed with Cohere, and extract intelligence signals using Claude. "
+        "Start a background task to process unprocessed documents: extract intelligence "
+        "signals using Claude. K2 handles document ingestion and embedding. "
         "This is an admin-only operation. Runs asynchronously."
     ),
 )
@@ -905,13 +875,12 @@ async def admin_trigger_process(
     ),
 ):
     """
-    Trigger document processing (chunking + embedding + extraction) in the background.
+    Trigger document processing (signal extraction) in the background.
 
     Processing includes:
-    - Semantic chunking via semchunk
-    - Cohere embeddings for hybrid search (dense + BM25 sparse)
-    - LLM-based signal extraction from each chunk
+    - LLM-based signal extraction from each document
     - Storage of results in database
+    (K2 handles document ingestion and embedding externally)
 
     Returns immediately; processing continues asynchronously.
     """
@@ -1037,17 +1006,14 @@ async def admin_get_status(request: Request):
 
 
 async def _background_ingest_url_process(db_pool: asyncpg.Pool, document_id: int):
-    """Background task: chunk, embed, and extract signals from an ingested URL document."""
+    """Background task: extract signals from an ingested URL document."""
     logger.info(f"Background processing started for ingested document {document_id}")
     try:
-        cohere_key = os.environ.get("COHERE_API_KEY", "")
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
-        from .embeddings import process_document_chunks
         from .extractor import process_document
 
-        chunks_stored = await process_document_chunks(db_pool, document_id, cohere_key)
-        logger.info(f"Ingested doc {document_id}: {chunks_stored} chunks embedded")
+        logger.info(f"Ingested doc {document_id}: skipping local embedding (K2 handles ingestion)")
 
         signals_stored = await process_document(db_pool, document_id, anthropic_key)
         logger.info(f"Ingested doc {document_id}: {signals_stored} signals extracted")
