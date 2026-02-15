@@ -1,4 +1,4 @@
-"""Shared limits and timeouts for external AI services (Cohere + Anthropic).
+"""Shared limits and timeouts for external AI services (Anthropic).
 
 These calls are high-latency and quota-limited. To keep the API responsive under
 load, we:
@@ -46,15 +46,12 @@ def _env_float(name: str, default: float) -> float:
 
 
 # Concurrency limits (process-wide)
-COHERE_MAX_CONCURRENT_REQUESTS = _env_int("COHERE_MAX_CONCURRENT_REQUESTS", 3)
 ANTHROPIC_MAX_CONCURRENT_REQUESTS = _env_int("ANTHROPIC_MAX_CONCURRENT_REQUESTS", 3)
 
-COHERE_SEMAPHORE = asyncio.Semaphore(COHERE_MAX_CONCURRENT_REQUESTS)
 ANTHROPIC_SEMAPHORE = asyncio.Semaphore(ANTHROPIC_MAX_CONCURRENT_REQUESTS)
 
 
 # Timeouts (seconds)
-COHERE_TIMEOUT_SECONDS = _env_float("COHERE_TIMEOUT_SECONDS", 10.0)
 ANTHROPIC_CHAT_TIMEOUT_SECONDS = _env_float("ANTHROPIC_CHAT_TIMEOUT_SECONDS", 30.0)
 ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS = _env_float("ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS", 45.0)
 
