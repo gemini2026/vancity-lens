@@ -32,6 +32,10 @@ class RuleType(str, Enum):
     SIGNAL_TYPE = "signal_type"
     KEYWORD = "keyword"
     SEVERITY = "severity"
+    PIPELINE_STAGE = "pipeline_stage"
+    APPLICATION_TYPE = "application_type"
+    HEIGHT_RANGE = "height_range"
+    UNIT_RANGE = "unit_range"
 
 
 class WatchlistRule(BaseModel):
@@ -583,6 +587,36 @@ class AlertEngine:
             elif rule_type == RuleType.SEVERITY:
                 signal_severity = signal.get('severity', '').lower()
                 return rule_value == signal_severity
+
+            elif rule_type == RuleType.PIPELINE_STAGE:
+                pipeline_stage = (signal.get("pipeline_stage") or "").lower()
+                return rule_value == pipeline_stage
+
+            elif rule_type == RuleType.APPLICATION_TYPE:
+                app_type = (signal.get("application_type") or "").lower()
+                return rule_value == app_type
+
+            elif rule_type == RuleType.HEIGHT_RANGE:
+                try:
+                    parts = rule_value.split("-")
+                    range_min, range_max = int(parts[0]), int(parts[1])
+                    storeys = signal.get("proposed_storeys") or signal.get("height_after")
+                    if storeys is None:
+                        return False
+                    return range_min <= int(storeys) <= range_max
+                except (ValueError, IndexError):
+                    return False
+
+            elif rule_type == RuleType.UNIT_RANGE:
+                try:
+                    parts = rule_value.split("-")
+                    range_min, range_max = int(parts[0]), int(parts[1])
+                    units = signal.get("unit_count") or signal.get("proposed_units")
+                    if units is None:
+                        return False
+                    return range_min <= int(units) <= range_max
+                except (ValueError, IndexError):
+                    return False
 
             else:
                 logger.warning(f"Unknown rule type: {rule_type}")
