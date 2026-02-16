@@ -102,6 +102,42 @@ class TestChangeRecord:
             ChangeRecord(**_valid_change_record_kwargs(plain_english_summary=""))
         assert "plain_english_summary" in str(exc_info.value)
 
+    def test_truncates_summary_over_200_words(self):
+        """ChangeRecord truncates plain_english_summary exceeding 200 words."""
+        long_summary = " ".join(["word"] * 250)
+        rec = ChangeRecord(**_valid_change_record_kwargs(plain_english_summary=long_summary))
+        # Validator produces: " ".join(first 197 words) + "..."
+        # The "..." is appended without a space, so the last token is "word..."
+        words = rec.plain_english_summary.split()
+        assert len(words) == 197
+        assert rec.plain_english_summary.endswith("...")
+        assert all(w == "word" for w in words[:196])
+
+    def test_keeps_summary_at_200_words(self):
+        """ChangeRecord keeps plain_english_summary at exactly 200 words unchanged."""
+        summary_200 = " ".join(["word"] * 200)
+        rec = ChangeRecord(**_valid_change_record_kwargs(plain_english_summary=summary_200))
+        words = rec.plain_english_summary.split()
+        assert len(words) == 200
+        assert "..." not in rec.plain_english_summary
+
+    def test_keeps_summary_under_200_words(self):
+        """ChangeRecord keeps short plain_english_summary unchanged."""
+        short_summary = "Downtown FSR increased from 3.0 to 5.0, enabling larger developments."
+        rec = ChangeRecord(**_valid_change_record_kwargs(plain_english_summary=short_summary))
+        assert rec.plain_english_summary == short_summary
+
+    def test_rejects_summary_exceeding_max_length(self):
+        """ChangeRecord rejects plain_english_summary exceeding 1200 characters."""
+        # Create a summary that is under 200 words but over 1200 characters
+        # Use long words to exceed char limit while staying under word limit
+        long_word = "a" * 100
+        # 13 words * 100 chars = 1300 chars + spaces > 1200
+        over_chars_summary = " ".join([long_word] * 13)
+        with pytest.raises(ValidationError) as exc_info:
+            ChangeRecord(**_valid_change_record_kwargs(plain_english_summary=over_chars_summary))
+        assert "plain_english_summary" in str(exc_info.value)
+
     def test_optional_metadata_fields(self):
         """Optional metadata fields default to None."""
         rec = ChangeRecord(**_valid_change_record_kwargs())

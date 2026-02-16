@@ -9,6 +9,9 @@ Key components:
 - ScraperSchedule: Configuration dataclass for a scraper's schedule
 - ScraperResult: Result tracking dataclass for each run
 - ScraperScheduler: Main scheduler class managing all scrapers
+
+F05-006: Political risk score weekly refresh
+F02-001 / F04-001: Ingestion SLA monitoring via data_source_freshness
 """
 
 import asyncio
@@ -206,8 +209,9 @@ class ScraperScheduler:
             "rezoning": "0 8 * * *",  # daily 8am
             "news": "0 */6 * * *",  # every 6 hours
             "opendata": "0 3 * * 1",  # weekly Monday 3am
-            "political_risk": "0 2 1 * *",  # monthly 1st 2am UTC
+            "political_risk": "0 2 * * 0",  # weekly Sunday 2am UTC (F05-006)
             "undervalued": "0 15 * * 1",    # weekly Monday 3pm UTC (8am Pacific)
+            "freshness_check": "0 */4 * * *",  # every 4 hours (F02-001/F04-001)
         }
 
         for name, cron in default_schedules.items():
@@ -319,6 +323,15 @@ class ScraperScheduler:
                 f"{documents_found} found, {documents_new} new, {documents_skipped} skipped"
             )
 
+            # Record successful ingestion for freshness monitoring (F02-001)
+            try:
+                from ..retrieval_logging import record_ingestion_success
+                await record_ingestion_success(self.db_pool, name)
+            except Exception as freshness_err:
+                logger.debug(
+                    "Failed to record freshness for '%s': %s", name, freshness_err
+                )
+
         except asyncio.TimeoutError:
             error_msg = f"Scraper '{name}' timed out after {schedule.timeout_seconds}s"
             logger.error(error_msg)
@@ -414,15 +427,30 @@ class ScraperScheduler:
 
     async def _background_loop(self):
         """Background task that runs every minute."""
+        # Counter to track freshness check intervals (every 240 minutes = 4 hours)
+        tick_count = 0
+        FRESHNESS_CHECK_INTERVAL_TICKS = 240  # minutes
+
         while self._running:
             try:
                 await asyncio.sleep(60)
                 if not self._running:
                     break
 
+                tick_count += 1
+
                 results = await self.run_all_due()
                 if results:
                     logger.info(f"Background loop ran {len(results)} scrapers")
+
+                # Run freshness SLA check every 4 hours (F02-001/F04-001)
+                if tick_count % FRESHNESS_CHECK_INTERVAL_TICKS == 0:
+                    try:
+                        await self.check_data_freshness_sla()
+                    except Exception as sla_err:
+                        logger.error(
+                            "Freshness SLA check failed: %s", sla_err, exc_info=True
+                        )
 
             except Exception as e:
                 logger.error(f"Error in background loop: {e}", exc_info=True)
@@ -449,6 +477,83 @@ class ScraperScheduler:
                 logger.warning(f"Error waiting for background task: {e}")
 
         self.background_task = None
+
+    async def check_data_freshness_sla(self) -> list:
+        """Check all data sources for SLA violations (F02-001 / F04-001).
+
+        Queries the ``data_source_freshness`` table and logs a WARNING for
+        any source whose ``last_successful_retrieval`` exceeds its
+        ``expected_cadence_hours`` by 50%.
+
+        Returns:
+            List of dicts describing stale sources (for programmatic use).
+        """
+        stale_sources: list = []
+        try:
+            async with self.db_pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT source_id,
+                           source_name,
+                           expected_cadence_hours,
+                           last_successful_retrieval,
+                           EXTRACT(EPOCH FROM (NOW() - last_successful_retrieval)) / 3600.0
+                               AS hours_since_last
+                    FROM data_source_freshness
+                    ORDER BY source_id
+                """)
+
+                for row in rows:
+                    source_id = row["source_id"]
+                    source_name = row["source_name"]
+                    cadence_h = row["expected_cadence_hours"]
+                    last_retrieval = row["last_successful_retrieval"]
+                    hours_since = row["hours_since_last"]
+
+                    if last_retrieval is None:
+                        # Never retrieved — always stale
+                        logger.warning(
+                            "DATA FRESHNESS SLA BREACH: %s (%s) has NEVER been retrieved "
+                            "(expected every %dh)",
+                            source_name, source_id, cadence_h,
+                        )
+                        stale_sources.append({
+                            "source_id": source_id,
+                            "source_name": source_name,
+                            "expected_cadence_hours": cadence_h,
+                            "hours_since_last": None,
+                            "breach_ratio": None,
+                        })
+                        continue
+
+                    threshold = cadence_h * 1.5  # 50% grace period
+                    if hours_since > threshold:
+                        breach_ratio = round(hours_since / cadence_h, 2)
+                        logger.warning(
+                            "DATA FRESHNESS SLA BREACH: %s (%s) last retrieved %.1fh ago "
+                            "(expected every %dh, threshold %.0fh, breach ratio %.2fx)",
+                            source_name, source_id, hours_since,
+                            cadence_h, threshold, breach_ratio,
+                        )
+                        stale_sources.append({
+                            "source_id": source_id,
+                            "source_name": source_name,
+                            "expected_cadence_hours": cadence_h,
+                            "hours_since_last": round(hours_since, 1),
+                            "breach_ratio": breach_ratio,
+                        })
+
+            if stale_sources:
+                logger.warning(
+                    "Data freshness check: %d/%d sources breaching SLA",
+                    len(stale_sources), len(rows),
+                )
+            else:
+                logger.info("Data freshness check: all %d sources within SLA", len(rows))
+
+        except Exception as exc:
+            logger.error("Failed to check data freshness SLA: %s", exc, exc_info=True)
+
+        return stale_sources
 
     async def _store_run(self, result: ScraperResult) -> None:
         """Store run result in database."""

@@ -124,8 +124,8 @@ SQL_ENTITLEMENTS = """
         b.max_fsr,
         ROUND(
             ST_Distance(
-                ST_Transform(ST_Centroid(p.geom), 3005),
-                ST_Transform(s.geom, 3005)
+                ST_Centroid(p.geom)::geography,
+                s.geom::geography
             )::numeric, 1
         ) AS distance_m,
         p.current_height,
@@ -494,7 +494,7 @@ def _build_sources(pid: str, parcel, best, value_estimate) -> SourceAttribution:
             origin="Bill 47 — Housing Statutes (TOA) Amendment Act, 2023",
             confidence="calculated",
             url="https://www.bclaws.gov.bc.ca/civix/document/id/bills/billsprevious/4th42nd:gov47-1",
-            note=f"Distance calculated via PostGIS ST_Distance in EPSG:3005 (BC Albers) from parcel centroid to station. "
+            note=f"Distance calculated via PostGIS geodesic ST_Distance (WGS84 geography) from parcel centroid to station. "
                  f"Tier {best.tier.value}: {best.tier.value == 1 and '0-200m' or best.tier.value == 2 and '200-400m' or '400-800m'} radius per Bill 47 s.481.1",
         ))
 

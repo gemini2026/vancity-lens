@@ -37,7 +37,7 @@ WEIGHT_COUNCIL = 0.20
 
 # Minimum thresholds
 MIN_APPLICATIONS = 5        # AC-OPP: need at least 5 applications
-MIN_SIGNALS = 3             # Need at least 3 signals for sentiment
+MIN_SIGNALS = 10            # Need at least 10 signals for theme/sentiment analysis
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 10.0) -> float:
@@ -48,19 +48,21 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 10.0) -> float:
 def compute_opposition_rate(
     total_applications: int,
     opposed_applications: int,
-) -> tuple[float, float]:
+) -> tuple[Optional[float], Optional[float], Optional[str]]:
     """
     Compute opposition rate and its score (0-10).
 
-    Returns (raw_rate_pct, score_0_10).
+    Returns (raw_rate_pct, score_0_10, status).
+    When total_applications < MIN_APPLICATIONS, returns (None, None, status_message)
+    so callers can distinguish "low risk" from "no data".
     """
     if total_applications < MIN_APPLICATIONS:
-        return 0.0, 0.0
+        return None, None, "Insufficient application history"
 
     rate = (opposed_applications / total_applications) * 100.0
     # Scale: 0% opposition = 0, 50%+ = 10
     score = _clamp(rate / 5.0)
-    return round(rate, 2), round(score, 1)
+    return round(rate, 2), round(score, 1), None
 
 
 def compute_delay_score(
@@ -174,16 +176,21 @@ def compute_council_resistance(
 
 
 def compute_composite_score(
-    opposition_score: float,
+    opposition_score: Optional[float],
     delay_score: float,
     sentiment_score: float,
     council_score: float,
-) -> float:
+) -> tuple[Optional[float], Optional[str]]:
     """
     Compute composite Political Risk Score (1-10).
 
     Weighted average of component scores, clamped to [1, 10].
+    Returns (score, status). When opposition_score is None (insufficient
+    application data), returns (None, "Insufficient application history").
     """
+    if opposition_score is None:
+        return None, "Insufficient application history"
+
     raw = (
         WEIGHT_OPPOSITION_RATE * opposition_score
         + WEIGHT_DELAY * delay_score
@@ -192,7 +199,7 @@ def compute_composite_score(
     )
     # Scale from 0-10 to 1-10
     score = 1.0 + (raw * 0.9)
-    return round(_clamp(score, 1.0, 10.0), 1)
+    return round(_clamp(score, 1.0, 10.0), 1), None
 
 
 async def compute_neighborhood_risk(
@@ -228,7 +235,7 @@ async def compute_neighborhood_risk(
 
         total_apps = app_stats["total_apps"] if app_stats else 0
         opposed_apps = app_stats["opposed_apps"] if app_stats else 0
-        opp_rate, opp_score = compute_opposition_rate(total_apps, opposed_apps)
+        opp_rate, opp_score, opp_status = compute_opposition_rate(total_apps, opposed_apps)
 
         # 2. Delay attribution: avg time between rezoning_application and council_decision
         delay_row = await conn.fetchrow("""
@@ -273,14 +280,19 @@ async def compute_neighborhood_risk(
         avg_against_pct, c_score = compute_council_resistance(vote_list)
 
         # Composite
-        composite = compute_composite_score(opp_score, d_score, s_score, c_score)
+        composite, score_status = compute_composite_score(opp_score, d_score, s_score, c_score)
 
         neg_signals = sum(1 for s in signal_list if s.get("sentiment") == "negative_for_development")
 
-        return {
+        # Determine themes_status based on signal count
+        themes_status = None
+        if len(signal_list) < MIN_SIGNALS:
+            themes_status = "Insufficient data for theme analysis"
+
+        result = {
             "neighborhood": neighborhood,
             "risk_score": composite,
-            "opposition_rate": opp_rate,
+            "opposition_rate": opp_rate if opp_rate is not None else 0.0,
             "delay_score": d_score,
             "sentiment_intensity": s_score,
             "council_resistance": c_score,
@@ -292,6 +304,14 @@ async def compute_neighborhood_risk(
             "avg_vote_against_pct": avg_against_pct,
             "period_months": period_months,
         }
+
+        # Add status fields when data is insufficient
+        if score_status:
+            result["score_status"] = score_status
+        if themes_status:
+            result["themes_status"] = themes_status
+
+        return result
 
 
 async def materialize_all_scores(
@@ -308,6 +328,17 @@ async def materialize_all_scores(
     for neighborhood in VANCOUVER_NEIGHBORHOODS:
         try:
             result = await compute_neighborhood_risk(db_pool, neighborhood, period_months)
+
+            # Skip DB materialization when score is None (insufficient data)
+            if result["risk_score"] is None:
+                logger.info(
+                    "Skipping materialization for %s: %s",
+                    neighborhood,
+                    result.get("score_status", "insufficient data"),
+                )
+                stats["scores"][neighborhood] = None
+                stats["neighborhoods_computed"] += 1
+                continue
 
             async with db_pool.acquire() as conn:
                 await conn.execute("""
@@ -400,13 +431,18 @@ THEME_KEYWORDS = {
 def extract_opposition_themes(
     signals: list[dict],
     top_n: int = 3,
-) -> list[dict]:
+) -> tuple[list[dict], Optional[str]]:
     """
     Extract top opposition themes from negative signals.
 
-    Returns list of {theme, count, example_summary} sorted by frequency.
+    Returns (themes_list, themes_status).
     AC-OPP-004: Top 3 themes from 10+ signals.
+    When signal count < MIN_SIGNALS (10), returns empty list with status message.
     """
+    if len(signals) < MIN_SIGNALS:
+        status = "Insufficient data for theme analysis" if signals else None
+        return [], status
+
     theme_counts: dict[str, int] = {}
     theme_examples: dict[str, str] = {}
 
@@ -435,7 +471,7 @@ def extract_opposition_themes(
             "example": theme_examples.get(theme, ""),
         }
         for theme, count in sorted_themes[:top_n]
-    ]
+    ], None
 
 
 def generate_risk_narrative(
@@ -497,8 +533,11 @@ async def get_opposition_themes(
     db_pool: asyncpg.Pool,
     neighborhood: str,
     period_months: int = 36,
-) -> list[dict]:
-    """Get top opposition themes for a neighborhood from signals."""
+) -> tuple[list[dict], Optional[str]]:
+    """Get top opposition themes for a neighborhood from signals.
+
+    Returns (themes_list, themes_status).
+    """
     cutoff = date.today() - timedelta(days=period_months * 30)
 
     try:
@@ -514,7 +553,7 @@ async def get_opposition_themes(
             return extract_opposition_themes([dict(r) for r in rows])
     except Exception as e:
         logger.debug("Error getting themes for %s: %s", neighborhood, e)
-        return []
+        return [], None
 
 
 async def get_parcel_political_risk(
@@ -574,8 +613,10 @@ async def get_parcel_political_risk(
                   AND confidence >= 0.60
             """, neighborhood, cutoff)
 
-            themes = extract_opposition_themes([dict(r) for r in all_signals])
+            themes, themes_status = extract_opposition_themes([dict(r) for r in all_signals])
             result["themes"] = themes
+            if themes_status:
+                result["themes_status"] = themes_status
 
             # Generate narrative
             if risk:

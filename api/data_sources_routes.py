@@ -54,14 +54,14 @@ async def search_contaminated_sites(
                        contamination_type, date_reported, date_updated,
                        associated_pid,
                        ROUND(ST_Distance(
-                           ST_Transform(geom, 3005),
-                           ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005)
+                           geom::geography,
+                           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
                        )::numeric, 1) AS distance_m
                 FROM contaminated_sites
                 WHERE geom IS NOT NULL
                   AND ST_DWithin(
-                      ST_Transform(geom, 3005),
-                      ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005),
+                      geom::geography,
+                      ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                       $3
                   )
                 ORDER BY distance_m
@@ -105,14 +105,14 @@ async def parcel_contaminated_sites(
                    cs.classification, cs.status, cs.contamination_type,
                    cs.date_reported, cs.date_updated,
                    ROUND(ST_Distance(
-                       ST_Transform(cs.geom, 3005),
-                       ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005)
+                       cs.geom::geography,
+                       ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
                    )::numeric, 1) AS distance_m
             FROM contaminated_sites cs
             WHERE cs.geom IS NOT NULL
               AND ST_DWithin(
-                  ST_Transform(cs.geom, 3005),
-                  ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005),
+                  cs.geom::geography,
+                  ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                   $3
               )
             ORDER BY distance_m

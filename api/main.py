@@ -222,6 +222,41 @@ async def lifespan(app: FastAPI):
     scheduler.register_scraper("statscan", scrape_statscan, "0 3 1 * *", enabled=True)
     scheduler.register_scraper("cmhc", scrape_cmhc, "0 3 15 * *", enabled=True)
 
+    # F06-002: Register weekly undervalued email digest
+    # Monday 08:00 PT = 15:00 UTC  (day_of_week 0 = Monday in scheduler)
+    from .intelligence.undervalued_routes import send_weekly_undervalued_digest
+
+    async def _undervalued_email_task(pool, start_date, end_date):
+        """Adapter: scheduler calls func(pool, start, end) -> dict."""
+        stats = await send_weekly_undervalued_digest(pool)
+        return {
+            "documents_found": stats.get("subscribers_found", 0),
+            "documents_new": stats.get("emails_sent", 0),
+            "documents_skipped": stats.get("emails_failed", 0),
+        }
+
+    scheduler.register_scraper(
+        "undervalued_email", _undervalued_email_task,
+        "0 15 * * 1", enabled=True, timeout_seconds=600,
+    )
+
+    # F05-006: Register weekly political risk score refresh (Sunday 2am UTC)
+    from .intelligence.political_risk import materialize_all_scores
+
+    async def _political_risk_refresh(pool, start_date, end_date):
+        """Adapter: wraps materialize_all_scores for the scheduler interface."""
+        stats = await materialize_all_scores(pool, period_months=36)
+        return {
+            "documents_found": stats.get("neighborhoods_computed", 0),
+            "documents_new": stats.get("neighborhoods_computed", 0),
+            "documents_skipped": stats.get("errors", 0),
+        }
+
+    scheduler.register_scraper(
+        "political_risk", _political_risk_refresh,
+        "0 2 * * 0", enabled=True, timeout_seconds=600,
+    )
+
     # Start background loop if enabled
     if os.getenv("SCRAPER_SCHEDULER_ENABLED", "false").lower() == "true":
         await scheduler.start_background_loop()
@@ -509,20 +544,20 @@ async def nearest_parcel(
         row = await conn.fetchrow("""
             SELECT pid, civic_address, current_zoning,
                 ROUND(ST_Distance(
-                    ST_Transform(ST_Centroid(geom), 3005),
-                    ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005)
+                    ST_Centroid(geom)::geography,
+                    ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
                 )::numeric, 1) AS distance_m,
                 ST_X(ST_Centroid(geom)) AS centroid_lng,
                 ST_Y(ST_Centroid(geom)) AS centroid_lat
             FROM parcels
             WHERE ST_DWithin(
-                ST_Transform(geom, 3005),
-                ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005),
+                geom::geography,
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
                 $3
             )
             ORDER BY ST_Distance(
-                ST_Transform(ST_Centroid(geom), 3005),
-                ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005)
+                ST_Centroid(geom)::geography,
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
             )
             LIMIT 1
         """, lng, lat, radius_m)
@@ -589,8 +624,8 @@ async def top_opportunities(
                     GREATEST(b.max_fsr, COALESCE(p.current_fsr, 0)) AS effective_fsr,
                     GREATEST(0, b.max_storeys - COALESCE(p.current_height, 0)) AS storey_uplift,
                     ROUND(ST_Distance(
-                        ST_Transform(ST_Centroid(p.geom), 3005),
-                        ST_Transform(s.geom, 3005)
+                        ST_Centroid(p.geom)::geography,
+                        s.geom::geography
                     )::numeric, 0) AS dist_m,
                     ROUND((p.lot_area_sqm * GREATEST(b.max_fsr, COALESCE(p.current_fsr, 0)) * 10.7639 * 800)::numeric, 0) AS est_value,
                     (COALESCE(p.current_height, 0) > b.max_storeys
@@ -630,14 +665,14 @@ async def nearby_stations(pid: str, response: Response = None):
             """
             SELECT s.name, s.line, s.type::text,
                 ROUND(ST_Distance(
-                    ST_Transform(ST_Centroid(p.geom), 3005),
-                    ST_Transform(s.geom, 3005)
+                    ST_Centroid(p.geom)::geography,
+                    s.geom::geography
                 )::numeric, 0) AS distance_m
             FROM parcels p, transit_stations s
             WHERE p.pid = $1
             ORDER BY ST_Distance(
-                ST_Transform(ST_Centroid(p.geom), 3005),
-                ST_Transform(s.geom, 3005)
+                ST_Centroid(p.geom)::geography,
+                s.geom::geography
             )
             LIMIT 5
             """,
@@ -772,8 +807,8 @@ async def top_opportunities_stream(
                     GREATEST(b.max_fsr, COALESCE(p.current_fsr, 0)) AS effective_fsr,
                     GREATEST(0, b.max_storeys - COALESCE(p.current_height, 0)) AS storey_uplift,
                     ROUND(ST_Distance(
-                        ST_Transform(ST_Centroid(p.geom), 3005),
-                        ST_Transform(s.geom, 3005)
+                        ST_Centroid(p.geom)::geography,
+                        s.geom::geography
                     )::numeric, 0) AS dist_m,
                     ROUND((p.lot_area_sqm * GREATEST(b.max_fsr, COALESCE(p.current_fsr, 0)) * 10.7639 * 800)::numeric, 0) AS est_value,
                     (COALESCE(p.current_height, 0) > b.max_storeys

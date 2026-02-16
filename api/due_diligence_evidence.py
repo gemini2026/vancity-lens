@@ -138,8 +138,8 @@ async def _utility_evidence_for_type(
                 u.material,
                 u.source_url,
                 ROUND(ST_Distance(
-                    ST_Transform(p.geom, 3005),
-                    ST_Transform(u.geom, 3005)
+                    p.geom::geography,
+                    u.geom::geography
                 )::numeric, 1) AS distance_m
             FROM parcels p
             JOIN utility_lines u ON u.utility_type = $2

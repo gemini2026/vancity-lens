@@ -45,11 +45,8 @@ SQL_PARCELS_IN_POLYGON = """
         SELECT ST_SetSRID(ST_GeomFromText($1), 4326) AS geom
     ),
     buffered AS (
-        -- Buffer by 10m in projected CRS to catch edge parcels
-        SELECT ST_Transform(
-            ST_Buffer(ST_Transform(z.geom, 3005), $2),
-            4326
-        ) AS geom
+        -- Buffer in metres using geography cast (geodesic)
+        SELECT ST_Buffer(z.geom::geography, $2)::geometry AS geom
         FROM zone z
     )
     SELECT
@@ -59,8 +56,8 @@ SQL_PARCELS_IN_POLYGON = """
         p.current_zoning,
         ST_AsText(p.geom) AS parcel_wkt,
         ST_Distance(
-            ST_Transform(ST_Centroid(p.geom), 3005),
-            ST_Transform((SELECT geom FROM zone), 3005)
+            ST_Centroid(p.geom)::geography,
+            (SELECT geom FROM zone)::geography
         ) AS dist_to_center_m
     FROM parcels p, buffered b
     WHERE ST_Within(ST_Centroid(p.geom), b.geom)

@@ -258,13 +258,13 @@ class ParcelSearchService:
                         COALESCE(current_zoning, '') as zoning,
                         COALESCE(geo_local_area, '') as neighborhood,
                         ST_Distance(
-                            ST_Transform(ST_SetSRID(ST_Point($2, $1), 4326), 3005),
-                            ST_Transform(ST_Centroid(geom), 3005)
+                            ST_SetSRID(ST_Point($2, $1), 4326)::geography,
+                            ST_Centroid(geom)::geography
                         ) as distance_m
                     FROM parcels
                     WHERE ST_DWithin(
-                        ST_Transform(ST_SetSRID(ST_Point($2, $1), 4326), 3005),
-                        ST_Transform(geom, 3005),
+                        ST_SetSRID(ST_Point($2, $1), 4326)::geography,
+                        geom::geography,
                         $3
                     )
                     ORDER BY distance_m ASC

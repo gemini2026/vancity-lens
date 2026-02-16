@@ -35,11 +35,11 @@ class TestSchedulerIntegration:
         source = inspect.getsource(ScraperScheduler._register_defaults)
         assert "political_risk" in source
 
-    def test_scheduler_political_risk_monthly(self):
+    def test_scheduler_political_risk_weekly(self):
         import inspect
         from api.intelligence.scheduler import ScraperScheduler
         source = inspect.getsource(ScraperScheduler._register_defaults)
-        assert "0 2 1 * *" in source
+        assert "0 2 * * 0" in source
 
     def test_scheduler_has_undervalued_schedule(self):
         import inspect

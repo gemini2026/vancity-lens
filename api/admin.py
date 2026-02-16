@@ -986,12 +986,12 @@ async def scrape_realtor(
                     row = await conn.fetchrow(
                         "SELECT pid, civic_address FROM parcels "
                         "WHERE ST_DWithin("
-                        "  ST_Transform(ST_Centroid(geom), 3005),"
-                        "  ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005),"
+                        "  ST_Centroid(geom)::geography,"
+                        "  ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,"
                         "  30"
                         ") ORDER BY ST_Distance("
-                        "  ST_Transform(ST_Centroid(geom), 3005),"
-                        "  ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), 4326), 3005)"
+                        "  ST_Centroid(geom)::geography,"
+                        "  ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography"
                         ") LIMIT 1",
                         listing["lng"], listing["lat"],
                     )

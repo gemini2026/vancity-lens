@@ -67,16 +67,29 @@ class TestThemeExtraction:
         assert len(THEME_KEYWORDS) >= 8
 
     def test_empty_signals(self):
-        themes = extract_opposition_themes([])
+        themes, status = extract_opposition_themes([])
         assert themes == []
+        assert status is None  # No status for truly empty list
+
+    def test_below_min_signals_returns_status(self):
+        """F05-004: <10 signals should show insufficient data message."""
+        signals = [
+            _make_negative_signal("Traffic congestion is major concern for residents"),
+            _make_negative_signal("Traffic impact study shows increased congestion"),
+            _make_negative_signal("Parking shortage due to new development"),
+        ]
+        themes, status = extract_opposition_themes(signals)
+        assert themes == []
+        assert status == "Insufficient data for theme analysis"
 
     def test_single_theme(self):
         signals = [
             _make_negative_signal("Traffic congestion is major concern for residents"),
             _make_negative_signal("Traffic impact study shows increased congestion"),
             _make_negative_signal("Parking shortage due to new development"),
-        ]
-        themes = extract_opposition_themes(signals)
+        ] + [_make_negative_signal(f"Traffic issue #{i}") for i in range(8)]
+        themes, status = extract_opposition_themes(signals)
+        assert status is None
         assert len(themes) >= 1
         assert any("Traffic" in t["theme"] for t in themes)
 
@@ -87,8 +100,9 @@ class TestThemeExtraction:
             _make_negative_signal("Traffic congestion will worsen"),
             _make_negative_signal("Sewer infrastructure cannot handle density"),
             _make_negative_signal("Loss of neighborhood character and scale"),
-        ]
-        themes = extract_opposition_themes(signals, top_n=3)
+        ] + [_make_negative_signal(f"General concern about height #{i}") for i in range(6)]
+        themes, status = extract_opposition_themes(signals, top_n=3)
+        assert status is None
         assert len(themes) <= 3
         # Should detect height, character, traffic, infrastructure themes
         theme_names = [t["theme"].lower() for t in themes]
@@ -99,8 +113,9 @@ class TestThemeExtraction:
             _make_positive_signal("Great transit-oriented development opportunity"),
             _make_positive_signal("Much needed housing density for the area"),
         ]
-        themes = extract_opposition_themes(signals)
+        themes, status = extract_opposition_themes(signals)
         assert themes == []
+        assert status == "Insufficient data for theme analysis"
 
     def test_top_n_limit(self):
         signals = [
@@ -111,16 +126,18 @@ class TestThemeExtraction:
             _make_negative_signal("Density overcrowd"),
             _make_negative_signal("Infrastructure sewer"),
             _make_negative_signal("Noise construction"),
-        ]
-        themes = extract_opposition_themes(signals, top_n=2)
+        ] + [_make_negative_signal(f"Extra concern #{i}") for i in range(4)]
+        themes, status = extract_opposition_themes(signals, top_n=2)
+        assert status is None
         assert len(themes) <= 2
 
     def test_theme_has_count_and_example(self):
         signals = [
             _make_negative_signal("Traffic congestion is a major concern"),
             _make_negative_signal("More traffic from this development"),
-        ]
-        themes = extract_opposition_themes(signals)
+        ] + [_make_negative_signal(f"Traffic problem #{i}") for i in range(9)]
+        themes, status = extract_opposition_themes(signals)
+        assert status is None
         assert len(themes) >= 1
         theme = themes[0]
         assert "theme" in theme
@@ -329,7 +346,7 @@ class TestConfidenceExclusion:
             {"summary": "Traffic bad", "headline": "", "sentiment": "negative_for_development"},
         ]
 
-        themes = await get_opposition_themes(pool, "Kitsilano")
+        themes, status = await get_opposition_themes(pool, "Kitsilano")
         # Verify the query was called with confidence filter
         call_args = conn.fetch.call_args
         query = call_args[0][0]

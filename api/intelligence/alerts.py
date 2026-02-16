@@ -57,6 +57,7 @@ class RuleType(str, Enum):
     UNDERVALUED_DISCOUNT = "undervalued_discount"
     UNDERVALUED_LOT_AREA = "undervalued_lot_area"
     UNDERVALUED_TOD_TIER = "undervalued_tod_tier"
+    PID = "pid"
 
 
 class WatchlistRule(BaseModel):
@@ -674,6 +675,11 @@ class AlertEngine:
                 return int(signal_tier) == tier_val
             except (ValueError, TypeError):
                 return False
+
+        elif rule_type == RuleType.PID:
+            # Match PID against the signal's affected_areas list
+            affected = signal.get("affected_areas") or []
+            return any(rule_value == pid.lower() for pid in affected)
 
         else:
             logger.warning(f"Unknown rule type: {rule_type}")

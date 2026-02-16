@@ -14,7 +14,7 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class ChangeRecordResponse(BaseModel):
     geographic_scope: Optional[str] = None
     affected_areas: list[str] = []
     entitlement_change: dict = {}
-    plain_english_summary: Optional[str] = None
+    plain_english_summary: Optional[str] = Field(None, max_length=1200)
     nlp_confidence_score: Optional[float] = None
     requires_manual_review: Optional[bool] = None
     extraction_timestamp: Optional[str] = None

@@ -248,8 +248,8 @@ async def get_signals_for_parcel(
                 d.source_type,
                 d.published_date AS source_date,
                 ROUND(ST_Distance(
-                    ST_Transform(p.geom, 3005),
-                    ST_Transform(isig.geom, 3005)
+                    p.geom::geography,
+                    isig.geom::geography
                 )::numeric, 1) AS distance_m
             FROM intelligence_signals isig
             JOIN documents d ON isig.document_id = d.id
@@ -257,8 +257,8 @@ async def get_signals_for_parcel(
             WHERE
                 isig.geom IS NOT NULL
                 AND ST_DWithin(
-                    ST_Transform(p.geom, 3005),
-                    ST_Transform(isig.geom, 3005),
+                    p.geom::geography,
+                    isig.geom::geography,
                     $2
                 )
             ORDER BY isig.event_date DESC, distance_m ASC

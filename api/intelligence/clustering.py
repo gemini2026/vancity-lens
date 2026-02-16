@@ -75,8 +75,8 @@ SQL_FIND_CLUSTERS = """
             a.parcel_pid AS center_pid,
             a.address AS center_address,
             a.neighborhood AS center_neighborhood,
-            ST_Y(ST_Transform(a.geom, 4326)) AS center_lat,
-            ST_X(ST_Transform(a.geom, 4326)) AS center_lng,
+            ST_Y(a.geom) AS center_lat,
+            ST_X(a.geom) AS center_lng,
             b.pipeline_id AS member_id,
             b.parcel_pid AS member_pid,
             b.address AS member_address,
@@ -84,14 +84,14 @@ SQL_FIND_CLUSTERS = """
             b.proposed_storeys AS member_storeys,
             b.proposed_units AS member_units,
             ROUND(ST_Distance(
-                ST_Transform(a.geom, 3005),
-                ST_Transform(b.geom, 3005)
+                a.geom::geography,
+                b.geom::geography
             )::numeric, 1) AS distance_m
         FROM pipeline_with_geom a
         JOIN pipeline_with_geom b ON a.pipeline_id != b.pipeline_id
         WHERE ST_DWithin(
-            ST_Transform(a.geom, 3005),
-            ST_Transform(b.geom, 3005),
+            a.geom::geography,
+            b.geom::geography,
             $2
         )
     )

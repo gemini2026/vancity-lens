@@ -1075,6 +1075,78 @@ def _row_to_entry(row) -> PipelineEntry:
     )
 
 
+async def _ensure_system_document(conn) -> int:
+    """
+    Ensure a system-level document exists for auto-generated signals.
+
+    Pipeline stage transitions and other system events need a valid document_id
+    to satisfy the intelligence_signals FK constraint.  This upserts a single
+    sentinel row and returns its id.
+    """
+    row = await conn.fetchrow(
+        "SELECT id FROM documents WHERE source_url = 'system://pipeline-stage-transitions'"
+    )
+    if row:
+        return row["id"]
+
+    row = await conn.fetchrow(
+        """
+        INSERT INTO documents (source_type, source_url, title, raw_text, text_length)
+        VALUES ('system', 'system://pipeline-stage-transitions',
+                'Pipeline Stage Transition Events',
+                'Auto-generated document for pipeline stage transition signals.', 63)
+        ON CONFLICT (source_url) DO NOTHING
+        RETURNING id
+        """,
+    )
+    if row:
+        return row["id"]
+
+    # Race condition: another transaction inserted between SELECT and INSERT
+    row = await conn.fetchrow(
+        "SELECT id FROM documents WHERE source_url = 'system://pipeline-stage-transitions'"
+    )
+    return row["id"]
+
+
+async def _create_stage_transition_signal(
+    conn,
+    pipeline_row,
+    old_stage: str,
+    new_stage: str,
+    headline: str,
+    summary: str,
+    severity: str,
+) -> int:
+    """
+    Insert an intelligence_signals record for a pipeline stage transition.
+
+    Returns the newly created signal id.
+    """
+    doc_id = await _ensure_system_document(conn)
+
+    row = await conn.fetchrow(
+        """
+        INSERT INTO intelligence_signals
+            (document_id, signal_type, headline, summary,
+             addresses, neighborhood, parcel_pid,
+             severity, confidence, event_date)
+        VALUES ($1, 'pipeline_stage_transition', $2, $3,
+                ARRAY[$4]::text[], $5, $6,
+                $7, 1.0, CURRENT_DATE)
+        RETURNING id
+        """,
+        doc_id,
+        headline,
+        summary,
+        pipeline_row["address"] or "Unknown address",
+        pipeline_row.get("neighborhood"),
+        pipeline_row.get("parcel_pid"),
+        severity,
+    )
+    return row["id"]
+
+
 async def _generate_stage_transition_alerts(
     conn,
     pipeline_row,
@@ -1084,13 +1156,17 @@ async def _generate_stage_transition_alerts(
     """
     AC-PIPE-005: Generate alerts for watchlists that match a pipeline stage transition.
 
-    Matches watchlists with rules targeting:
+    Creates an intelligence_signals record for the transition, then matches
+    active watchlists with rules targeting:
     - The pipeline entry's neighborhood
     - The pipeline entry's zoning
     - signal_type='stage_transition'
+
+    Errors are caught and logged so that alert generation never prevents the
+    stage update from succeeding.
     """
     address = pipeline_row["address"] or "Unknown address"
-    neighborhood = pipeline_row["neighborhood"]
+    neighborhood = pipeline_row.get("neighborhood")
     headline = f"Stage change: {address} moved from {old_stage} → {new_stage}"
     summary = (
         f"Pipeline project at {address}"
@@ -1103,7 +1179,23 @@ async def _generate_stage_transition_alerts(
     elif new_stage in ("approved", "under_staff_review"):
         severity = "medium"
 
-    # Find matching watchlists (neighborhood or signal_type rules)
+    try:
+        # Create a real intelligence_signals record so alerts have a valid FK
+        signal_id = await _create_stage_transition_signal(
+            conn, pipeline_row, old_stage, new_stage, headline, summary, severity
+        )
+        logger.info(
+            f"Created intelligence signal {signal_id} for pipeline "
+            f"{pipeline_row['id']} stage transition: {old_stage} → {new_stage}"
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failed to create stage transition signal for pipeline "
+            f"{pipeline_row['id']}: {e}"
+        )
+        return
+
+    # Find matching watchlists (neighborhood, signal_type, or zoning rules)
     match_query = """
         SELECT DISTINCT w.id AS watchlist_id
         FROM watchlists w
@@ -1124,9 +1216,9 @@ async def _generate_stage_transition_alerts(
                 """
                 INSERT INTO alerts
                 (watchlist_id, signal_id, alert_type, headline, summary, severity, is_read, created_at)
-                VALUES ($1, 0, 'stage_transition', $2, $3, $4, false, NOW())
+                VALUES ($1, $2, 'stage_transition', $3, $4, $5, false, NOW())
                 """,
-                wl["watchlist_id"], headline, summary, severity,
+                wl["watchlist_id"], signal_id, headline, summary, severity,
             )
         if watchlist_rows:
             logger.info(

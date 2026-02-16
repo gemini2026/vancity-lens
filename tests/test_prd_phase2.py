@@ -73,6 +73,46 @@ class TestChangeWatchlistMatching:
         signal = {"change_type": "council_vote"}
         assert AlertEngine.match_rule(signal, rule) is False
 
+    def test_rule_type_has_pid(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "PID")
+
+    def test_match_pid_in_affected_areas(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pid", rule_value="012-345-678")
+        signal = {"affected_areas": ["012-345-678", "Kitsilano"]}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_pid_not_in_affected_areas(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pid", rule_value="012-345-678")
+        signal = {"affected_areas": ["999-888-777", "Downtown"]}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_pid_empty_affected_areas(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pid", rule_value="012-345-678")
+        signal = {"affected_areas": []}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_pid_missing_affected_areas(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pid", rule_value="012-345-678")
+        signal = {}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_pid_case_insensitive(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pid", rule_value="012-345-678")
+        signal = {"affected_areas": ["012-345-678"]}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_pid_null_affected_areas(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pid", rule_value="012-345-678")
+        signal = {"affected_areas": None}
+        assert AlertEngine.match_rule(signal, rule) is False
+
 
 class TestCouncilScraper:
     """F02-E: Playwright council meeting scraper."""

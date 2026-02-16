@@ -195,8 +195,8 @@ FROM parcels p
 WHERE cs.geom IS NOT NULL
   AND cs.associated_pid IS NULL
   AND ST_DWithin(
-    ST_Transform(cs.geom, 3005),
-    ST_Transform(p.geom, 3005),
+    cs.geom::geography,
+    p.geom::geography,
     50
   )
 """

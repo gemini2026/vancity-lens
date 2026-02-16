@@ -309,13 +309,22 @@ async def score_parcels(
                     if flagged and not has_active:
                         stats["undervalued_count"] += 1
 
+                    # Look up TOD tier via spatial join with toa_buffers
+                    tier_row = await conn.fetchrow("""
+                        SELECT MIN(tb.tier) AS tier
+                        FROM toa_buffers tb
+                        JOIN parcels pp ON pp.pid = $1
+                        WHERE ST_Intersects(pp.geom, tb.geom)
+                    """, parcel["pid"])
+                    parcel_tod_tier = tier_row["tier"] if tier_row else None
+
                     # Collect scored parcel for alert generation
                     lot_area_sqft = float(parcel["lot_area_sqm"] or 0) * 10.7639
                     scored_list.append({
                         "pid": parcel["pid"],
                         "discount_pct": discount or 0,
                         "lot_area_sqft": round(lot_area_sqft, 1),
-                        "tod_tier": None,  # TOD tier not available in current schema
+                        "tod_tier": parcel_tod_tier,
                         "is_undervalued": flagged,
                         "neighborhood": neighborhood,
                     })
@@ -343,29 +352,86 @@ async def score_parcels(
 async def get_top_opportunities(
     db_pool: asyncpg.Pool,
     top_n: int = 20,
+    tod_tier: Optional[str] = None,
+    neighborhood: Optional[str] = None,
 ) -> list[dict]:
     """
     Get top undervalued parcels (weekly opportunity alert).
 
     Excludes parcels with active applications.
+
+    Args:
+        db_pool: Database connection pool
+        top_n: Maximum number of results to return
+        tod_tier: Optional filter, e.g. "Tier 1", "Tier 2", "Tier 3"
+        neighborhood: Optional filter by geo_local_area name
     """
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
+        # Build dynamic WHERE clauses and parameter list
+        conditions = [
+            "us.is_undervalued = TRUE",
+            "us.has_active_application = FALSE",
+        ]
+        params: list = []
+        param_idx = 0
+
+        # Parse tod_tier string (e.g. "Tier 1") into integer for DB query
+        tier_int: Optional[int] = None
+        if tod_tier:
+            # Accept formats like "Tier 1", "tier 2", "1", "2"
+            tier_str = tod_tier.strip().lower().replace("tier", "").strip()
+            try:
+                tier_int = int(tier_str)
+            except ValueError:
+                tier_int = None  # Invalid tier string, ignore filter
+
+        if tier_int is not None:
+            param_idx += 1
+            conditions.append(f"""
+                EXISTS (
+                    SELECT 1 FROM toa_buffers tb
+                    WHERE ST_Intersects(p.geom, tb.geom)
+                      AND tb.tier = ${param_idx}
+                )
+            """)
+            params.append(tier_int)
+
+        if neighborhood:
+            param_idx += 1
+            conditions.append(f"p.geo_local_area = ${param_idx}")
+            params.append(neighborhood)
+
+        where_clause = " AND ".join(conditions)
+
+        query = f"""
             SELECT DISTINCT ON (us.pid)
                 us.pid, us.neighborhood, us.assessed_value, us.implied_value,
                 us.buildable_sqft, us.discount_pct, us.repeat_signal,
                 us.has_contamination, us.has_heritage, us.caveats,
                 us.comp_count, us.computed_at,
-                p.civic_address, p.current_zoning
+                p.civic_address, p.current_zoning,
+                (
+                    SELECT MIN(tb.tier)
+                    FROM toa_buffers tb
+                    WHERE ST_Intersects(p.geom, tb.geom)
+                ) AS tod_tier
             FROM undervalued_scores us
             JOIN parcels p ON p.pid = us.pid
-            WHERE us.is_undervalued = TRUE
-              AND us.has_active_application = FALSE
+            WHERE {where_clause}
             ORDER BY us.pid, us.computed_at DESC
-        """)
+        """
+
+        rows = await conn.fetch(query, *params)
 
         # Sort by discount and take top N
-        results = [dict(r) for r in rows]
+        results = []
+        for r in rows:
+            row_dict = dict(r)
+            # Format tod_tier as human-readable string (e.g. "Tier 1")
+            raw_tier = row_dict.get("tod_tier")
+            row_dict["tod_tier"] = f"Tier {raw_tier}" if raw_tier is not None else None
+            results.append(row_dict)
+
         results.sort(key=lambda x: float(x.get("discount_pct") or 0), reverse=True)
         return results[:top_n]
 

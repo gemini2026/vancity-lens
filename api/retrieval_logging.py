@@ -1,4 +1,8 @@
-"""Retrieval audit logging (DI-005) and data freshness monitoring (DI-006)."""
+"""Retrieval audit logging (DI-005) and data freshness monitoring (DI-006).
+
+Also provides record_ingestion_success() for scrapers/jobs to stamp
+their last-successful-retrieval time in data_source_freshness.
+"""
 
 import json
 import logging
@@ -94,3 +98,55 @@ async def log_retrieval(db_pool, source_id: str, query_params: Optional[dict] = 
                     "Failed to log retrieval for %s: %s",
                     source_id, log_err,
                 )
+
+
+# ── Standalone freshness helpers (F02-001, F04-001) ─────────────────
+
+
+# Map scraper names (as registered in the scheduler) to data_source_freshness IDs
+SCRAPER_TO_SOURCE_ID = {
+    "council": "DS-006",
+    "dpb": "DS-015",
+    "rezoning": "DS-016",
+    "news": "DS-013",
+    "opendata": "DS-001",
+    "bclaws": "DS-005",
+    "gazette": "DS-014",
+    "contaminated": "DS-007",
+    "statscan": "DS-008",
+    "cmhc": "DS-009",
+    "political_risk": "DS-017",
+}
+
+
+async def record_ingestion_success(db_pool, source_id: str) -> None:
+    """Record a successful ingestion for a data source.
+
+    Updates the ``last_successful_retrieval`` timestamp in the
+    ``data_source_freshness`` table so the SLA monitor can detect
+    stale sources.
+
+    Args:
+        db_pool: asyncpg connection pool.
+        source_id: The ``source_id`` value in ``data_source_freshness``
+            (e.g. ``"DS-001"``).  Alternatively, pass a scheduler scraper
+            name (e.g. ``"council"``) and it will be mapped automatically.
+    """
+    # Allow callers to pass a scheduler scraper name for convenience
+    resolved_id = SCRAPER_TO_SOURCE_ID.get(source_id, source_id)
+
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE data_source_freshness
+                SET last_successful_retrieval = NOW(),
+                    updated_at = NOW()
+                WHERE source_id = $1
+                """,
+                resolved_id,
+            )
+    except Exception as exc:
+        logger.warning(
+            "record_ingestion_success failed for %s: %s", resolved_id, exc
+        )

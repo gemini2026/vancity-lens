@@ -324,8 +324,8 @@ class OpportunityAlertEngine:
                         MAX(t.max_storeys) AS entitled_storeys,
                         MAX(t.max_fsr) AS entitled_fsr,
                         MIN(ST_Distance(
-                            ST_Transform(ST_Centroid(p.geom), 3005),
-                            ST_Transform(s.geom, 3005)
+                            ST_Centroid(p.geom)::geography,
+                            s.geom::geography
                         )) AS dist_to_nearest_station
                     FROM parcels p
                     CROSS JOIN profile_data pd

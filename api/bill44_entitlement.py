@@ -58,8 +58,8 @@ SQL_CHECK_ELIGIBLE = """
 SQL_NEAREST_TRANSIT_DISTANCE = """
     SELECT MIN(
         ST_Distance(
-            ST_Transform(p.geom, 3005),
-            ST_Transform(ts.geom, 3005)
+            p.geom::geography,
+            ts.geom::geography
         )
     ) AS min_distance_m
     FROM parcels p

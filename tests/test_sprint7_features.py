@@ -77,41 +77,48 @@ class TestOppositionRate:
     """Sprint 7.1: Opposition rate per neighborhood."""
 
     def test_no_applications(self):
-        rate, score = compute_opposition_rate(0, 0)
-        assert rate == 0.0
-        assert score == 0.0
+        rate, score, status = compute_opposition_rate(0, 0)
+        assert rate is None
+        assert score is None
+        assert status == "Insufficient application history"
 
     def test_below_min_applications(self):
-        rate, score = compute_opposition_rate(3, 2)
-        assert rate == 0.0
-        assert score == 0.0
+        rate, score, status = compute_opposition_rate(3, 2)
+        assert rate is None
+        assert score is None
+        assert status == "Insufficient application history"
 
     def test_no_opposition(self):
-        rate, score = compute_opposition_rate(20, 0)
+        rate, score, status = compute_opposition_rate(20, 0)
         assert rate == 0.0
         assert score == 0.0
+        assert status is None
 
     def test_moderate_opposition(self):
         # 5 of 20 opposed = 25%
-        rate, score = compute_opposition_rate(20, 5)
+        rate, score, status = compute_opposition_rate(20, 5)
         assert rate == 25.0
         assert 4.0 <= score <= 6.0
+        assert status is None
 
     def test_high_opposition(self):
         # 15 of 20 opposed = 75%
-        rate, score = compute_opposition_rate(20, 15)
+        rate, score, status = compute_opposition_rate(20, 15)
         assert rate == 75.0
         assert score == 10.0  # Clamped at 10 since 75/5 = 15 > 10
+        assert status is None
 
     def test_total_opposition(self):
-        rate, score = compute_opposition_rate(10, 10)
+        rate, score, status = compute_opposition_rate(10, 10)
         assert rate == 100.0
         assert score == 10.0
+        assert status is None
 
     def test_boundary_min_applications(self):
-        rate, score = compute_opposition_rate(MIN_APPLICATIONS, 2)
+        rate, score, status = compute_opposition_rate(MIN_APPLICATIONS, 2)
         assert rate > 0
         assert score > 0
+        assert status is None
 
 
 # ── Delay Score Tests ───────────────────────────────────────────────
@@ -169,10 +176,8 @@ class TestSentimentIntensity:
     def test_all_negative_recent(self):
         today = date.today()
         signals = [
-            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.9},
-            {"event_date": (today - timedelta(days=10)).isoformat(), "sentiment": "negative_for_development", "confidence": 0.8},
-            {"event_date": (today - timedelta(days=20)).isoformat(), "sentiment": "negative_for_development", "confidence": 0.7},
-            {"event_date": (today - timedelta(days=30)).isoformat(), "sentiment": "negative_for_development", "confidence": 0.85},
+            {"event_date": (today - timedelta(days=i * 5)).isoformat(), "sentiment": "negative_for_development", "confidence": 0.9}
+            for i in range(12)
         ]
         score = compute_sentiment_intensity(signals)
         assert score > 7.0  # All negative, recent
@@ -180,33 +185,35 @@ class TestSentimentIntensity:
     def test_all_positive(self):
         today = date.today()
         signals = [
-            {"event_date": today.isoformat(), "sentiment": "positive_for_development", "confidence": 0.9},
-            {"event_date": (today - timedelta(days=10)).isoformat(), "sentiment": "positive_for_development", "confidence": 0.8},
-            {"event_date": (today - timedelta(days=20)).isoformat(), "sentiment": "neutral", "confidence": 0.7},
-            {"event_date": (today - timedelta(days=30)).isoformat(), "sentiment": "positive_for_development", "confidence": 0.85},
+            {"event_date": (today - timedelta(days=i * 5)).isoformat(), "sentiment": "positive_for_development", "confidence": 0.9}
+            for i in range(12)
         ]
         score = compute_sentiment_intensity(signals)
         assert score == 0.0  # No negative signals
 
     def test_mixed_sentiment(self):
         today = date.today()
-        signals = [
-            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.9},
-            {"event_date": today.isoformat(), "sentiment": "positive_for_development", "confidence": 0.9},
-            {"event_date": today.isoformat(), "sentiment": "neutral", "confidence": 0.8},
-            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.8},
-        ]
+        signals = []
+        # 5 negative + 5 positive + 2 neutral = 12 signals (above MIN_SIGNALS=10)
+        for i in range(5):
+            signals.append({"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.9})
+        for i in range(5):
+            signals.append({"event_date": today.isoformat(), "sentiment": "positive_for_development", "confidence": 0.9})
+        for i in range(2):
+            signals.append({"event_date": today.isoformat(), "sentiment": "neutral", "confidence": 0.8})
         score = compute_sentiment_intensity(signals)
-        assert 5.0 <= score <= 10.0  # 50% negative = significant
+        assert 5.0 <= score <= 10.0  # ~42% negative = significant
 
     def test_old_negative_decays(self):
         today = date.today()
         old_date = (today - timedelta(days=365)).isoformat()
+        # 8 old negatives + 4 recent positives = 12 signals
         signals = [
-            {"event_date": old_date, "sentiment": "negative_for_development", "confidence": 0.9},
-            {"event_date": old_date, "sentiment": "negative_for_development", "confidence": 0.9},
-            {"event_date": old_date, "sentiment": "negative_for_development", "confidence": 0.9},
-            {"event_date": today.isoformat(), "sentiment": "positive_for_development", "confidence": 0.9},
+            {"event_date": old_date, "sentiment": "negative_for_development", "confidence": 0.9}
+            for _ in range(8)
+        ] + [
+            {"event_date": today.isoformat(), "sentiment": "positive_for_development", "confidence": 0.9}
+            for _ in range(4)
         ]
         score = compute_sentiment_intensity(signals)
         # Old negatives decay significantly, recent positive dominates
@@ -215,22 +222,30 @@ class TestSentimentIntensity:
     def test_low_confidence_excluded(self):
         today = date.today()
         signals = [
-            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.4},
-            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.3},
-            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.5},
+            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.4}
+            for _ in range(12)
         ]
-        # All below 0.60 threshold
+        # All below 0.60 threshold — even though count >= MIN_SIGNALS,
+        # after filtering by confidence no valid signals remain
         assert compute_sentiment_intensity(signals) == 0.0
 
     def test_date_object_input(self):
         today = date.today()
         signals = [
-            {"event_date": today, "sentiment": "negative_for_development", "confidence": 0.9},
-            {"event_date": today, "sentiment": "negative_for_development", "confidence": 0.8},
-            {"event_date": today, "sentiment": "negative_for_development", "confidence": 0.7},
+            {"event_date": today, "sentiment": "negative_for_development", "confidence": 0.9}
+            for _ in range(12)
         ]
         score = compute_sentiment_intensity(signals)
         assert score > 0
+
+    def test_below_new_min_signals_returns_zero(self):
+        """With MIN_SIGNALS=10, 5 signals should return 0.0."""
+        today = date.today()
+        signals = [
+            {"event_date": today.isoformat(), "sentiment": "negative_for_development", "confidence": 0.9}
+            for _ in range(5)
+        ]
+        assert compute_sentiment_intensity(signals) == 0.0
 
 
 # ── Council Resistance Tests ────────────────────────────────────────
@@ -292,34 +307,47 @@ class TestCompositeScore:
         assert abs(total - 1.0) < 0.001
 
     def test_all_zero_components(self):
-        score = compute_composite_score(0, 0, 0, 0)
+        score, status = compute_composite_score(0, 0, 0, 0)
         assert score == 1.0  # Minimum score
+        assert status is None
 
     def test_all_max_components(self):
-        score = compute_composite_score(10, 10, 10, 10)
+        score, status = compute_composite_score(10, 10, 10, 10)
         assert score == 10.0  # Maximum score
+        assert status is None
 
     def test_low_risk_score(self):
         # AC-OPP-003: Low opposition -> score <= 3
-        score = compute_composite_score(1.0, 0.5, 1.0, 0.5)
+        score, status = compute_composite_score(1.0, 0.5, 1.0, 0.5)
         assert score <= 3.0
+        assert status is None
 
     def test_high_risk_score(self):
         # AC-OPP-002: High opposition -> score >= 7
-        score = compute_composite_score(9.0, 8.0, 9.0, 8.0)
+        score, status = compute_composite_score(9.0, 8.0, 9.0, 8.0)
         assert score >= 7.0
+        assert status is None
 
     def test_moderate_risk(self):
-        score = compute_composite_score(5.0, 5.0, 5.0, 5.0)
+        score, status = compute_composite_score(5.0, 5.0, 5.0, 5.0)
         assert 4.0 <= score <= 6.0
+        assert status is None
 
     def test_always_at_least_one(self):
-        score = compute_composite_score(0, 0, 0, 0)
+        score, status = compute_composite_score(0, 0, 0, 0)
         assert score >= 1.0
+        assert status is None
 
     def test_never_exceeds_ten(self):
-        score = compute_composite_score(15, 15, 15, 15)
+        score, status = compute_composite_score(15, 15, 15, 15)
         assert score <= 10.0
+        assert status is None
+
+    def test_insufficient_data_when_opposition_none(self):
+        """F05-005: None opposition score propagates insufficient data status."""
+        score, status = compute_composite_score(None, 5.0, 5.0, 5.0)
+        assert score is None
+        assert status == "Insufficient application history"
 
 
 # ── DB Query Tests ──────────────────────────────────────────────────

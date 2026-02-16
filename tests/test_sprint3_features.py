@@ -458,10 +458,27 @@ class TestClusteringDetection:
 class TestStageTransitionAlerts:
     """Test alert generation on pipeline stage transitions."""
 
+    @staticmethod
+    def _mock_conn_for_alerts(watchlist_rows, system_doc_id=1, signal_id=99):
+        """Create an AsyncMock conn pre-configured for stage transition alerts.
+
+        The new implementation calls conn.fetchrow three times:
+          1. _ensure_system_document: SELECT → returns {"id": system_doc_id}
+          2. _create_stage_transition_signal: INSERT → returns {"id": signal_id}
+        Then conn.fetch once for the watchlist match query.
+        """
+        conn = AsyncMock()
+        conn.fetchrow.side_effect = [
+            {"id": system_doc_id},  # system document lookup
+            {"id": signal_id},      # intelligence_signals INSERT RETURNING id
+        ]
+        conn.fetch.return_value = watchlist_rows
+        conn.execute.return_value = "INSERT 0 1"
+        return conn, signal_id
+
     @pytest.mark.asyncio
     async def test_alert_generated_for_matching_watchlist(self):
         """Matching neighborhood watchlist → alert created."""
-        conn = AsyncMock()
         pipeline_row = {
             "id": 1,
             "address": "100 Main St",
@@ -470,9 +487,7 @@ class TestStageTransitionAlerts:
             "current_zoning": "RS-1",
         }
 
-        # Watchlist matches neighborhood
-        conn.fetch.return_value = [{"watchlist_id": 42}]
-        conn.execute.return_value = "INSERT 0 1"
+        conn, sig_id = self._mock_conn_for_alerts([{"watchlist_id": 42}])
 
         await _generate_stage_transition_alerts(
             conn, pipeline_row, "rezoning_application", "public_hearing"
@@ -481,15 +496,16 @@ class TestStageTransitionAlerts:
         # Should have queried watchlists and inserted an alert
         conn.fetch.assert_called_once()
         conn.execute.assert_called_once()
-        # Verify the alert headline contains stage names
+        # Verify the alert contains the signal_id and stage names in headline
+        # conn.execute positional args: (sql, watchlist_id, signal_id, headline, summary, severity)
         call_args = conn.execute.call_args[0]
-        assert "rezoning_application" in call_args[2]
-        assert "public_hearing" in call_args[2]
+        assert call_args[2] == sig_id  # signal_id from intelligence_signals
+        assert "rezoning_application" in call_args[3]  # headline
+        assert "public_hearing" in call_args[3]
 
     @pytest.mark.asyncio
     async def test_no_alert_when_no_matching_watchlist(self):
         """No matching watchlist → no alert created."""
-        conn = AsyncMock()
         pipeline_row = {
             "id": 2,
             "address": "200 Granville St",
@@ -498,7 +514,7 @@ class TestStageTransitionAlerts:
             "current_zoning": "RS-1",
         }
 
-        conn.fetch.return_value = []  # No matching watchlists
+        conn, _ = self._mock_conn_for_alerts([])
 
         await _generate_stage_transition_alerts(
             conn, pipeline_row, "development_permit", "building_permit"
@@ -510,7 +526,6 @@ class TestStageTransitionAlerts:
     @pytest.mark.asyncio
     async def test_alert_severity_high_for_construction(self):
         """under_construction or completed → severity 'high'."""
-        conn = AsyncMock()
         pipeline_row = {
             "id": 3,
             "address": "300 Cambie St",
@@ -519,21 +534,20 @@ class TestStageTransitionAlerts:
             "current_zoning": "RS-1",
         }
 
-        conn.fetch.return_value = [{"watchlist_id": 10}]
-        conn.execute.return_value = "INSERT 0 1"
+        conn, _ = self._mock_conn_for_alerts([{"watchlist_id": 10}])
 
         await _generate_stage_transition_alerts(
             conn, pipeline_row, "building_permit", "under_construction"
         )
 
+        # conn.execute args: (sql, watchlist_id, signal_id, headline, summary, severity)
         call_args = conn.execute.call_args[0]
-        severity = call_args[4]  # 5th positional arg
+        severity = call_args[5]  # severity is the 6th positional arg
         assert severity == "high"
 
     @pytest.mark.asyncio
     async def test_alert_severity_medium_for_permit(self):
         """approved or under_staff_review → severity 'medium'."""
-        conn = AsyncMock()
         pipeline_row = {
             "id": 4,
             "address": "400 Broadway",
@@ -542,15 +556,15 @@ class TestStageTransitionAlerts:
             "current_zoning": "RS-1",
         }
 
-        conn.fetch.return_value = [{"watchlist_id": 20}]
-        conn.execute.return_value = "INSERT 0 1"
+        conn, _ = self._mock_conn_for_alerts([{"watchlist_id": 20}])
 
         await _generate_stage_transition_alerts(
             conn, pipeline_row, "application_submitted", "under_staff_review"
         )
 
+        # conn.execute args: (sql, watchlist_id, signal_id, headline, summary, severity)
         call_args = conn.execute.call_args[0]
-        severity = call_args[4]
+        severity = call_args[5]  # severity is the 6th positional arg
         assert severity == "medium"
 
     @pytest.mark.asyncio
@@ -565,7 +579,8 @@ class TestStageTransitionAlerts:
             "current_zoning": "C-2",
         }
 
-        conn.fetch.side_effect = Exception("DB connection lost")
+        # Error on the very first fetchrow (system doc lookup) — early failure
+        conn.fetchrow.side_effect = Exception("DB connection lost")
 
         # Should not raise
         await _generate_stage_transition_alerts(
@@ -575,7 +590,6 @@ class TestStageTransitionAlerts:
     @pytest.mark.asyncio
     async def test_multiple_watchlists_generate_multiple_alerts(self):
         """Multiple matching watchlists → one alert per watchlist."""
-        conn = AsyncMock()
         pipeline_row = {
             "id": 6,
             "address": "600 Main St",
@@ -584,12 +598,11 @@ class TestStageTransitionAlerts:
             "current_zoning": "RS-1",
         }
 
-        conn.fetch.return_value = [
+        conn, _ = self._mock_conn_for_alerts([
             {"watchlist_id": 1},
             {"watchlist_id": 2},
             {"watchlist_id": 3},
-        ]
-        conn.execute.return_value = "INSERT 0 1"
+        ])
 
         await _generate_stage_transition_alerts(
             conn, pipeline_row, "public_hearing", "council_decision"

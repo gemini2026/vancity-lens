@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .change_prompts import CHANGE_CANDIDATE_PATTERNS, CHANGE_EXTRACTION_PROMPT
 from .llm_backend import generate_chat
@@ -21,13 +21,24 @@ class ChangeRecord(BaseModel):
     geographic_scope: str
     affected_areas: list[str]
     entitlement_change: dict[str, Any]
-    plain_english_summary: str = Field(..., min_length=10)
+    plain_english_summary: str = Field(..., min_length=10, max_length=1200)
     nlp_confidence_score: float = Field(..., ge=0.0, le=1.0)
     requires_manual_review: bool = False
     source_url: Optional[str] = None
     source_document_title: Optional[str] = None
     extraction_model: Optional[str] = None
     extraction_latency_ms: Optional[int] = None
+
+    @field_validator("plain_english_summary", mode="before")
+    @classmethod
+    def truncate_summary(cls, v: str) -> str:
+        """Truncate plain_english_summary to 200 words maximum."""
+        if not isinstance(v, str):
+            return v
+        words = v.split()
+        if len(words) > 200:
+            return " ".join(words[:197]) + "..."
+        return v
 
     @model_validator(mode='after')
     def set_review_flag(self):
