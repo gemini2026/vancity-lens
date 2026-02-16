@@ -708,7 +708,7 @@ class TestSchedulerEdgeCases:
         status = scheduler.get_status()
 
         assert status["running"] is False
-        assert status["total_scrapers"] == 5
+        assert status["total_scrapers"] == 7
         assert all(not v["has_function"] for v in status["scrapers"].values())
 
     @pytest.mark.asyncio
