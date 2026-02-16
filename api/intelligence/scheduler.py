@@ -206,6 +206,8 @@ class ScraperScheduler:
             "rezoning": "0 8 * * *",  # daily 8am
             "news": "0 */6 * * *",  # every 6 hours
             "opendata": "0 3 * * 1",  # weekly Monday 3am
+            "political_risk": "0 2 1 * *",  # monthly 1st 2am UTC
+            "undervalued": "0 15 * * 1",    # weekly Monday 3pm UTC (8am Pacific)
         }
 
         for name, cron in default_schedules.items():
