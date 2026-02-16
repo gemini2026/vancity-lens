@@ -82,3 +82,79 @@ class TestK8sCronJobs:
         with open("k8s/cronjob-undervalued.yaml") as f:
             content = f.read()
         assert "undervalued" in content or "score_parcels" in content
+
+
+class TestUndervaluedWatchlistRules:
+    """F06-B: Undervalued alert filter rule types."""
+
+    def test_rule_type_has_undervalued_discount(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "UNDERVALUED_DISCOUNT")
+
+    def test_rule_type_has_undervalued_lot_area(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "UNDERVALUED_LOT_AREA")
+
+    def test_rule_type_has_undervalued_tod_tier(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "UNDERVALUED_TOD_TIER")
+
+    def test_match_undervalued_discount_above_threshold(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+        signal = {"discount_pct": 25.0}
+        rule = WatchlistRule(rule_type=RuleType.UNDERVALUED_DISCOUNT, rule_value="20")
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_undervalued_discount_below_threshold(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+        signal = {"discount_pct": 15.0}
+        rule = WatchlistRule(rule_type=RuleType.UNDERVALUED_DISCOUNT, rule_value="20")
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_undervalued_lot_area_above_min(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+        signal = {"lot_area_sqft": 5000}
+        rule = WatchlistRule(rule_type=RuleType.UNDERVALUED_LOT_AREA, rule_value="4000")
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_undervalued_lot_area_below_min(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+        signal = {"lot_area_sqft": 3000}
+        rule = WatchlistRule(rule_type=RuleType.UNDERVALUED_LOT_AREA, rule_value="4000")
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_undervalued_tod_tier(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+        signal = {"tod_tier": 1}
+        rule = WatchlistRule(rule_type=RuleType.UNDERVALUED_TOD_TIER, rule_value="1")
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_undervalued_tod_tier_no_match(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+        signal = {"tod_tier": 3}
+        rule = WatchlistRule(rule_type=RuleType.UNDERVALUED_TOD_TIER, rule_value="1")
+        assert AlertEngine.match_rule(signal, rule) is False
+
+
+class TestRiskChoropleth:
+    """F05-C: Map choropleth for neighborhood risk scores."""
+
+    def test_political_risk_api_file_exists(self):
+        assert os.path.isfile("frontend/src/lib/political-risk-api.ts")
+
+    def test_political_risk_api_has_fetch_function(self):
+        with open("frontend/src/lib/political-risk-api.ts") as f:
+            content = f.read()
+        assert "fetchNeighborhoodRiskScores" in content
+
+    def test_mapview_has_risk_toggle(self):
+        with open("frontend/src/components/MapView.tsx") as f:
+            content = f.read()
+        assert "showRisk" in content or "riskChoropleth" in content
+
+    def test_mapview_has_risk_colors(self):
+        with open("frontend/src/components/MapView.tsx") as f:
+            content = f.read()
+        # Should define risk score color thresholds
+        assert ("RISK_COLORS" in content or "riskColor" in content or
+                ("green" in content.lower() and "risk" in content.lower()))

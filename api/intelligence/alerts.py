@@ -38,6 +38,9 @@ class RuleType(str, Enum):
     UNIT_RANGE = "unit_range"
     GEOGRAPHIC_SCOPE = "geographic_scope"
     CHANGE_TYPE = "change_type"
+    UNDERVALUED_DISCOUNT = "undervalued_discount"
+    UNDERVALUED_LOT_AREA = "undervalued_lot_area"
+    UNDERVALUED_TOD_TIER = "undervalued_tod_tier"
 
 
 class WatchlistRule(BaseModel):
@@ -630,6 +633,32 @@ class AlertEngine:
             elif rule_type == RuleType.CHANGE_TYPE:
                 change_type = (signal.get("change_type") or "").lower()
                 return rule_value == change_type
+
+            elif rule_type == RuleType.UNDERVALUED_DISCOUNT:
+                try:
+                    min_discount = float(rule_value)
+                    discount = signal.get("discount_pct", 0)
+                    return float(discount) >= min_discount
+                except (ValueError, TypeError):
+                    return False
+
+            elif rule_type == RuleType.UNDERVALUED_LOT_AREA:
+                try:
+                    min_area = float(rule_value)
+                    area = signal.get("lot_area_sqft", 0)
+                    return float(area) >= min_area
+                except (ValueError, TypeError):
+                    return False
+
+            elif rule_type == RuleType.UNDERVALUED_TOD_TIER:
+                try:
+                    tier_val = int(rule_value)
+                    signal_tier = signal.get("tod_tier")
+                    if signal_tier is None:
+                        return False
+                    return int(signal_tier) == tier_val
+                except (ValueError, TypeError):
+                    return False
 
             else:
                 logger.warning(f"Unknown rule type: {rule_type}")
