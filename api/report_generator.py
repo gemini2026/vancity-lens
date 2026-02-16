@@ -446,6 +446,73 @@ class ReportGenerator:
 
         pdf.ln(3)
 
+    def _collect_red_flags(self, data: ParcelReport) -> list[dict]:
+        """
+        Collect red flags from parcel data for risk assessment.
+
+        Auto-aggregates risk flags from:
+        - Heritage designation (A/B/C)
+        - Contamination status
+        - Assessed value anomalies (outliers)
+        - Data currency warnings
+
+        Returns:
+            List of dicts with keys: flag_name, severity, detail
+        """
+        flags = []
+
+        # Heritage designation risk
+        heritage = getattr(data, "heritage_designation", None)
+        if heritage:
+            severity_map = {"A": "high", "B": "medium", "C": "low"}
+            severity = severity_map.get(heritage, "medium")
+            flags.append({
+                "flag_name": "Heritage Designation",
+                "severity": severity,
+                "detail": f"Property has heritage designation category {heritage}. "
+                         f"Development may require heritage conservation approval."
+            })
+
+        # Contamination risk
+        contamination = getattr(data, "contamination_status", None)
+        if contamination and contamination not in ("Not Listed", "None", None):
+            severity = "high" if "Active" in contamination else "medium"
+            flags.append({
+                "flag_name": "Environmental Contamination",
+                "severity": severity,
+                "detail": f"Site contamination status: {contamination}. "
+                         f"May require environmental remediation."
+            })
+
+        # Assessed value anomaly (outlier detection)
+        assessed = getattr(data, "assessed_value", None)
+        median = getattr(data, "neighbourhood_median_assessed", None)
+        std_dev = getattr(data, "neighbourhood_std_assessed", None)
+
+        if assessed and median and std_dev:
+            z_score = abs((assessed - median) / std_dev) if std_dev > 0 else 0
+            if z_score > 2:  # More than 2 standard deviations
+                severity = "medium"
+                flags.append({
+                    "flag_name": "Assessed Value Anomaly",
+                    "severity": severity,
+                    "detail": f"Assessed value (${assessed:,}) is {z_score:.1f} standard deviations "
+                             f"from neighbourhood median (${median:,}). Verify assessment accuracy."
+                })
+
+        # Data currency warnings
+        data_currency = getattr(data, "data_currency", [])
+        if isinstance(data_currency, list):
+            for warning in data_currency:
+                if isinstance(warning, dict):
+                    flags.append({
+                        "flag_name": warning.get("source", "Data Currency"),
+                        "severity": "low",
+                        "detail": warning.get("message", "Data may be stale. Verify current status.")
+                    })
+
+        return flags
+
     def _build_before_after_section(self, pdf: FPDF, parcel_data: ParcelReport):
         """Build before/after Bill 47 comparison table with colored uplift cells."""
         if not parcel_data.current_storeys and not parcel_data.entitled_storeys:
