@@ -37,11 +37,13 @@ async def get_cached_hbu(
         async with db_pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT analysis, narrative, confidence_score, sources,
-                       llm_model, created_at, expires_at
-                FROM hbu_analyses
-                WHERE pid = $1 AND expires_at > NOW()
-                ORDER BY created_at DESC
+                SELECT h.analysis, h.narrative, h.confidence_score, h.sources,
+                       h.llm_model, h.created_at, h.expires_at,
+                       p.civic_address, p.current_zoning
+                FROM hbu_analyses h
+                JOIN parcels p ON p.pid = h.pid
+                WHERE h.pid = $1 AND h.expires_at > NOW()
+                ORDER BY h.created_at DESC
                 LIMIT 1
                 """,
                 pid,
@@ -60,11 +62,13 @@ async def get_cached_hbu(
 
             return {
                 "pid": pid,
+                "address": row["civic_address"] or "",
+                "current_zoning": row["current_zoning"] or "",
                 "highest_best_use": analysis,
-                "narrative": row["narrative"],
                 "confidence_score": float(row["confidence_score"]) if row["confidence_score"] else None,
-                "sources": sources,
+                "sources": sources or [],
                 "llm_model": row["llm_model"],
+                "analysis_duration_ms": 0,  # not tracked for cached results
                 "cached_at": row["created_at"].isoformat() if row["created_at"] else None,
                 "expires_at": row["expires_at"].isoformat() if row["expires_at"] else None,
             }
@@ -243,7 +247,13 @@ async def analyze_hbu(
 
 
 def _parse_llm_response(answer_text: str) -> dict[str, Any]:
-    """Extract JSON from LLM response, handling markdown code fences."""
+    """Extract JSON from LLM response, handling markdown code fences.
+
+    Always guarantees these keys exist in the result (frontend depends on them):
+    - key_constraints: list
+    - feasibility_verdict: str
+    - recommended_use: str
+    """
     text = answer_text.strip()
 
     # Strip markdown code fences
@@ -252,27 +262,35 @@ def _parse_llm_response(answer_text: str) -> dict[str, Any]:
         lines = [line for line in lines if not line.strip().startswith("```")]
         text = "\n".join(lines).strip()
 
+    parsed = None
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
     except json.JSONDecodeError:
-        pass
+        # Try to find a JSON object embedded in the text
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            try:
+                parsed = json.loads(text[start:end])
+            except json.JSONDecodeError:
+                pass
 
-    # Try to find a JSON object embedded in the text
-    start = text.find("{")
-    end = text.rfind("}") + 1
-    if start >= 0 and end > start:
-        try:
-            return json.loads(text[start:end])
-        except json.JSONDecodeError:
-            pass
+    if not isinstance(parsed, dict):
+        logger.warning("Could not parse LLM response as JSON, returning raw narrative")
+        parsed = {
+            "recommended_use": "Analysis available — see narrative",
+            "narrative": answer_text,
+        }
 
-    logger.warning("Could not parse LLM response as JSON, returning raw narrative")
-    return {
-        "recommended_use": "Analysis available — see narrative",
-        "narrative": answer_text,
-        "key_constraints": [],
-        "feasibility_verdict": "unknown",
-    }
+    # Guarantee required keys the frontend depends on
+    parsed.setdefault("key_constraints", [])
+    parsed.setdefault("feasibility_verdict", "unknown")
+    parsed.setdefault("recommended_use", "See narrative")
+    # Ensure key_constraints is always a list
+    if not isinstance(parsed["key_constraints"], list):
+        parsed["key_constraints"] = []
+
+    return parsed
 
 
 def _compute_confidence(

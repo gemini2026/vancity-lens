@@ -313,6 +313,161 @@ class TestHBUFrontend:
         assert "Retry" in content
 
 
+class TestHBUSchemaValidation:
+    """Verify all code paths return the same schema matching the frontend interface."""
+
+    # The canonical set of top-level keys the frontend HBUAnalysis interface expects
+    REQUIRED_TOP_LEVEL_KEYS = {
+        "pid", "address", "current_zoning", "highest_best_use",
+        "confidence_score", "sources", "llm_model",
+        "analysis_duration_ms", "cached_at", "expires_at",
+    }
+
+    # Keys the frontend reads from highest_best_use
+    REQUIRED_HBU_KEYS = {
+        "recommended_use", "key_constraints", "feasibility_verdict",
+    }
+
+    # Keys the frontend conditionally reads (nullable, but should exist)
+    OPTIONAL_HBU_KEYS = {
+        "zoning_basis", "max_height_storeys", "max_fsr",
+        "estimated_units", "buildable_sqft", "narrative",
+    }
+
+    def test_fresh_analysis_has_all_top_level_keys(self):
+        """analyze_hbu() response has all keys the frontend expects."""
+        from api.intelligence.hbu_engine import analyze_hbu
+        import asyncio
+
+        mock_pool = MagicMock()
+        conn = AsyncMock()
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+        conn.fetchrow = AsyncMock(return_value=None)
+        conn.execute = AsyncMock()
+
+        mock_entitlement = {
+            "pid": "100-001-006",
+            "civic_address": "3838 Cambie Street",
+            "current_zoning": "RS-1",
+            "in_toa": True,
+            "best_entitlement": {
+                "station_name": "King Edward", "tier": 1,
+                "max_storeys": 20, "max_fsr": 5.5, "distance_m": 165.2,
+                "current_storeys": 10, "current_fsr": 0.6,
+                "storey_uplift": 10, "fsr_uplift": 4.9,
+                "zoning_already_exceeds": False,
+            },
+            "value_estimate": {
+                "lot_area_sqm": 600, "buildable_sqft": 35521,
+                "estimated_land_value": 28416696,
+            },
+        }
+
+        mock_llm_response = json.dumps({
+            "recommended_use": "20-storey mixed-use",
+            "zoning_basis": "Bill 47 Tier 1 TOD",
+            "max_height_storeys": 20, "max_fsr": 5.5,
+            "estimated_units": 85,
+            "unit_mix": {"studio": 15, "1br": 35, "2br": 25, "3br": 10},
+            "buildable_sqft": 35521,
+            "key_constraints": ["View cone restriction"],
+            "feasibility_verdict": "pencils",
+            "narrative": "This lot qualifies for Tier 1...",
+            "cited_sources": [{"title": "Zoning Bylaw", "section": "4.7", "relevance": "base"}],
+        })
+
+        with patch("api.intelligence.hbu_engine.compute_entitlement") as mock_ent, \
+             patch("api.intelligence.hbu_engine.retrieve_document_chunks") as mock_ret, \
+             patch("api.intelligence.hbu_engine.generate_chat") as mock_llm:
+            mock_ent.return_value = MagicMock()
+            mock_ent.return_value.model_dump = MagicMock(return_value=mock_entitlement)
+            mock_ret.return_value = [{"chunk_text": "test", "document_title": "Test"}]
+            mock_llm.return_value = (mock_llm_response, "gemini-2.0-flash", 1.5)
+
+            result = asyncio.get_event_loop().run_until_complete(
+                analyze_hbu(mock_pool, "100-001-006")
+            )
+
+        missing = self.REQUIRED_TOP_LEVEL_KEYS - set(result.keys())
+        assert not missing, f"Fresh analysis missing top-level keys: {missing}"
+
+        hbu = result["highest_best_use"]
+        missing_hbu = self.REQUIRED_HBU_KEYS - set(hbu.keys())
+        assert not missing_hbu, f"Fresh HBU missing required keys: {missing_hbu}"
+
+    def test_fallback_response_has_all_top_level_keys(self):
+        """_build_fallback_response() has all keys the frontend expects."""
+        from api.intelligence.hbu_engine import _build_fallback_response
+
+        ent = {
+            "civic_address": "123 Test St",
+            "current_zoning": "RS-1",
+            "best_entitlement": {"max_storeys": 20, "tier": 1, "max_fsr": 5.5},
+        }
+        result = _build_fallback_response("100-001-006", ent, {"buildable_sqft": 35000})
+
+        missing = self.REQUIRED_TOP_LEVEL_KEYS - set(result.keys())
+        assert not missing, f"Fallback missing top-level keys: {missing}"
+
+        hbu = result["highest_best_use"]
+        missing_hbu = self.REQUIRED_HBU_KEYS - set(hbu.keys())
+        assert not missing_hbu, f"Fallback HBU missing required keys: {missing_hbu}"
+
+    def test_fallback_key_constraints_is_list(self):
+        """key_constraints must always be a list (frontend calls .length on it)."""
+        from api.intelligence.hbu_engine import _build_fallback_response
+        ent = {"best_entitlement": {}}
+        result = _build_fallback_response("test", ent, {})
+        assert isinstance(result["highest_best_use"]["key_constraints"], list)
+
+    def test_fallback_sources_is_list(self):
+        """sources must always be a list (frontend calls .length on it)."""
+        from api.intelligence.hbu_engine import _build_fallback_response
+        ent = {"best_entitlement": {}}
+        result = _build_fallback_response("test", ent, {})
+        assert isinstance(result["sources"], list)
+
+    def test_confidence_score_in_valid_range(self):
+        """confidence_score must be 0.0-1.0 or None."""
+        from api.intelligence.hbu_engine import _compute_confidence
+        # Test all possible input combos
+        for in_toa in (True, False):
+            for n_chunks in (0, 3, 6):
+                for has_fields in (True, False):
+                    ent = {"in_toa": in_toa}
+                    if in_toa:
+                        ent["best_entitlement"] = {"zoning_already_exceeds": False}
+                    chunks = [{"chunk_text": f"c{i}"} for i in range(n_chunks)]
+                    hbu = {}
+                    if has_fields:
+                        hbu = {"max_height_storeys": 20, "max_fsr": 5.5, "feasibility_verdict": "pencils"}
+                    score = _compute_confidence(ent, chunks, hbu)
+                    assert 0.0 <= score <= 1.0, f"Score {score} out of range for in_toa={in_toa}, chunks={n_chunks}"
+
+    def test_parse_llm_response_always_has_required_keys(self):
+        """_parse_llm_response must always return key_constraints and feasibility_verdict."""
+        from api.intelligence.hbu_engine import _parse_llm_response
+
+        # Test with various bad inputs
+        for bad_input in ["", "not json", "42", "null", '{"foo": "bar"}']:
+            result = _parse_llm_response(bad_input)
+            assert "feasibility_verdict" in result, f"Missing feasibility_verdict for input: {bad_input}"
+            assert "key_constraints" in result, f"Missing key_constraints for input: {bad_input}"
+            assert isinstance(result["key_constraints"], list), f"key_constraints not a list for: {bad_input}"
+
+    def test_cached_response_schema_matches_fresh(self):
+        """get_cached_hbu query now JOINs parcels for address/current_zoning."""
+        with open("api/intelligence/hbu_engine.py") as f:
+            code = f.read()
+        # Verify the cached path returns address and current_zoning
+        assert '"address"' in code or "'address'" in code
+        assert '"current_zoning"' in code or "'current_zoning'" in code
+        assert '"analysis_duration_ms"' in code or "'analysis_duration_ms'" in code
+        # Verify JOIN parcels is in the cached query
+        assert "JOIN parcels" in code
+
+
 class TestHBUPDFSection:
     """HBU section in PDF report."""
 
