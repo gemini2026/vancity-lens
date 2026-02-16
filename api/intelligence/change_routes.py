@@ -14,10 +14,84 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="", tags=["regulatory-changes"])
+
+
+class ChangeRecordResponse(BaseModel):
+    """Response model for a single regulatory change record."""
+
+    change_id: str
+    signal_id: Optional[int] = None
+    change_type: str
+    source_url: Optional[str] = None
+    source_document_title: Optional[str] = None
+    publication_date: Optional[str] = None
+    effective_date: Optional[str] = None
+    geographic_scope: Optional[str] = None
+    affected_areas: list[str] = []
+    entitlement_change: dict = {}
+    plain_english_summary: Optional[str] = None
+    nlp_confidence_score: Optional[float] = None
+    requires_manual_review: Optional[bool] = None
+    extraction_timestamp: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class PaginationMeta(BaseModel):
+    """Pagination metadata."""
+
+    page: int
+    per_page: int
+    total: int
+    total_pages: int
+
+
+class PaginatedChanges(BaseModel):
+    """Paginated response for change records search."""
+
+    results: list[ChangeRecordResponse]
+    pagination: PaginationMeta
+
+
+def _row_to_response(row) -> ChangeRecordResponse:
+    """Convert a database row to a ChangeRecordResponse.
+
+    Handles JSONB deserialization (asyncpg returns JSONB as strings)
+    and date/datetime serialization to ISO strings.
+
+    Args:
+        row: asyncpg Record from change_records table
+
+    Returns:
+        ChangeRecordResponse instance
+    """
+    entitlement_change_raw = row["entitlement_change"]
+    if isinstance(entitlement_change_raw, str):
+        entitlement_change = json.loads(entitlement_change_raw)
+    else:
+        entitlement_change = entitlement_change_raw or {}
+
+    return ChangeRecordResponse(
+        change_id=str(row["change_id"]),
+        signal_id=row["signal_id"],
+        change_type=row["change_type"],
+        source_url=row["source_url"],
+        source_document_title=row["source_document_title"],
+        publication_date=row["publication_date"].isoformat() if row["publication_date"] else None,
+        effective_date=row["effective_date"].isoformat() if row["effective_date"] else None,
+        geographic_scope=row["geographic_scope"],
+        affected_areas=row["affected_areas"] or [],
+        entitlement_change=entitlement_change,
+        plain_english_summary=row["plain_english_summary"],
+        nlp_confidence_score=float(row["nlp_confidence_score"]) if row["nlp_confidence_score"] else None,
+        requires_manual_review=row["requires_manual_review"],
+        extraction_timestamp=row["extraction_timestamp"].isoformat() if row["extraction_timestamp"] else None,
+        created_at=row["created_at"].isoformat() if row["created_at"] else None,
+    )
 
 
 def get_db_pool(request: Request) -> asyncpg.Pool:
@@ -39,6 +113,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
         "Paginated search of regulatory change archive with filters. "
         "Supports full-text search, change type, geographic scope, date range, and affected area filtering."
     ),
+    response_model=PaginatedChanges,
 )
 async def get_changes(
     request: Request,
@@ -124,33 +199,8 @@ async def get_changes(
                 offset,
             )
 
-        # Serialize results (handle JSONB and dates)
-        results = []
-        for row in rows:
-            entitlement_change_raw = row["entitlement_change"]
-            # asyncpg returns JSONB as string — must json.loads()
-            if isinstance(entitlement_change_raw, str):
-                entitlement_change = json.loads(entitlement_change_raw)
-            else:
-                entitlement_change = entitlement_change_raw or {}
-
-            results.append({
-                "change_id": str(row["change_id"]),
-                "signal_id": row["signal_id"],
-                "change_type": row["change_type"],
-                "source_url": row["source_url"],
-                "source_document_title": row["source_document_title"],
-                "publication_date": row["publication_date"].isoformat() if row["publication_date"] else None,
-                "effective_date": row["effective_date"].isoformat() if row["effective_date"] else None,
-                "geographic_scope": row["geographic_scope"],
-                "affected_areas": row["affected_areas"] or [],
-                "entitlement_change": entitlement_change,
-                "plain_english_summary": row["plain_english_summary"],
-                "nlp_confidence_score": float(row["nlp_confidence_score"]) if row["nlp_confidence_score"] else None,
-                "requires_manual_review": row["requires_manual_review"],
-                "extraction_timestamp": row["extraction_timestamp"].isoformat() if row["extraction_timestamp"] else None,
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            })
+        # Serialize results via shared helper
+        results = [_row_to_response(row) for row in rows]
 
         total_pages = (total + per_page - 1) // per_page
 
@@ -160,15 +210,15 @@ async def get_changes(
             f"dates={start_date}..{end_date}, q={q}}}"
         )
 
-        return {
-            "results": results,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": total,
-                "total_pages": total_pages,
-            },
-        }
+        return PaginatedChanges(
+            results=results,
+            pagination=PaginationMeta(
+                page=page,
+                per_page=per_page,
+                total=total,
+                total_pages=total_pages,
+            ),
+        )
 
     except HTTPException:
         raise
@@ -184,6 +234,7 @@ async def get_changes(
     "/changes/{change_id}",
     summary="Get single change record",
     description="Retrieve a single regulatory change record by UUID.",
+    response_model=ChangeRecordResponse,
 )
 async def get_change_by_id(
     request: Request,
@@ -216,30 +267,7 @@ async def get_change_by_id(
                 detail=f"Change record {change_id} not found",
             )
 
-        # Handle JSONB
-        entitlement_change_raw = row["entitlement_change"]
-        if isinstance(entitlement_change_raw, str):
-            entitlement_change = json.loads(entitlement_change_raw)
-        else:
-            entitlement_change = entitlement_change_raw or {}
-
-        result = {
-            "change_id": str(row["change_id"]),
-            "signal_id": row["signal_id"],
-            "change_type": row["change_type"],
-            "source_url": row["source_url"],
-            "source_document_title": row["source_document_title"],
-            "publication_date": row["publication_date"].isoformat() if row["publication_date"] else None,
-            "effective_date": row["effective_date"].isoformat() if row["effective_date"] else None,
-            "geographic_scope": row["geographic_scope"],
-            "affected_areas": row["affected_areas"] or [],
-            "entitlement_change": entitlement_change,
-            "plain_english_summary": row["plain_english_summary"],
-            "nlp_confidence_score": float(row["nlp_confidence_score"]) if row["nlp_confidence_score"] else None,
-            "requires_manual_review": row["requires_manual_review"],
-            "extraction_timestamp": row["extraction_timestamp"].isoformat() if row["extraction_timestamp"] else None,
-            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-        }
+        result = _row_to_response(row)
 
         logger.info(f"Retrieved change record: {change_id}")
         return result

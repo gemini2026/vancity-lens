@@ -6,10 +6,33 @@ import logging
 from datetime import datetime
 from typing import Any, Optional
 
+from pydantic import BaseModel, Field, model_validator
+
 from .change_prompts import CHANGE_CANDIDATE_PATTERNS, CHANGE_EXTRACTION_PROMPT
 from .llm_backend import generate_chat
 
 logger = logging.getLogger(__name__)
+
+
+class ChangeRecord(BaseModel):
+    """Structured representation of an extracted regulatory change."""
+
+    change_type: str
+    geographic_scope: str
+    affected_areas: list[str]
+    entitlement_change: dict[str, Any]
+    plain_english_summary: str = Field(..., min_length=10)
+    nlp_confidence_score: float = Field(..., ge=0.0, le=1.0)
+    requires_manual_review: bool = False
+    source_url: Optional[str] = None
+    source_document_title: Optional[str] = None
+    extraction_model: Optional[str] = None
+    extraction_latency_ms: Optional[int] = None
+
+    @model_validator(mode='after')
+    def set_review_flag(self):
+        self.requires_manual_review = self.nlp_confidence_score < 0.85
+        return self
 
 
 def is_candidate_chunk(text: str) -> bool:
@@ -31,14 +54,14 @@ def is_candidate_chunk(text: str) -> bool:
     return False
 
 
-def parse_extraction_response(answer_text: str) -> dict[str, Any]:
+def parse_extraction_response(answer_text: str) -> ChangeRecord:
     """Parse and validate LLM extraction response.
 
     Args:
         answer_text: JSON string from LLM
 
     Returns:
-        Validated dictionary with change record fields including:
+        Validated ChangeRecord instance with fields including:
         - All fields from LLM response
         - nlp_confidence_score: confidence value
         - requires_manual_review: bool (True if confidence < 0.85)
@@ -51,28 +74,17 @@ def parse_extraction_response(answer_text: str) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON response: {e}")
 
-    # Validate required fields
-    required = ["change_type", "geographic_scope", "affected_areas",
-                "entitlement_change", "plain_english_summary", "confidence"]
-    missing = [f for f in required if f not in data]
-    if missing:
-        raise ValueError(f"Missing required fields: {missing}")
+    # Map 'confidence' key from LLM response to 'nlp_confidence_score'
+    if "confidence" in data and "nlp_confidence_score" not in data:
+        data["nlp_confidence_score"] = data.pop("confidence")
 
-    # Extract confidence and determine review flag
-    confidence = float(data.get("confidence", 0.0))
+    # Validate via Pydantic model (handles required field checks + type coercion)
+    try:
+        record = ChangeRecord(**data)
+    except Exception as e:
+        raise ValueError(f"Validation failed: {e}")
 
-    # Build result with renamed fields
-    result = {
-        "change_type": data["change_type"],
-        "geographic_scope": data["geographic_scope"],
-        "affected_areas": data["affected_areas"],
-        "entitlement_change": data["entitlement_change"],
-        "plain_english_summary": data["plain_english_summary"],
-        "nlp_confidence_score": confidence,
-        "requires_manual_review": confidence < 0.85,
-    }
-
-    return result
+    return record
 
 
 async def extract_regulatory_change(
@@ -80,7 +92,7 @@ async def extract_regulatory_change(
     source_url: str,
     source_title: str,
     max_tokens: int = 1000,
-) -> dict[str, Any]:
+) -> ChangeRecord:
     """Extract structured regulatory change from document chunk using LLM.
 
     Args:
@@ -90,7 +102,7 @@ async def extract_regulatory_change(
         max_tokens: Max tokens for LLM response
 
     Returns:
-        Dictionary with extracted fields plus metadata:
+        ChangeRecord with extracted fields plus metadata:
         - change_type, geographic_scope, affected_areas, entitlement_change,
           plain_english_summary, nlp_confidence_score, requires_manual_review
         - source_url, source_document_title
@@ -115,41 +127,44 @@ Text to analyze:
 {chunk_text}
 """
 
-    # Call LLM backend
-    answer_text, model_used, latency = await generate_chat(
-        system_prompt=CHANGE_EXTRACTION_PROMPT,
-        user_message=user_message,
-        max_tokens=max_tokens,
-    )
+    # Call LLM backend — wrap errors in ValueError (Issue 17)
+    try:
+        answer_text, model_used, latency = await generate_chat(
+            system_prompt=CHANGE_EXTRACTION_PROMPT,
+            user_message=user_message,
+            max_tokens=max_tokens,
+        )
+    except Exception as e:
+        raise ValueError(f"LLM extraction failed: {e}") from e
 
     # Parse and validate response
     result = parse_extraction_response(answer_text)
 
-    # Add metadata
-    result["source_url"] = source_url
-    result["source_document_title"] = source_title
-    result["extraction_model"] = model_used
-    result["extraction_latency_ms"] = int(latency * 1000)
+    # Set metadata fields on the model
+    result.source_url = source_url
+    result.source_document_title = source_title
+    result.extraction_model = model_used
+    result.extraction_latency_ms = int(latency * 1000)
 
     logger.info(
         "Extracted change: type=%s scope=%s confidence=%.2f review=%s model=%s latency=%dms",
-        result["change_type"],
-        result["geographic_scope"],
-        result["nlp_confidence_score"],
-        result["requires_manual_review"],
+        result.change_type,
+        result.geographic_scope,
+        result.nlp_confidence_score,
+        result.requires_manual_review,
         model_used,
-        result["extraction_latency_ms"],
+        result.extraction_latency_ms,
     )
 
     return result
 
 
-async def store_change_record(db_pool, record: dict[str, Any]) -> int:
+async def store_change_record(db_pool, record: ChangeRecord) -> int:
     """Store change record in database with duplicate check.
 
     Args:
         db_pool: asyncpg connection pool
-        record: Change record dictionary with fields:
+        record: ChangeRecord instance with fields:
             - change_type, source_url, source_document_title
             - publication_date (optional), effective_date (optional)
             - geographic_scope, affected_areas, entitlement_change
@@ -158,19 +173,7 @@ async def store_change_record(db_pool, record: dict[str, Any]) -> int:
 
     Returns:
         Record ID (existing or newly inserted)
-
-    Raises:
-        ValueError: If required fields are missing
     """
-    required = [
-        "change_type", "source_url", "source_document_title",
-        "geographic_scope", "affected_areas", "entitlement_change",
-        "plain_english_summary", "nlp_confidence_score", "requires_manual_review"
-    ]
-    missing = [f for f in required if f not in record]
-    if missing:
-        raise ValueError(f"Missing required fields: {missing}")
-
     async with db_pool.acquire() as conn:
         # Check for duplicate (same source_url + change_type + summary)
         existing = await conn.fetchval(
@@ -181,9 +184,9 @@ async def store_change_record(db_pool, record: dict[str, Any]) -> int:
               AND plain_english_summary = $3
             LIMIT 1
             """,
-            record["source_url"],
-            record["change_type"],
-            record["plain_english_summary"],
+            record.source_url,
+            record.change_type,
+            record.plain_english_summary,
         )
 
         if existing:
@@ -204,25 +207,25 @@ async def store_change_record(db_pool, record: dict[str, Any]) -> int:
             )
             RETURNING change_id
             """,
-            record["change_type"],
-            record["source_url"],
-            record["source_document_title"],
-            record.get("publication_date"),
-            record.get("effective_date"),
-            record["geographic_scope"],
-            json.dumps(record["affected_areas"]),
-            json.dumps(record["entitlement_change"]),
-            record["plain_english_summary"],
-            record["nlp_confidence_score"],
-            record["requires_manual_review"],
+            record.change_type,
+            record.source_url,
+            record.source_document_title,
+            getattr(record, "publication_date", None),
+            getattr(record, "effective_date", None),
+            record.geographic_scope,
+            json.dumps(record.affected_areas),
+            json.dumps(record.entitlement_change),
+            record.plain_english_summary,
+            record.nlp_confidence_score,
+            record.requires_manual_review,
         )
 
         logger.info(
             "Stored change record: id=%s type=%s scope=%s review=%s",
             record_id,
-            record["change_type"],
-            record["geographic_scope"],
-            record["requires_manual_review"],
+            record.change_type,
+            record.geographic_scope,
+            record.requires_manual_review,
         )
 
         return record_id
