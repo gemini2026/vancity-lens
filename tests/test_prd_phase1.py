@@ -368,3 +368,233 @@ class TestMarketBenchmarksIntegration:
         assert result.value_estimate is not None
         assert result.value_estimate.price_per_sqft_assumption == Decimal("800")
         assert result.market_data_date == MARKET_DATA_DATE
+
+
+class TestStalenessWarnings:
+    """F01-D: Data staleness warnings in entitlement response."""
+
+    @pytest.mark.asyncio
+    async def test_stale_assessment_warning(self):
+        """Parcels with BC Assessment data > 1 year old get a staleness warning."""
+        from datetime import date
+        from api.entitlement import compute_entitlement
+
+        conn = AsyncMock()
+        stale_year = date.today().year - 2
+        parcel_row = {
+            "pid": "100-001-020",
+            "civic_address": "300 Stale Data Rd",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("500"),
+            "assessed_value": 1000000,
+            "assessed_year": stale_year,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "Dunbar-Southlands",
+            "lat": Decimal("49.240"),
+            "lng": Decimal("-123.190"),
+        }
+        entitlement_rows = []
+        view_cone_row = None
+        heritage_row = None
+        benchmark_row = None
+
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, view_cone_row, heritage_row, benchmark_row
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-020")
+        warning_msgs = [w.message for w in result.data_warnings]
+        assert any(str(stale_year) in m for m in warning_msgs)
+
+    @pytest.mark.asyncio
+    async def test_stale_market_data_warning(self):
+        """Market benchmarks older than 12 months trigger a staleness warning."""
+        from api.entitlement import compute_entitlement
+
+        conn = AsyncMock()
+        parcel_row = {
+            "pid": "100-001-021",
+            "civic_address": "400 Old Market Ln",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("500"),
+            "assessed_value": 1000000,
+            "assessed_year": 2026,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "Marpole",
+            "lat": Decimal("49.210"),
+            "lng": Decimal("-123.130"),
+        }
+        entitlement_rows = [{
+            "station_name": "Marine Drive",
+            "distance_m": Decimal("200"),
+            "tier": 1,
+            "max_storeys": 20,
+            "max_fsr": Decimal("5.5"),
+            "current_height": 2,
+            "current_fsr": Decimal("0.6"),
+        }]
+        view_cone_row = None
+        heritage_row = None
+        benchmark_row = {
+            "revenue_per_sf": Decimal("800"),
+            "hard_cost_per_sf": Decimal("350"),
+            "effective_date": "2024-01-01",
+        }
+
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, view_cone_row, heritage_row, benchmark_row
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-021")
+        warning_msgs = [w.message for w in result.data_warnings]
+        assert any("Cost data may be outdated" in m for m in warning_msgs)
+
+    @pytest.mark.asyncio
+    async def test_no_stale_assessment_when_current(self):
+        """Parcels with current-year assessment data do NOT get a staleness warning."""
+        from datetime import date
+        from api.entitlement import compute_entitlement
+
+        conn = AsyncMock()
+        parcel_row = {
+            "pid": "100-001-022",
+            "civic_address": "500 Fresh Data Ave",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("500"),
+            "assessed_value": 1000000,
+            "assessed_year": date.today().year,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "Kitsilano",
+            "lat": Decimal("49.265"),
+            "lng": Decimal("-123.165"),
+        }
+        entitlement_rows = []
+        view_cone_row = None
+        heritage_row = None
+        benchmark_row = None
+
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, view_cone_row, heritage_row, benchmark_row
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-022")
+        stale_codes = [w.code for w in result.data_warnings if w.code == "STALE_ASSESSMENT"]
+        assert len(stale_codes) == 0
+
+    @pytest.mark.asyncio
+    async def test_no_stale_market_when_recent(self):
+        """Market benchmarks less than 12 months old do NOT trigger staleness."""
+        from datetime import date, timedelta
+        from api.entitlement import compute_entitlement
+
+        conn = AsyncMock()
+        recent_date = (date.today() - timedelta(days=100)).isoformat()
+        parcel_row = {
+            "pid": "100-001-023",
+            "civic_address": "600 Recent Mkt Blvd",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("500"),
+            "assessed_value": 1000000,
+            "assessed_year": date.today().year,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "Marpole",
+            "lat": Decimal("49.210"),
+            "lng": Decimal("-123.130"),
+        }
+        entitlement_rows = [{
+            "station_name": "Marine Drive",
+            "distance_m": Decimal("200"),
+            "tier": 1,
+            "max_storeys": 20,
+            "max_fsr": Decimal("5.5"),
+            "current_height": 2,
+            "current_fsr": Decimal("0.6"),
+        }]
+        view_cone_row = None
+        heritage_row = None
+        benchmark_row = {
+            "revenue_per_sf": Decimal("800"),
+            "hard_cost_per_sf": Decimal("350"),
+            "effective_date": recent_date,
+        }
+
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, view_cone_row, heritage_row, benchmark_row
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-023")
+        stale_codes = [w.code for w in result.data_warnings if w.code == "STALE_MARKET_DATA"]
+        assert len(stale_codes) == 0
+
+
+class TestPipelineSchemaEnhancement:
+    """F04-A: Enhanced supply_pipeline schema."""
+
+    def test_migration_file_exists(self):
+        assert os.path.exists("db/043_pipeline_schema_v2.sql")
+
+    def test_migration_adds_application_id(self):
+        with open("db/043_pipeline_schema_v2.sql") as f:
+            content = f.read()
+        assert "application_id" in content
+
+    def test_migration_adds_application_type(self):
+        with open("db/043_pipeline_schema_v2.sql") as f:
+            content = f.read()
+        assert "application_type" in content
+
+    def test_pipeline_stage_enum_has_nine_stages(self):
+        from api.intelligence.supply_pipeline import PipelineStage
+        assert len(PipelineStage) == 9
+
+    def test_pipeline_stage_has_enquiry(self):
+        from api.intelligence.supply_pipeline import PipelineStage
+        assert hasattr(PipelineStage, "ENQUIRY")
+
+    def test_pipeline_stage_has_withdrawn(self):
+        from api.intelligence.supply_pipeline import PipelineStage
+        assert hasattr(PipelineStage, "WITHDRAWN")
+
+    def test_pipeline_stage_has_refused(self):
+        from api.intelligence.supply_pipeline import PipelineStage
+        assert hasattr(PipelineStage, "REFUSED")

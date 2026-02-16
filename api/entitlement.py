@@ -105,7 +105,8 @@ def validate_pid_format(pid: str) -> str:
 
 SQL_PARCEL_INFO = """
     SELECT pid, civic_address, current_zoning, current_height,
-           current_fsr, lot_area_sqm, assessed_value, asking_price,
+           current_fsr, lot_area_sqm, assessed_value, assessed_year,
+           asking_price,
            land_value, improvement_value, year_built, geo_local_area
     FROM parcels
     WHERE pid = $1
@@ -389,6 +390,29 @@ async def compute_entitlement(
         parcel["current_zoning"],
     )
     cp_dict = cp_result.model_dump() if cp_result and cp_result.has_bonus else None
+
+    # Staleness warnings (DV-F01-006, DV-F01-007)
+    from datetime import date as date_cls
+    current_year = date_cls.today().year
+    assessed_year = parcel.get("assessed_year")
+    if assessed_year and assessed_year < current_year - 1:
+        data_warnings.append(DataQualityWarning(
+            code="STALE_ASSESSMENT",
+            field="assessed_value",
+            message=f"Assessment data is from {assessed_year} -- may not reflect current values",
+        ))
+
+    if market_data_date:
+        try:
+            md = date_cls.fromisoformat(str(market_data_date))
+            if (date_cls.today() - md).days > 365:
+                data_warnings.append(DataQualityWarning(
+                    code="STALE_MARKET_DATA",
+                    field="market_data",
+                    message=f"Cost data may be outdated -- last updated {market_data_date}",
+                ))
+        except (ValueError, TypeError):
+            pass  # Non-ISO date format (e.g. "2025-Q4") — skip staleness check
 
     return ParcelEntitlementResponse(
         pid=pid,
