@@ -7,7 +7,6 @@ import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
-from decimal import Decimal
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
@@ -461,12 +460,6 @@ async def list_api_versions():
 )
 async def get_entitlement(
     pid: str,
-    price_per_sqft: Decimal = Query(
-        default=Decimal("800"),
-        ge=100,
-        le=3000,
-        description="$/sqft of buildable area for value estimation",
-    ),
     response: Response = None,
 ):
     """
@@ -484,7 +477,7 @@ async def get_entitlement(
         response.headers["X-API-Version"] = "1"
     async with db.acquire() as conn:
         try:
-            result = await compute_entitlement(conn, pid, price_per_sqft)
+            result = await compute_entitlement(conn, pid)
         except ParcelNotFoundError:
             raise HTTPException(
                 status_code=404,

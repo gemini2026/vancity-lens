@@ -166,7 +166,7 @@ class TestLotAreaWarning:
     @pytest.mark.asyncio
     async def test_no_warning_normal_lot(self, mock_conn, base_parcel, tier1_entitlement):
         """Normal lot area (500 sqm ≈ 5,382 SF) produces no warning."""
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -182,7 +182,7 @@ class TestLotAreaWarning:
         """Lot area > 500K SF triggers LOT_AREA_ANOMALY warning."""
         parcel = base_parcel.copy()
         parcel["lot_area_sqm"] = Decimal("50000")  # ~538,000 SF > 500K
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -200,7 +200,7 @@ class TestLotAreaWarning:
         """Null lot area does not trigger warning (just skips check)."""
         parcel = base_parcel.copy()
         parcel["lot_area_sqm"] = None
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -218,7 +218,7 @@ class TestFSRWarning:
     @pytest.mark.asyncio
     async def test_no_warning_normal_fsr(self, mock_conn, base_parcel, tier1_entitlement):
         """FSR 2.5 is within range — no warning."""
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -236,7 +236,7 @@ class TestFSRWarning:
         parcel["current_fsr"] = Decimal("0.05")
         ent = tier1_entitlement.copy()
         ent["current_fsr"] = Decimal("0.05")
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -254,7 +254,7 @@ class TestFSRWarning:
         parcel["current_fsr"] = Decimal("20.0")
         ent = tier1_entitlement.copy()
         ent["current_fsr"] = Decimal("20.0")
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -274,7 +274,7 @@ class TestFSRWarning:
         parcel["current_fsr"] = None
         ent = tier1_entitlement.copy()
         ent["current_fsr"] = None
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -292,7 +292,7 @@ class TestFSRWarning:
         parcel["current_fsr"] = Decimal("0.1")
         ent = tier1_entitlement.copy()
         ent["current_fsr"] = Decimal("0.1")
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -310,7 +310,7 @@ class TestFSRWarning:
         parcel["current_fsr"] = Decimal("15.0")
         ent = tier1_entitlement.copy()
         ent["current_fsr"] = Decimal("15.0")
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -332,7 +332,7 @@ class TestViewConeHardCap:
     @pytest.mark.asyncio
     async def test_no_view_cone(self, mock_conn, base_parcel, tier1_entitlement):
         """No view cone → entitled_height_m reflects full storeys."""
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -351,7 +351,7 @@ class TestViewConeHardCap:
     async def test_view_cone_caps_height(self, mock_conn, base_parcel, tier1_entitlement):
         """View cone at 30m caps 20-storey entitlement down to ~10 storeys."""
         view_cone_result = {"view_cone_max_m": Decimal("30.0")}
-        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -370,7 +370,7 @@ class TestViewConeHardCap:
     async def test_view_cone_very_low(self, mock_conn, base_parcel, tier1_entitlement):
         """View cone at 3.0m (below ground floor 3.5m) → 1 storey only."""
         view_cone_result = {"view_cone_max_m": Decimal("3.0")}
-        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -386,7 +386,7 @@ class TestViewConeHardCap:
     async def test_view_cone_above_entitlement(self, mock_conn, base_parcel, tier1_entitlement):
         """View cone at 100m (above 20-storey = 60.5m) → no cap applied."""
         view_cone_result = {"view_cone_max_m": Decimal("100.0")}
-        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -404,7 +404,7 @@ class TestViewConeHardCap:
         """When view cone caps storeys, storey_uplift is recalculated."""
         # Current height: 6 storeys, Bill 47: 20, View cone caps to 9
         view_cone_result = {"view_cone_max_m": Decimal("30.0")}
-        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -420,7 +420,7 @@ class TestViewConeHardCap:
     async def test_view_cone_null_result(self, mock_conn, base_parcel, tier1_entitlement):
         """View cone query returns row with NULL max_height_m → no cap."""
         view_cone_result = {"view_cone_max_m": None}
-        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, view_cone_result, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -442,7 +442,7 @@ class TestMarketDataDate:
 
     @pytest.mark.asyncio
     async def test_market_data_date_present(self, mock_conn, base_parcel, tier1_entitlement):
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -455,7 +455,7 @@ class TestMarketDataDate:
     @pytest.mark.asyncio
     async def test_market_data_date_on_non_toa_parcel(self, mock_conn, base_parcel):
         """Even non-TOA parcels include market_data_date."""
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[], []]  # no entitlements + no community plan
         mock_conn.fetchval.return_value = 0
 
@@ -476,7 +476,7 @@ class TestEntitledHeightIntegration:
     @pytest.mark.asyncio
     async def test_height_m_on_tier1(self, mock_conn, base_parcel, tier1_entitlement):
         """Tier 1 = 20 storeys → 60.5m."""
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier1_entitlement], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -499,7 +499,7 @@ class TestEntitledHeightIntegration:
             "current_height": 6,
             "current_fsr": Decimal("2.5"),
         }
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier2_ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -523,7 +523,7 @@ class TestEntitledHeightIntegration:
             "current_height": 6,
             "current_fsr": Decimal("2.5"),
         }
-        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        mock_conn.fetchrow.side_effect = [base_parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         mock_conn.fetch.side_effect = [[tier3_ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 

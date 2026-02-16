@@ -302,8 +302,8 @@ class TestEntitlementEndpoint:
                 response = client.get("/api/v1/parcels/123-456-789/entitlement")
                 assert response.status_code == 200
 
-    def test_entitlement_accepts_price_per_sqft_query_param(self, client):
-        """Entitlement accepts price_per_sqft query parameter."""
+    def test_entitlement_ignores_legacy_price_per_sqft_param(self, client):
+        """F01-B: price_per_sqft query param removed; now sourced from market_benchmarks DB."""
         with patch("api.main.db.acquire") as mock_acquire:
             mock_conn = AsyncMock()
             mock_acquire.return_value.__aenter__ = AsyncMock(return_value=mock_conn)
@@ -322,19 +322,9 @@ class TestEntitlementEndpoint:
             }
 
             with patch("api.main.compute_entitlement", return_value=mock_response):
+                # Legacy param is silently ignored (not an error)
                 response = client.get("/api/v1/parcels/123-456-789/entitlement?price_per_sqft=1000")
                 assert response.status_code == 200
-
-    def test_entitlement_validates_price_per_sqft_bounds(self, client):
-        """Entitlement validates price_per_sqft is between 100 and 3000."""
-        with patch("api.main.db.acquire"):
-            # Price too low
-            response = client.get("/api/v1/parcels/123-456-789/entitlement?price_per_sqft=50")
-            assert response.status_code == 422
-
-            # Price too high
-            response = client.get("/api/v1/parcels/123-456-789/entitlement?price_per_sqft=5000")
-            assert response.status_code == 422
 
     def test_entitlement_response_has_required_fields(self, client):
         """Entitlement response includes required ParcelEntitlementResponse fields."""

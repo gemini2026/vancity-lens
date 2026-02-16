@@ -645,7 +645,7 @@ class TestEntitlementIntegration:
         }
         transit_distance = {"min_distance_m": Decimal("150")}
 
-        conn.fetchrow.side_effect = [parcel, None, None, None, bill44_eligible, transit_distance]  # parcel + view cone + heritage + setback + bill44_eligibility + transit
+        conn.fetchrow.side_effect = [parcel, None, None, None, None, bill44_eligible, transit_distance]  # parcel + view cone + heritage + benchmark + setback + bill44_eligibility + transit
         conn.fetch.side_effect = [[ent], []]  # entitlements + no community plan
         conn.fetchval.return_value = 0
 
@@ -700,7 +700,7 @@ class TestEntitlementIntegration:
             "conditions": "20% below-market rental required",
         }
 
-        conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         conn.fetch.side_effect = [[ent], [community_plan_row]]  # entitlements + community plan
         conn.fetchval.return_value = 0
 
@@ -744,7 +744,7 @@ class TestEntitlementIntegration:
             "current_fsr": Decimal("2.5"),
         }
 
-        conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
+        conn.fetchrow.side_effect = [parcel, None, None, None, None, None]  # parcel + view cone + heritage + benchmark + setback + bill44
         conn.fetch.side_effect = [[ent], []]  # entitlements + no community plan
         conn.fetchval.return_value = 0
 

@@ -43,7 +43,7 @@ class TestHeritageIntegration:
         view_cone_row = None
         heritage_row = {"name": "Smith House", "category": "A"}
 
-        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row])
+        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row, None])
         conn.fetch = AsyncMock(return_value=entitlement_rows)
 
         with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
@@ -80,7 +80,7 @@ class TestHeritageIntegration:
         view_cone_row = None
         heritage_row = None
 
-        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row])
+        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row, None])
         conn.fetch = AsyncMock(return_value=entitlement_rows)
 
         with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
@@ -117,7 +117,7 @@ class TestHeritageIntegration:
         view_cone_row = None
         heritage_row = {"name": "Old Mill", "category": "A"}
 
-        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row])
+        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row, None])
         conn.fetch = AsyncMock(return_value=entitlement_rows)
 
         with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
@@ -154,7 +154,7 @@ class TestHeritageIntegration:
         view_cone_row = None
         heritage_row = {"name": "Historic Building", "category": "B"}
 
-        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row])
+        conn.fetchrow = AsyncMock(side_effect=[parcel_row, view_cone_row, heritage_row, None])
         conn.fetch = AsyncMock(return_value=entitlement_rows)
 
         with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
@@ -213,3 +213,158 @@ class TestMarketBenchmarks:
             data = json.load(f)
         for row in data:
             assert row["hard_cost_per_sf"] > 0
+
+
+class TestMarketBenchmarksIntegration:
+    """F01-B: Entitlement engine uses DB market benchmarks."""
+
+    @pytest.mark.asyncio
+    async def test_value_estimate_uses_neighborhood_revenue(self):
+        """Value estimate uses neighbourhood-specific revenue, not static $800."""
+        from api.entitlement import compute_entitlement
+
+        conn = AsyncMock()
+        parcel_row = {
+            "pid": "100-001-010",
+            "civic_address": "100 Benchmark Dr",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("600"),
+            "assessed_value": 1500000,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "Kitsilano",
+            "lat": Decimal("49.265"),
+            "lng": Decimal("-123.165"),
+        }
+        entitlement_rows = [{
+            "station_name": "Broadway-City Hall",
+            "distance_m": Decimal("150"),
+            "tier": 1,
+            "max_storeys": 20,
+            "max_fsr": Decimal("5.5"),
+            "current_height": None,
+            "current_fsr": None,
+        }]
+        view_cone_row = None
+        heritage_row = None
+        benchmark_row = {
+            "revenue_per_sf": Decimal("1200"),
+            "hard_cost_per_sf": Decimal("450"),
+            "effective_date": "2025-01-01",
+        }
+
+        # Note: fetchrow order is: parcel, view_cone, heritage, benchmark
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, view_cone_row, heritage_row, benchmark_row
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-010")
+        assert result.value_estimate is not None
+        assert result.value_estimate.price_per_sqft_assumption == Decimal("1200")
+
+    @pytest.mark.asyncio
+    async def test_market_data_timestamp_in_response(self):
+        """Response includes market_data_date from benchmark effective_date."""
+        from api.entitlement import compute_entitlement
+
+        conn = AsyncMock()
+        parcel_row = {
+            "pid": "100-001-011",
+            "civic_address": "200 Timestamp St",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("500"),
+            "assessed_value": 1000000,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "Marpole",
+            "lat": Decimal("49.210"),
+            "lng": Decimal("-123.130"),
+        }
+        entitlement_rows = [{
+            "station_name": "Marine Drive",
+            "distance_m": Decimal("200"),
+            "tier": 1,
+            "max_storeys": 20,
+            "max_fsr": Decimal("5.5"),
+            "current_height": None,
+            "current_fsr": None,
+        }]
+        view_cone_row = None
+        heritage_row = None
+        benchmark_row = {
+            "revenue_per_sf": Decimal("800"),
+            "hard_cost_per_sf": Decimal("350"),
+            "effective_date": "2025-06-15",
+        }
+
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, view_cone_row, heritage_row, benchmark_row
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-011")
+        assert result.market_data_date == "2025-06-15"
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_default_when_no_benchmark(self):
+        """When no benchmark row found, falls back to $800/sqft."""
+        from api.entitlement import compute_entitlement, MARKET_DATA_DATE
+
+        conn = AsyncMock()
+        parcel_row = {
+            "pid": "100-001-012",
+            "civic_address": "300 Fallback Ln",
+            "current_zoning": "RS-1",
+            "current_height": None,
+            "current_fsr": None,
+            "lot_area_sqm": Decimal("500"),
+            "assessed_value": 1000000,
+            "asking_price": None,
+            "land_value": None,
+            "improvement_value": None,
+            "year_built": None,
+            "geo_local_area": "UnknownNeighbourhood",
+            "lat": Decimal("49.210"),
+            "lng": Decimal("-123.130"),
+        }
+        entitlement_rows = [{
+            "station_name": "Marine Drive",
+            "distance_m": Decimal("200"),
+            "tier": 1,
+            "max_storeys": 20,
+            "max_fsr": Decimal("5.5"),
+            "current_height": None,
+            "current_fsr": None,
+        }]
+
+        # benchmark returns None (no match)
+        conn.fetchrow = AsyncMock(side_effect=[
+            parcel_row, None, None, None
+        ])
+        conn.fetch = AsyncMock(return_value=entitlement_rows)
+
+        with patch("api.entitlement.compute_validation", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_setbacks", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_bill44", new_callable=AsyncMock, return_value=None), \
+             patch("api.entitlement.compute_community_plan_bonus", new_callable=AsyncMock, return_value=None):
+            result = await compute_entitlement(conn, "100-001-012")
+        assert result.value_estimate is not None
+        assert result.value_estimate.price_per_sqft_assumption == Decimal("800")
+        assert result.market_data_date == MARKET_DATA_DATE

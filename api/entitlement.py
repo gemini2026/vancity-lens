@@ -159,12 +159,19 @@ SQL_HERITAGE_CHECK = """
     LIMIT 1
 """
 
+# F01-B: Market benchmark lookup for neighbourhood-specific revenue/cost data
+SQL_MARKET_BENCHMARK = """
+    SELECT revenue_per_sf, hard_cost_per_sf, effective_date::text
+    FROM market_benchmarks
+    WHERE neighbourhood = $1 AND product_type = 'condo'
+    LIMIT 1
+"""
+
 # ── Engine ───────────────────────────────────────────────────
 
 async def compute_entitlement(
     conn: asyncpg.Connection,
     pid: str,
-    price_per_sqft: Decimal = Decimal("800"),
 ) -> ParcelEntitlementResponse:
     """
     The core "magic trick":
@@ -244,6 +251,16 @@ async def compute_entitlement(
                         "Additional review required; development subject to heritage regulations.",
                 field="heritage_site",
             ))
+
+    # 2d. F01-B: Market benchmark lookup for neighbourhood-specific pricing
+    neighbourhood = parcel.get("geo_local_area") or ""
+    benchmark_row = await conn.fetchrow(SQL_MARKET_BENCHMARK, neighbourhood)
+    if benchmark_row:
+        price_per_sqft = Decimal(str(benchmark_row["revenue_per_sf"]))
+        market_data_date = benchmark_row["effective_date"]
+    else:
+        price_per_sqft = Decimal("800")
+        market_data_date = MARKET_DATA_DATE
 
     # 3. Build entitlement objects
     #    CRITICAL: Bill 47 sets MINIMUM density floors, not replacements.
@@ -384,7 +401,7 @@ async def compute_entitlement(
         sources=sources,
         validation=validation,
         data_warnings=data_warnings,
-        market_data_date=MARKET_DATA_DATE,
+        market_data_date=market_data_date,
         setbacks=setbacks_dict,
         bill44=bill44_dict,
         community_plan=cp_dict,
