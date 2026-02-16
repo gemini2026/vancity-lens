@@ -172,16 +172,16 @@ class ParcelEntitlementResponse(BaseModel):
     market_data_date: Optional[str] = Field(
         None, description="AC-HBU-007: When market data (cost/revenue assumptions) was last updated"
     )
-    # FR-HBU-008: Setbacks and site coverage
-    setbacks: Optional[SetbackInfo] = Field(
+    # FR-HBU-008: Setbacks and site coverage (SetbackResult.model_dump())
+    setbacks: Optional[dict] = Field(
         None, description="Setback distances (front/rear/side) and site coverage from zoning rules"
     )
-    # FR-HBU-004: Bill 44 small-scale multi-unit housing
-    bill44: Optional[Bill44Info] = Field(
+    # FR-HBU-004: Bill 44 small-scale multi-unit housing (Bill44Result.model_dump())
+    bill44: Optional[dict] = Field(
         None, description="Bill 44 SSMUH entitlement (eligible zones, max units, transit bonus)"
     )
-    # FR-HBU-005: Community plan density bonuses
-    community_plan: Optional[CommunityPlanInfo] = Field(
+    # FR-HBU-005: Community plan density bonuses (CommunityPlanResult.model_dump())
+    community_plan: Optional[dict] = Field(
         None, description="Community plan density bonus (plan name, bonus FSR/storeys, conditions)"
     )
     # F01-A: Heritage designation

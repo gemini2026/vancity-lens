@@ -221,8 +221,8 @@ class TestGetTopOpportunities:
         pool, conn = _make_async_pool_mock()
         conn.fetch.side_effect = Exception("table not found")
 
-        result = await get_top_opportunities(pool)
-        assert result == []
+        with pytest.raises(Exception, match="table not found"):
+            await get_top_opportunities(pool)
 
 
 class TestGetParcelUndervaluation:
@@ -255,8 +255,8 @@ class TestGetParcelUndervaluation:
         pool, conn = _make_async_pool_mock()
         conn.fetchrow.side_effect = Exception("error")
 
-        result = await get_parcel_undervaluation(pool, "001-234-567")
-        assert result is None
+        with pytest.raises(Exception, match="error"):
+            await get_parcel_undervaluation(pool, "001-234-567")
 
 
 # ── Route Tests ─────────────────────────────────────────────────────

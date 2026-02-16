@@ -12,7 +12,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from .supply_pipeline import PipelineStage
+from .supply_pipeline import PipelineStage, STAGE_MIGRATION_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -156,11 +156,13 @@ async def detect_clusters(
 
         for m in members_raw:
             seen_pids.add(m["parcel_pid"])
+            raw_stage = m["pipeline_stage"]
+            stage = STAGE_MIGRATION_MAP.get(raw_stage, raw_stage)
             members.append(ClusterMember(
                 pipeline_id=m["pipeline_id"],
                 parcel_pid=m["parcel_pid"],
                 address=m["address"],
-                pipeline_stage=m["pipeline_stage"],
+                pipeline_stage=stage,
                 proposed_storeys=m.get("proposed_storeys"),
                 proposed_units=m.get("proposed_units"),
                 distance_m=float(m["distance_m"]),

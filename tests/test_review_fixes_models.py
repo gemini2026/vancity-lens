@@ -226,70 +226,58 @@ class TestDealGrade:
 
 
 class TestParcelEntitlementResponseSubModels:
-    """ParcelEntitlementResponse integration with sub-model types."""
+    """ParcelEntitlementResponse integration with dict fields."""
 
-    def test_setbacks_as_sub_model(self):
-        """ParcelEntitlementResponse accepts SetbackInfo instance."""
+    def test_setbacks_as_dict(self):
+        """ParcelEntitlementResponse accepts setbacks as dict."""
         resp = ParcelEntitlementResponse(
             pid="001-234-567",
             in_toa=False,
-            setbacks=SetbackInfo(front_m=3.0, rear_m=7.5),
+            setbacks={"front_setback_m": 3.0, "rear_setback_m": 7.5},
         )
-        assert isinstance(resp.setbacks, SetbackInfo)
-        assert resp.setbacks.front_m == Decimal("3.0")
+        assert isinstance(resp.setbacks, dict)
+        assert resp.setbacks["front_setback_m"] == 3.0
 
-    def test_setbacks_as_dict_coerced(self):
-        """ParcelEntitlementResponse coerces a raw dict to SetbackInfo (Pydantic v2)."""
+    def test_bill44_as_dict(self):
+        """ParcelEntitlementResponse accepts bill44 as dict."""
         resp = ParcelEntitlementResponse(
             pid="001-234-567",
             in_toa=False,
-            setbacks={"front_m": 3.0, "rear_m": 7.5},
+            bill44={"is_eligible": True, "max_units": 4, "transit_bonus": False},
         )
-        assert isinstance(resp.setbacks, SetbackInfo)
-        assert resp.setbacks.front_m == Decimal("3.0")
-        assert resp.setbacks.rear_m == Decimal("7.5")
+        assert isinstance(resp.bill44, dict)
+        assert resp.bill44["is_eligible"] is True
+        assert resp.bill44["max_units"] == 4
 
-    def test_bill44_as_dict_coerced(self):
-        """ParcelEntitlementResponse coerces a raw dict to Bill44Info."""
-        resp = ParcelEntitlementResponse(
-            pid="001-234-567",
-            in_toa=False,
-            bill44={"eligible": True, "max_units": 4, "transit_bonus": False},
-        )
-        assert isinstance(resp.bill44, Bill44Info)
-        assert resp.bill44.eligible is True
-        assert resp.bill44.max_units == 4
-
-    def test_community_plan_as_dict_coerced(self):
-        """ParcelEntitlementResponse coerces a raw dict to CommunityPlanInfo."""
+    def test_community_plan_as_dict(self):
+        """ParcelEntitlementResponse accepts community_plan as dict."""
         resp = ParcelEntitlementResponse(
             pid="001-234-567",
             in_toa=False,
             community_plan={"plan_name": "Broadway Plan", "max_fsr": 5.0, "max_storeys": 20},
         )
-        assert isinstance(resp.community_plan, CommunityPlanInfo)
-        assert resp.community_plan.plan_name == "Broadway Plan"
-        assert resp.community_plan.max_fsr == Decimal("5.0")
+        assert isinstance(resp.community_plan, dict)
+        assert resp.community_plan["plan_name"] == "Broadway Plan"
 
-    def test_full_response_with_all_sub_models(self):
-        """ParcelEntitlementResponse can be created with all new sub-model types populated."""
+    def test_full_response_with_dicts(self):
+        """ParcelEntitlementResponse can be created with all dict fields populated."""
         resp = ParcelEntitlementResponse(
             pid="001-234-567",
             in_toa=True,
-            setbacks={"front_m": 3.0, "rear_m": 7.5, "side_m": 1.2, "site_coverage_pct": 60},
-            bill44={"eligible": True, "max_units": 6, "transit_bonus": True, "description": "SSMUH"},
-            community_plan={"plan_name": "Cambie Corridor", "max_fsr": 4.5, "max_storeys": 18},
+            setbacks={"front_setback_m": 3.0, "rear_setback_m": 7.5},
+            bill44={"is_eligible": True, "max_units": 6},
+            community_plan={"plan_name": "Cambie Corridor"},
             heritage_category="B",
             market_data_date="2025-01-15",
         )
-        assert isinstance(resp.setbacks, SetbackInfo)
-        assert isinstance(resp.bill44, Bill44Info)
-        assert isinstance(resp.community_plan, CommunityPlanInfo)
+        assert isinstance(resp.setbacks, dict)
+        assert isinstance(resp.bill44, dict)
+        assert isinstance(resp.community_plan, dict)
         assert resp.heritage_category == "B"
         assert resp.market_data_date == "2025-01-15"
 
-    def test_all_sub_models_none(self):
-        """ParcelEntitlementResponse works with all sub-model fields as None."""
+    def test_all_fields_none(self):
+        """ParcelEntitlementResponse works with all optional fields as None."""
         resp = ParcelEntitlementResponse(
             pid="001-234-567",
             in_toa=False,
@@ -304,16 +292,3 @@ class TestParcelEntitlementResponseSubModels:
         assert resp.community_plan is None
         assert resp.heritage_category is None
         assert resp.market_data_date is None
-
-    def test_partial_setback_dict_coerced(self):
-        """Partial dict coerces to SetbackInfo with remaining fields as None."""
-        resp = ParcelEntitlementResponse(
-            pid="001-234-567",
-            in_toa=False,
-            setbacks={"front_m": 3.0},
-        )
-        assert isinstance(resp.setbacks, SetbackInfo)
-        assert resp.setbacks.front_m == Decimal("3.0")
-        assert resp.setbacks.rear_m is None
-        assert resp.setbacks.side_m is None
-        assert resp.setbacks.site_coverage_pct is None
