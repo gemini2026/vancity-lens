@@ -139,6 +139,7 @@ class ReportGenerator:
         try:
             await self._build_environmental_section(pdf, parcel_data, db_pool)
         except Exception as e:
+            logger.error("Failed to build %s section for %s: %s", "Environmental", pid, e, exc_info=True)
             self._render_unavailable_section(pdf, "Environmental", "Environmental data source", str(e))
 
         self._build_heritage_section(pdf, parcel_data)
@@ -147,16 +148,19 @@ class ReportGenerator:
         try:
             await self._build_nearby_development(pdf, parcel_data, db_pool)
         except Exception as e:
+            logger.error("Failed to build %s section for %s: %s", "Nearby Development", pid, e, exc_info=True)
             self._render_unavailable_section(pdf, "Nearby Development", "Development pipeline data source", str(e))
 
         try:
             await self._build_market_context(pdf, db_pool)
         except Exception as e:
+            logger.error("Failed to build %s section for %s: %s", "Market Context", pid, e, exc_info=True)
             self._render_unavailable_section(pdf, "Market Context", "CMHC housing data source", str(e))
 
         try:
             await self._build_demographic_profile(pdf, parcel_data, db_pool)
         except Exception as e:
+            logger.error("Failed to build %s section for %s: %s", "Demographic Profile", pid, e, exc_info=True)
             self._render_unavailable_section(pdf, "Demographic Profile", "StatsCan demographics data source", str(e))
 
         self._build_red_flags_summary(pdf, parcel_data)
@@ -164,6 +168,7 @@ class ReportGenerator:
         try:
             await self._build_data_currency(pdf, db_pool)
         except Exception as e:
+            logger.error("Failed to build %s section for %s: %s", "Data Currency", pid, e, exc_info=True)
             self._render_unavailable_section(pdf, "Data Currency", "Data currency tracking source", str(e))
 
         self._build_pro_forma(pdf, parcel_data)
@@ -222,7 +227,8 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except Exception:
+            except Exception as e:
+                logger.error("Failed to fetch entitlement data for %s: %s", pid, e, exc_info=True)
                 entitlement_row = None
 
             # Build report data
@@ -392,7 +398,7 @@ class ReportGenerator:
             try:
                 data.due_diligence_evidence = await build_due_diligence_evidence(conn, pid)
             except Exception as e:
-                logger.warning("Failed to build due diligence evidence for %s: %s", pid, str(e)[:200])
+                logger.error("Failed to build due diligence evidence for %s: %s", pid, e, exc_info=True)
                 data.due_diligence_evidence = None
 
             return data
@@ -1158,6 +1164,7 @@ class ReportGenerator:
                 )
         except Exception as e:
             logger.warning("LLM enhancement failed, using template summary: %s", e)
+            final_summary += "\n(Auto-generated summary)"
 
         pdf.multi_cell(0, 5, final_summary)
         pdf.ln(4)
@@ -1633,8 +1640,8 @@ class ReportGenerator:
                         row = await conn.fetchrow(query)
                         if row and row["latest"]:
                             source_dates[label] = row["latest"].strftime("%Y-%m-%d")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Data currency query failed for %s: %s", label, e)
         except Exception as e:
             logger.debug("Data currency query failed: %s", e)
 
