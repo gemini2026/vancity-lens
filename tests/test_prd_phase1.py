@@ -166,3 +166,50 @@ class TestHeritageIntegration:
         assert result.heritage_category == "B"
         warning_msgs = [w.message for w in result.data_warnings]
         assert any("Heritage Category B" in m and "Additional review" in m for m in warning_msgs)
+
+
+class TestMarketBenchmarks:
+    """F01-B: Market benchmarks DB table and seed data."""
+
+    def test_migration_file_exists(self):
+        assert os.path.exists("db/042_market_benchmarks.sql")
+
+    def test_seed_file_exists(self):
+        assert os.path.exists("data/seed/market_benchmarks.json")
+
+    def test_seed_data_has_required_fields(self):
+        with open("data/seed/market_benchmarks.json") as f:
+            data = json.load(f)
+        assert len(data) > 0
+        first = data[0]
+        required = ["neighbourhood", "product_type", "revenue_per_sf",
+                     "hard_cost_per_sf", "source", "effective_date"]
+        for field in required:
+            assert field in first, f"Missing field: {field}"
+
+    def test_seed_data_covers_all_neighborhoods(self):
+        with open("data/seed/market_benchmarks.json") as f:
+            data = json.load(f)
+        neighborhoods = {d["neighbourhood"] for d in data}
+        assert len(neighborhoods) >= 20
+
+    def test_seed_data_has_four_product_types(self):
+        with open("data/seed/market_benchmarks.json") as f:
+            data = json.load(f)
+        product_types = {d["product_type"] for d in data}
+        assert "condo" in product_types
+        assert "rental" in product_types
+        assert "commercial" in product_types
+        assert "townhouse" in product_types
+
+    def test_revenue_per_sf_is_positive(self):
+        with open("data/seed/market_benchmarks.json") as f:
+            data = json.load(f)
+        for row in data:
+            assert row["revenue_per_sf"] > 0
+
+    def test_hard_cost_per_sf_is_positive(self):
+        with open("data/seed/market_benchmarks.json") as f:
+            data = json.load(f)
+        for row in data:
+            assert row["hard_cost_per_sf"] > 0
