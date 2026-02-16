@@ -214,4 +214,9 @@ export interface ParcelEntitlement {
   heritage_category: "A" | "B" | "C" | null;
   market_data_date: string | null;
   data_warnings: DataQualityWarning[];
+  // Parcel Click Enrichment: ILR fields
+  land_value?: number;
+  improvement_value?: number;
+  year_built?: number;
+  improvement_to_land_ratio?: number;
 }

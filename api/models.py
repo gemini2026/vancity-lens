@@ -187,6 +187,13 @@ class ParcelEntitlementResponse(BaseModel):
     # F01-A: Heritage designation
     heritage_site: bool = Field(default=False, description="Is parcel a designated heritage site")
     heritage_category: Optional[Literal["A", "B", "C"]] = Field(None, description="Heritage category: A, B, or C")
+    # Parcel Click Enrichment: ILR fields
+    land_value: Optional[int] = Field(None, description="BC Assessment land value in dollars")
+    improvement_value: Optional[int] = Field(None, description="BC Assessment improvement value in dollars")
+    year_built: Optional[int] = Field(None, description="Year the improvement was built")
+    improvement_to_land_ratio: Optional[float] = Field(
+        None, description="Improvement value / (land + improvement); low ratio (<0.25) suggests teardown candidate"
+    )
 
     @computed_field
     @property

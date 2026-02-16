@@ -9,7 +9,9 @@ import RiskFlagsSection from "./RiskFlagsSection";
 import ShareButton from "./ShareButton";
 import BeforeAfterComparison from "./BeforeAfterComparison";
 import HBUAnalysisPanel from "./HBUAnalysis";
+import ComparableSalesPanel from "./ComparableSalesPanel";
 import { saveParcel, unsaveParcel, checkParcelSaved } from "@/lib/saved-parcels-api";
+import { fetchComparables } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getApiBase } from "@/lib/api-base";
 
@@ -83,6 +85,10 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
   const [dueDiligenceEvidenceError, setDueDiligenceEvidenceError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [savePending, setSavePending] = useState(false);
+  const [comparables, setComparables] = useState<any[]>([]);
+  const [comparablesLoading, setComparablesLoading] = useState(false);
+  const [contamination, setContamination] = useState<any>(null);
+  const [contaminationLoading, setContaminationLoading] = useState(false);
   const isAuthenticated = typeof window !== "undefined" && !!localStorage.getItem("token");
 
   const color = SIGNAL_COLORS[data.signal] || "#6b7280";
@@ -123,6 +129,34 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [data?.pid, isAuthenticated]);
+
+  // Fetch comparable sales
+  useEffect(() => {
+    if (!data?.pid) return;
+    let cancelled = false;
+    setComparablesLoading(true);
+    fetchComparables(data.pid)
+      .then((res) => { if (!cancelled) setComparables(res || []); })
+      .catch(() => { if (!cancelled) setComparables([]); })
+      .finally(() => { if (!cancelled) setComparablesLoading(false); });
+    return () => { cancelled = true; };
+  }, [data?.pid]);
+
+  // Fetch contamination data
+  useEffect(() => {
+    if (!data?.pid) return;
+    let cancelled = false;
+    setContaminationLoading(true);
+    fetch(`${API_BASE}/api/v1/parcels/${data.pid}/contaminated-sites?radius_m=50`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((json) => { if (!cancelled) setContamination(json); })
+      .catch(() => { if (!cancelled) setContamination(null); })
+      .finally(() => { if (!cancelled) setContaminationLoading(false); });
+    return () => { cancelled = true; };
+  }, [data?.pid]);
 
   const handleToggleSave = useCallback(async () => {
     if (savePending) return;
@@ -228,6 +262,34 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
           </div>
         </div>
 
+        {/* Heritage Warning Banner */}
+        {data.heritage_site && (
+          <div className="mb-3 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-md">
+            <div className="text-xs font-bold text-amber-400">
+              Heritage Designation — Category {data.heritage_category || "?"}
+            </div>
+            <div className="text-[10px] text-amber-300/80 mt-0.5">
+              {data.heritage_category === "A"
+                ? "Demolition restricted. Development requires Heritage Commission approval."
+                : data.heritage_category === "B"
+                  ? "Heritage review required. Retention or integration of heritage elements expected."
+                  : "Heritage register listing. Additional review may apply."}
+            </div>
+          </div>
+        )}
+
+        {/* Contamination Warning Banner */}
+        {contamination?.has_contaminated_sites && (
+          <div className="mb-3 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-md">
+            <div className="text-xs font-bold text-red-400">
+              Contaminated Site{contamination.count > 1 ? "s" : ""} Nearby ({contamination.count} within {contamination.radius_m}m)
+            </div>
+            <div className="text-[10px] text-red-300/80 mt-0.5">
+              Environmental assessment may be required. Review site remediation status before acquisition.
+            </div>
+          </div>
+        )}
+
         {/* Entitlement Summary */}
         {be && (be.zoning_already_exceeds ? (
           <div className="mb-3">
@@ -326,6 +388,20 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
           </CollapsibleSection>
         )}
 
+        {/* Comparable Sales */}
+        <CollapsibleSection
+          title="Comparable Sales"
+          badge={comparables.length > 0 ? <span className="text-[10px] text-gray-400 ml-1.5">({comparables.length} found)</span> : undefined}
+        >
+          {comparablesLoading ? (
+            <div className="text-[11px] text-gray-500 py-2">Loading comparable sales...</div>
+          ) : comparables.length > 0 ? (
+            <ComparableSalesPanel parcelId={data.pid} comparables={comparables} />
+          ) : (
+            <div className="text-[11px] text-gray-500 py-2">No comparable sales found within 1km.</div>
+          )}
+        </CollapsibleSection>
+
         {/* Value Estimate */}
         {ve && (
           <CollapsibleSection title="Value Estimate" defaultOpen>
@@ -368,6 +444,23 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
                 <>
                   <span className="text-gray-500">Net Leasable Area</span>
                   <span className="text-gray-300 text-right">{ve.nla_sqft.toLocaleString()} sqft</span>
+                </>
+              )}
+              {data.year_built != null && (
+                <>
+                  <span className="text-gray-500">Year Built</span>
+                  <span className="text-gray-300 text-right">{data.year_built}</span>
+                </>
+              )}
+              {data.improvement_to_land_ratio != null && (
+                <>
+                  <span className="text-gray-500">Improvement/Land Ratio</span>
+                  <span className={cn("text-right font-semibold", data.improvement_to_land_ratio < 0.25 ? "text-green-400" : "text-gray-300")}>
+                    {(data.improvement_to_land_ratio * 100).toFixed(0)}%
+                    {data.improvement_to_land_ratio < 0.25 && (
+                      <span className="text-[10px] ml-1 text-green-400">(likely teardown)</span>
+                    )}
+                  </span>
                 </>
               )}
             </div>

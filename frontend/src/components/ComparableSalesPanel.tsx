@@ -90,63 +90,55 @@ export const ComparableSalesPanel: React.FC<ComparableSalesPanelProps> = ({
   };
 
   const getSortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return " ⇅";
-    return sortOrder === "asc" ? " ↑" : " ↓";
+    if (sortKey !== key) return " \u21C5";
+    return sortOrder === "asc" ? " \u2191" : " \u2193";
   };
 
   return (
-    <div className="w-full bg-white rounded-lg shadow-md p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Comparable Sales Analysis</h2>
-        <p className="text-sm text-gray-600">Parcel ID: {parcelId}</p>
-      </div>
-
+    <div className="w-full bg-transparent rounded-lg">
       {comparables.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-4 text-gray-500 text-[11px]">
           No comparable sales found in the search area.
         </div>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded">
-              <p className="text-xs font-semibold text-gray-600 uppercase">Avg Price/SqFt</p>
-              <p className="text-lg font-bold text-blue-600">${avgPsf.toFixed(2)}</p>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="bg-blue-500/10 border border-blue-500/20 p-2 rounded">
+              <p className="text-[9px] font-semibold text-gray-500 uppercase">Avg $/SqFt</p>
+              <p className="text-sm font-bold text-blue-400">${avgPsf.toFixed(0)}</p>
             </div>
-            <div className="bg-green-50 p-4 rounded">
-              <p className="text-xs font-semibold text-gray-600 uppercase">Median Price</p>
-              <p className="text-lg font-bold text-green-600">{formatCurrency(medianPrice)}</p>
+            <div className="bg-green-500/10 border border-green-500/20 p-2 rounded">
+              <p className="text-[9px] font-semibold text-gray-500 uppercase">Median Price</p>
+              <p className="text-sm font-bold text-green-400">{formatCurrency(medianPrice)}</p>
             </div>
-            <div className="bg-purple-50 p-4 rounded">
-              <p className="text-xs font-semibold text-gray-600 uppercase">Price Range Low</p>
-              <p className="text-lg font-bold text-purple-600">{formatCurrency(priceRange.low)}</p>
+            <div className="bg-purple-500/10 border border-purple-500/20 p-2 rounded">
+              <p className="text-[9px] font-semibold text-gray-500 uppercase">Low</p>
+              <p className="text-sm font-bold text-purple-400">{formatCurrency(priceRange.low)}</p>
             </div>
-            <div className="bg-orange-50 p-4 rounded">
-              <p className="text-xs font-semibold text-gray-600 uppercase">Price Range High</p>
-              <p className="text-lg font-bold text-orange-600">{formatCurrency(priceRange.high)}</p>
+            <div className="bg-orange-500/10 border border-orange-500/20 p-2 rounded">
+              <p className="text-[9px] font-semibold text-gray-500 uppercase">High</p>
+              <p className="text-sm font-bold text-orange-400">{formatCurrency(priceRange.high)}</p>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[11px]">
               <thead>
-                <tr className="border-b-2 border-gray-300 bg-gray-50">
-                  <th className="text-left p-3 cursor-pointer hover:bg-gray-100" onClick={() => handleSort("address")}>
-                    Address {getSortIndicator("address")}
+                <tr className="border-b border-gray-700">
+                  <th className="text-left p-1.5 cursor-pointer hover:text-white text-gray-400 font-semibold" onClick={() => handleSort("address")}>
+                    Address{getSortIndicator("address")}
                   </th>
-                  <th className="text-right p-3 cursor-pointer hover:bg-gray-100" onClick={() => handleSort("price")}>
-                    Sale Price {getSortIndicator("price")}
+                  <th className="text-right p-1.5 cursor-pointer hover:text-white text-gray-400 font-semibold" onClick={() => handleSort("price")}>
+                    Price{getSortIndicator("price")}
                   </th>
-                  <th className="text-center p-3 cursor-pointer hover:bg-gray-100" onClick={() => handleSort("sale_date")}>
-                    Date {getSortIndicator("sale_date")}
+                  <th className="text-center p-1.5 cursor-pointer hover:text-white text-gray-400 font-semibold" onClick={() => handleSort("sale_date")}>
+                    Date{getSortIndicator("sale_date")}
                   </th>
-                  <th className="text-right p-3 cursor-pointer hover:bg-gray-100" onClick={() => handleSort("sqft")}>
-                    SqFt {getSortIndicator("sqft")}
+                  <th className="text-right p-1.5 cursor-pointer hover:text-white text-gray-400 font-semibold" onClick={() => handleSort("price_per_sqft")}>
+                    PSF{getSortIndicator("price_per_sqft")}
                   </th>
-                  <th className="text-right p-3 cursor-pointer hover:bg-gray-100" onClick={() => handleSort("price_per_sqft")}>
-                    PSF {getSortIndicator("price_per_sqft")}
-                  </th>
-                  <th className="text-right p-3 cursor-pointer hover:bg-gray-100" onClick={() => handleSort("distance_m")}>
-                    Distance {getSortIndicator("distance_m")}
+                  <th className="text-right p-1.5 cursor-pointer hover:text-white text-gray-400 font-semibold" onClick={() => handleSort("distance_m")}>
+                    Dist{getSortIndicator("distance_m")}
                   </th>
                 </tr>
               </thead>
@@ -154,27 +146,24 @@ export const ComparableSalesPanel: React.FC<ComparableSalesPanelProps> = ({
                 {sortedComparables.map((comp, idx) => (
                   <tr
                     key={idx}
-                    className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                    className="border-b border-gray-800 hover:bg-white/[0.03] transition-colors"
                   >
-                    <td className="p-3 text-gray-800 font-medium">{comp.address}</td>
-                    <td className="p-3 text-right text-gray-700">{formatCurrency(comp.price)}</td>
-                    <td className="p-3 text-center text-gray-600 text-xs">
+                    <td className="p-1.5 text-gray-300 font-medium truncate max-w-[120px]">{comp.address}</td>
+                    <td className="p-1.5 text-right text-gray-300">{formatCurrency(comp.price)}</td>
+                    <td className="p-1.5 text-center text-gray-500 text-[10px]">
                       {formatDate(comp.sale_date)}
                     </td>
-                    <td className="p-3 text-right text-gray-600">
-                      {comp.sqft.toLocaleString("en-CA")}
+                    <td className="p-1.5 text-right font-medium text-gray-300">
+                      ${comp.price_per_sqft.toFixed(0)}
                     </td>
-                    <td className="p-3 text-right font-medium text-gray-800">
-                      ${comp.price_per_sqft.toFixed(2)}
-                    </td>
-                    <td className="p-3 text-right text-gray-600">
+                    <td className="p-1.5 text-right">
                       <span
-                        className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                           comp.distance_m < 300
-                            ? "bg-green-100 text-green-800"
+                            ? "bg-green-500/20 text-green-400"
                             : comp.distance_m < 600
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-orange-100 text-orange-800"
+                              ? "bg-yellow-500/20 text-yellow-400"
+                              : "bg-orange-500/20 text-orange-400"
                         }`}
                       >
                         {comp.distance_m.toLocaleString("en-CA")}m
@@ -186,21 +175,9 @@ export const ComparableSalesPanel: React.FC<ComparableSalesPanelProps> = ({
             </table>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Adjustment Highlights</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-sm bg-blue-50 p-3 rounded">
-                <span className="font-medium text-gray-700">Time Adjustments: </span>
-                <span className="text-gray-600">Recent sales within 12 months preferred</span>
-              </div>
-              <div className="text-sm bg-green-50 p-3 rounded">
-                <span className="font-medium text-gray-700">Location Adjustments: </span>
-                <span className="text-gray-600">Proximity impacts comparable relevance</span>
-              </div>
-              <div className="text-sm bg-purple-50 p-3 rounded">
-                <span className="font-medium text-gray-700">Size Adjustments: </span>
-                <span className="text-gray-600">Property size reflected in PSF comparison</span>
-              </div>
+          <div className="mt-3 pt-2 border-t border-gray-800">
+            <div className="text-[10px] text-gray-500">
+              Time-adjusted, distance-weighted analysis. Recent sales within 12 months within 1km radius.
             </div>
           </div>
         </>

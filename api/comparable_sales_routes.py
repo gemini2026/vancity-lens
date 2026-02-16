@@ -7,15 +7,104 @@ Provides:
 - POST /api/v1/comparables/analyze - Run comp analysis
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Query, Path, HTTPException
 
+logger = logging.getLogger(__name__)
+
 
 def _resolve_param(value):
     """Resolve FastAPI Query/Path parameter to its actual value for direct calls."""
     return getattr(value, 'default', value)
+
+
+# ── SQL for real PostGIS comparable sales query ──────────────────
+SQL_PARCEL_CENTROID = """
+    SELECT ST_X(ST_Centroid(geom)) AS lng, ST_Y(ST_Centroid(geom)) AS lat
+    FROM parcels WHERE pid = $1
+"""
+
+SQL_COMPARABLE_SALES = """
+    SELECT cs.address,
+           cs.price,
+           cs.sale_date,
+           cs.sqft,
+           cs.price_per_sqft,
+           ROUND(ST_Distance(
+               cs.geom::geography,
+               ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+           )::numeric, 1) AS distance_m,
+           cs.property_type,
+           cs.bedrooms,
+           cs.year_built
+    FROM comparable_sales cs
+    WHERE cs.geom IS NOT NULL
+      AND ST_DWithin(
+          cs.geom::geography,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+          $3
+      )
+      AND cs.sale_date >= NOW() - INTERVAL '1 month' * $4
+    ORDER BY distance_m
+    LIMIT $5
+"""
+
+
+async def _fetch_real_comparables(
+    parcel_id: str,
+    radius_m: int,
+    max_results: int,
+    months_back: int,
+    property_type: Optional[str] = None,
+) -> Optional[List["ComparableSale"]]:
+    """Attempt to fetch real comparable sales from DB via PostGIS spatial query.
+
+    Returns None if DB pool is unavailable or the comparable_sales table is empty/missing.
+    """
+    try:
+        from .db import db
+        async with db.acquire() as conn:
+            # Get parcel centroid
+            parcel = await conn.fetchrow(SQL_PARCEL_CENTROID, parcel_id)
+            if not parcel:
+                return None
+
+            rows = await conn.fetch(
+                SQL_COMPARABLE_SALES,
+                parcel["lng"], parcel["lat"],
+                radius_m, months_back, max_results * 3,  # fetch extra for filtering
+            )
+
+            if not rows:
+                return None
+
+            results = []
+            for row in rows:
+                sale = ComparableSale(
+                    address=row["address"],
+                    price=float(row["price"]),
+                    sale_date=row["sale_date"],
+                    sqft=float(row["sqft"]),
+                    price_per_sqft=float(row["price_per_sqft"]),
+                    distance_m=float(row["distance_m"]),
+                    property_type=row["property_type"],
+                    bedrooms=row.get("bedrooms"),
+                    year_built=row.get("year_built"),
+                )
+                results.append(sale)
+
+            # Apply property_type filter if given
+            if property_type:
+                results = [c for c in results if c.property_type == property_type]
+
+            return results[:max_results]
+
+    except Exception as exc:
+        logger.debug("Real comparable sales query unavailable, falling back to mock: %s", exc)
+        return None
 
 
 # Models for comparable sales data
@@ -111,6 +200,14 @@ async def get_parcel_comparables(
     if not parcel_id or not parcel_id.strip():
         raise HTTPException(status_code=400, detail="parcel_id cannot be empty")
 
+    # Try real PostGIS spatial query first
+    real_results = await _fetch_real_comparables(
+        parcel_id, radius_m, max_results, months_back, property_type
+    )
+    if real_results is not None:
+        return real_results
+
+    # Fallback: mock data when DB pool is unavailable or comparable_sales table is empty
     _cutoff_date = datetime.utcnow() - timedelta(days=months_back * 30)  # noqa: F841
 
     comparables = [

@@ -420,6 +420,16 @@ async def compute_entitlement(
         except ValueError:
             pass  # Non-ISO date format (e.g. "2025-Q4") — skip staleness check
 
+    # 10. Parcel Click Enrichment: ILR computation
+    land_val = parcel.get("land_value") or None
+    improvement_val = parcel.get("improvement_value") or None
+    yr_built = parcel.get("year_built") or None
+    ilr: Optional[float] = None
+    if land_val is not None and improvement_val is not None:
+        total = land_val + improvement_val
+        if total > 0:
+            ilr = round(improvement_val / total, 4)
+
     return ParcelEntitlementResponse(
         pid=pid,
         civic_address=parcel["civic_address"],
@@ -437,6 +447,10 @@ async def compute_entitlement(
         community_plan=cp_dict,
         heritage_site=heritage_site,
         heritage_category=heritage_category,
+        land_value=land_val,
+        improvement_value=improvement_val,
+        year_built=yr_built,
+        improvement_to_land_ratio=ilr,
     )
 
 
