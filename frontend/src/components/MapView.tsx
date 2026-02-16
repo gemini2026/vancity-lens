@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { fetchTOAGeoJSON, fetchEntitlement, fetchNearestParcel, fetchOpportunities } from "@/lib/api";
 import { getSignalsForParcel, getSignalsGeoJSON } from "@/lib/intel-api";
+import { fetchNeighborhoodRiskScores, type NeighborhoodRisk } from "@/lib/political-risk-api";
 import type { ParcelEntitlement, EntitlementSignal } from "@/lib/types";
 import type { IntelSignal } from "@/lib/intel-types";
 import ParcelDetailPanel from "./ParcelDetailPanel";
@@ -26,6 +27,11 @@ const TIER_BORDERS: Record<number, string> = {
   1: "rgba(220, 38, 38, 0.6)",
   2: "rgba(234, 88, 12, 0.45)",
   3: "rgba(202, 138, 4, 0.3)",
+};
+const RISK_COLORS: Record<string, string> = {
+  low: "rgba(34, 197, 94, 0.25)",      // green for 1-3
+  medium: "rgba(234, 179, 8, 0.30)",    // yellow for 4-6
+  high: "rgba(239, 68, 68, 0.35)",      // red for 7-10
 };
 const SIGNAL_COLORS: Record<EntitlementSignal, string> = {
   high_alpha: "#dc2626",
@@ -113,6 +119,8 @@ export default function MapView() {
   const [financingPid, setFinancingPid] = useState<string>("");
   const [showCaseStudies, setShowCaseStudies] = useState(true);
   const [visibleTiers, setVisibleTiers] = useState<Record<number, boolean>>({ 1: true, 2: true, 3: true });
+  const [showRiskChoropleth, setShowRiskChoropleth] = useState(false);
+  const [riskScores, setRiskScores] = useState<NeighborhoodRisk[]>([]);
 
   const toggleTier = useCallback((tier: number) => {
     setVisibleTiers(prev => {
@@ -719,6 +727,13 @@ export default function MapView() {
     });
   }, [showClusters]);
 
+  // Fetch risk scores when choropleth is enabled
+  useEffect(() => {
+    if (showRiskChoropleth && riskScores.length === 0) {
+      fetchNeighborhoodRiskScores().then(setRiskScores);
+    }
+  }, [showRiskChoropleth, riskScores.length]);
+
   return (
     <div className="relative w-full h-full">
       <style>{`
@@ -811,6 +826,18 @@ export default function MapView() {
           )}
         >
           {showClusters ? "Hide" : "Show"} Clusters{clusters.length > 0 ? ` (${clusters.length})` : ""}
+        </button>
+        <button
+          onClick={() => setShowRiskChoropleth(prev => !prev)}
+          className={cn(
+            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            showRiskChoropleth
+              ? "bg-red-600/90 border border-red-400 text-white"
+              : "bg-gray-900/92 border border-white/10 text-gray-400"
+          )}
+          title="Toggle neighborhood risk overlay"
+        >
+          Risk Map
         </button>
         {!showCaseStudies && (
           <button
