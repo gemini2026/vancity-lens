@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -120,6 +120,31 @@ class DataQualityWarning(BaseModel):
     field: Optional[str] = Field(None, description="Which field this warning applies to")
 
 
+# ── Entitlement Sub-Models ──────────────────────────────────
+
+class SetbackInfo(BaseModel):
+    """Setback distances and site coverage from zoning rules."""
+    front_m: Optional[Decimal] = None
+    rear_m: Optional[Decimal] = None
+    side_m: Optional[Decimal] = None
+    site_coverage_pct: Optional[Decimal] = None
+
+
+class Bill44Info(BaseModel):
+    """Bill 44 SSMUH entitlement details."""
+    eligible: Optional[bool] = None
+    max_units: Optional[int] = None
+    transit_bonus: Optional[bool] = None
+    description: Optional[str] = None
+
+
+class CommunityPlanInfo(BaseModel):
+    """Community plan density bonus details."""
+    plan_name: Optional[str] = None
+    max_fsr: Optional[Decimal] = None
+    max_storeys: Optional[int] = None
+
+
 class ParcelEntitlementResponse(BaseModel):
     """
     The main API response: everything Colin needs to see
@@ -148,20 +173,20 @@ class ParcelEntitlementResponse(BaseModel):
         None, description="AC-HBU-007: When market data (cost/revenue assumptions) was last updated"
     )
     # FR-HBU-008: Setbacks and site coverage
-    setbacks: Optional[dict] = Field(
+    setbacks: Optional[SetbackInfo] = Field(
         None, description="Setback distances (front/rear/side) and site coverage from zoning rules"
     )
     # FR-HBU-004: Bill 44 small-scale multi-unit housing
-    bill44: Optional[dict] = Field(
+    bill44: Optional[Bill44Info] = Field(
         None, description="Bill 44 SSMUH entitlement (eligible zones, max units, transit bonus)"
     )
     # FR-HBU-005: Community plan density bonuses
-    community_plan: Optional[dict] = Field(
+    community_plan: Optional[CommunityPlanInfo] = Field(
         None, description="Community plan density bonus (plan name, bonus FSR/storeys, conditions)"
     )
     # F01-A: Heritage designation
     heritage_site: bool = Field(default=False, description="Is parcel a designated heritage site")
-    heritage_category: Optional[str] = Field(None, description="Heritage category: A, B, or C")
+    heritage_category: Optional[Literal["A", "B", "C"]] = Field(None, description="Heritage category: A, B, or C")
 
     @computed_field
     @property
@@ -335,7 +360,7 @@ class DueDiligenceItem(BaseModel):
 class DealValidation(BaseModel):
     """V3 comprehensive validation — multi-axis grading with three-scenario pro forma."""
     # Composite grade (Economics axis) — NOW GRADED ON BASE CASE
-    deal_grade: str = Field(..., description="A/B/C/D/F economics grade (graded on BASE scenario)")
+    deal_grade: Literal["A", "B", "C", "D", "F"] = Field(..., description="A/B/C/D/F economics grade (graded on BASE scenario)")
     deal_score: int = Field(..., ge=0, le=100, description="0-100 economics score")
     confidence_level: str = Field(..., description="'high', 'medium', 'low' — based on data completeness")
     # V2: Multi-axis grading
