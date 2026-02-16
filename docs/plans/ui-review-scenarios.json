@@ -1,0 +1,224 @@
+{
+  "settings": {
+    "base_url": "http://localhost:3000",
+    "output_dir": "docs/designs/screenshots/original",
+    "viewport": {"width": 1440, "height": 900},
+    "color_scheme": "dark",
+    "full_page": false,
+    "settle_ms": 3000,
+    "nav_timeout_ms": 30000,
+    "loading_selectors": [".animate-spin", ".animate-pulse", "[role='progressbar']"]
+  },
+  "seed_commands": [],
+  "variables": {},
+  "scenarios": [
+    {
+      "name": "01_map_default",
+      "description": "Map view — default landing page with TOA layers and markers",
+      "steps": [
+        {"action": "goto", "url": "/", "wait_until": "networkidle", "timeout_ms": 30000},
+        {"action": "wait", "ms": 5000},
+        {"action": "screenshot", "name": "01_map_default", "settle_s": 2}
+      ]
+    },
+    {
+      "name": "02_map_interactions",
+      "description": "Map view — toggle layers, search, and view parcel detail",
+      "steps": [
+        {"action": "goto", "url": "/", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {"action": "screenshot", "name": "02_map_legend", "settle_s": 1},
+        {
+          "action": "click",
+          "selector": "input[placeholder*='Search'], input[placeholder*='search'], input[placeholder*='address']",
+          "timeout_ms": 5000,
+          "optional": true
+        },
+        {"action": "screenshot", "name": "03_map_search_open", "settle_s": 1, "optional": true},
+        {"action": "keyboard", "key": "Escape", "optional": true},
+        {
+          "action": "evaluate",
+          "expression": "() => { const canvas = document.querySelector('.mapboxgl-canvas'); if (canvas) { const rect = canvas.getBoundingClientRect(); const x = rect.left + rect.width * 0.45; const y = rect.top + rect.height * 0.45; canvas.dispatchEvent(new MouseEvent('click', { clientX: x, clientY: y, bubbles: true })); } }",
+          "optional": true
+        },
+        {"action": "wait", "ms": 4000},
+        {"action": "screenshot", "name": "04_map_parcel_detail", "settle_s": 2}
+      ]
+    },
+    {
+      "name": "03_intel_default",
+      "description": "Intelligence tab — default view with chat and signal feed",
+      "steps": [
+        {"action": "goto", "url": "/#intel", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {"action": "screenshot", "name": "05_intel_default", "settle_s": 2}
+      ]
+    },
+    {
+      "name": "04_intel_interactions",
+      "description": "Intelligence tab — expand signal, filter signals",
+      "steps": [
+        {"action": "goto", "url": "/#intel", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {
+          "action": "check_visible",
+          "selector": "[class*='signal'], [class*='Signal'], [data-testid*='signal']",
+          "variable": "has_signals",
+          "timeout_ms": 5000
+        },
+        {
+          "action": "conditional",
+          "variable": "has_signals",
+          "equals": "true",
+          "then": [
+            {
+              "action": "click",
+              "selector": "[class*='signal']:first-child, [class*='Signal']:first-child",
+              "optional": true
+            },
+            {"action": "wait", "ms": 2000},
+            {"action": "screenshot", "name": "06_intel_signal_expanded", "settle_s": 1}
+          ],
+          "else": [
+            {"action": "log", "message": "No signals found, skipping signal expansion"},
+            {"action": "screenshot", "name": "06_intel_no_signals", "settle_s": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05_hoods_list",
+      "description": "Neighborhoods tab — list view with ranked neighborhoods",
+      "steps": [
+        {"action": "goto", "url": "/#hoods", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {"action": "screenshot", "name": "07_hoods_list", "settle_s": 2}
+      ]
+    },
+    {
+      "name": "06_hoods_detail",
+      "description": "Neighborhoods tab — click first neighborhood to see detail scorecard",
+      "steps": [
+        {"action": "goto", "url": "/#hoods", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {
+          "action": "check_visible",
+          "selector": "[class*='neighborhood'], [class*='Neighborhood'], button:has-text('View'), [class*='hood']",
+          "variable": "has_hoods",
+          "timeout_ms": 5000
+        },
+        {
+          "action": "conditional",
+          "variable": "has_hoods",
+          "equals": "true",
+          "then": [
+            {
+              "action": "click",
+              "selector": "[class*='neighborhood']:first-child, [class*='Neighborhood']:first-child, [class*='hood'] >> nth=0",
+              "optional": true
+            },
+            {"action": "wait", "ms": 2000},
+            {"action": "screenshot", "name": "08_hoods_detail", "settle_s": 2}
+          ],
+          "else": [
+            {"action": "log", "message": "No neighborhoods found"},
+            {"action": "screenshot", "name": "08_hoods_empty", "settle_s": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07_hoods_compare",
+      "description": "Neighborhoods tab — select multiple neighborhoods and compare",
+      "steps": [
+        {"action": "goto", "url": "/#hoods", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {
+          "action": "check_visible",
+          "selector": "input[type='checkbox']",
+          "variable": "has_checkboxes",
+          "timeout_ms": 5000
+        },
+        {
+          "action": "conditional",
+          "variable": "has_checkboxes",
+          "equals": "true",
+          "then": [
+            {"action": "click", "selector": "input[type='checkbox'] >> nth=0", "optional": true},
+            {"action": "wait", "ms": 500},
+            {"action": "click", "selector": "input[type='checkbox'] >> nth=1", "optional": true},
+            {"action": "wait", "ms": 500},
+            {
+              "action": "click",
+              "selector": "button:has-text('Compare')",
+              "optional": true,
+              "wait_for_navigation": false
+            },
+            {"action": "wait", "ms": 2000},
+            {"action": "screenshot", "name": "09_hoods_compare", "settle_s": 2}
+          ],
+          "else": [
+            {"action": "log", "message": "No comparison checkboxes found"},
+            {"action": "screenshot", "name": "09_hoods_no_compare", "settle_s": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08_theme_light",
+      "description": "Light mode — capture key screens in light theme",
+      "steps": [
+        {"action": "goto", "url": "/", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {
+          "action": "evaluate",
+          "expression": "() => { document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light'); localStorage.setItem('vancity-theme', 'light'); }"
+        },
+        {"action": "wait", "ms": 1000},
+        {"action": "screenshot", "name": "10_light_map", "settle_s": 2},
+        {"action": "goto", "url": "/#intel", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 2000},
+        {"action": "screenshot", "name": "11_light_intel", "settle_s": 2},
+        {"action": "goto", "url": "/#hoods", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 2000},
+        {"action": "screenshot", "name": "12_light_hoods", "settle_s": 2},
+        {
+          "action": "evaluate",
+          "expression": "() => { document.documentElement.classList.remove('light'); document.documentElement.classList.add('dark'); localStorage.setItem('vancity-theme', 'dark'); }"
+        }
+      ]
+    },
+    {
+      "name": "09_mobile_viewport",
+      "description": "Mobile viewport — key screens at 390x844",
+      "steps": [
+        {
+          "action": "evaluate",
+          "expression": "() => { window.__originalViewport = { width: window.innerWidth, height: window.innerHeight }; }"
+        },
+        {"action": "goto", "url": "/", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {"action": "screenshot", "name": "13_mobile_map", "settle_s": 2},
+        {"action": "goto", "url": "/#intel", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 2000},
+        {"action": "screenshot", "name": "14_mobile_intel", "settle_s": 2},
+        {"action": "goto", "url": "/#hoods", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 2000},
+        {"action": "screenshot", "name": "15_mobile_hoods", "settle_s": 2}
+      ]
+    },
+    {
+      "name": "10_disclaimer",
+      "description": "Disclaimer banner — capture the fixed bottom disclaimer",
+      "steps": [
+        {
+          "action": "evaluate",
+          "expression": "() => { localStorage.removeItem('vancity-disclaimer-dismissed'); }"
+        },
+        {"action": "goto", "url": "/", "wait_until": "networkidle"},
+        {"action": "wait", "ms": 3000},
+        {"action": "screenshot", "name": "16_disclaimer_visible", "settle_s": 2, "full_page": false}
+      ]
+    }
+  ]
+}
