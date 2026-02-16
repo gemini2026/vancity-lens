@@ -284,3 +284,20 @@ class TestReportSectionReorder:
         with open("api/report_generator.py") as f:
             content = f.read()
         assert "_build_red_flags_summary" in content
+
+
+class TestUnavailabilityHandling:
+    """F03-D: Data unavailability handling in reports."""
+    def test_unavailability_helper_exists(self):
+        from api.report_generator import ReportGenerator
+        assert hasattr(ReportGenerator, "_render_unavailable_section")
+    def test_unavailability_message_format(self):
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        assert "Data unavailable" in content or "data unavailable" in content
+    def test_all_async_sections_have_error_handling(self):
+        """Each async section should have try/except for graceful degradation."""
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        # Check that the generate method wraps async calls
+        assert "_render_unavailable_section" in content

@@ -135,14 +135,37 @@ class ReportGenerator:
         await self._build_executive_summary(pdf, parcel_data)
         self._build_title_ownership(pdf, parcel_data)
         self._build_entitlement_analysis(pdf, parcel_data)
-        await self._build_environmental_section(pdf, parcel_data, db_pool)
+
+        try:
+            await self._build_environmental_section(pdf, parcel_data, db_pool)
+        except Exception as e:
+            self._render_unavailable_section(pdf, "Environmental", "Environmental data source", str(e))
+
         self._build_heritage_section(pdf, parcel_data)
         self._build_before_after_section(pdf, parcel_data)
-        await self._build_nearby_development(pdf, parcel_data, db_pool)
-        await self._build_market_context(pdf, db_pool)
-        await self._build_demographic_profile(pdf, parcel_data, db_pool)
+
+        try:
+            await self._build_nearby_development(pdf, parcel_data, db_pool)
+        except Exception as e:
+            self._render_unavailable_section(pdf, "Nearby Development", "Development pipeline data source", str(e))
+
+        try:
+            await self._build_market_context(pdf, db_pool)
+        except Exception as e:
+            self._render_unavailable_section(pdf, "Market Context", "CMHC housing data source", str(e))
+
+        try:
+            await self._build_demographic_profile(pdf, parcel_data, db_pool)
+        except Exception as e:
+            self._render_unavailable_section(pdf, "Demographic Profile", "StatsCan demographics data source", str(e))
+
         self._build_red_flags_summary(pdf, parcel_data)
-        await self._build_data_currency(pdf, db_pool)
+
+        try:
+            await self._build_data_currency(pdf, db_pool)
+        except Exception as e:
+            self._render_unavailable_section(pdf, "Data Currency", "Data currency tracking source", str(e))
+
         self._build_pro_forma(pdf, parcel_data)
         self._build_due_diligence(pdf, parcel_data)
         if parcel_data.comparables:
@@ -380,6 +403,20 @@ class ReportGenerator:
     ) -> Decimal:
         """Compute buildable square footage from FSR."""
         return lot_area_sqm * entitled_fsr * Decimal("10.7639")
+
+    def _render_unavailable_section(self, pdf: FPDF, section_name: str, source_name: str, error: str = ""):
+        """Render a graceful degradation message when a section's data is unavailable."""
+        from datetime import datetime, timezone
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        msg = f"Data unavailable -- {source_name} timeout at {timestamp}"
+        if error:
+            msg += f" ({error})"
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(180, 0, 0)
+        pdf.multi_cell(0, 5, msg)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.ln(3)
 
     def _build_header_section(self, pdf: FPDF, parcel_data: ParcelReport):
         """Build branded header with VanCity Lens logo and title."""
