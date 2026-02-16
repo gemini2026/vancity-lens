@@ -8,6 +8,7 @@ Scoring: discount_pct = (implied_value - assessed_value) / implied_value * 100
 Threshold: >25% discount flags as undervalued.
 """
 
+import asyncio
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
@@ -88,30 +89,27 @@ async def compute_comp_averages(
     cutoff = date.today() - timedelta(days=lookback_months * 30)
     averages = {}
 
-    try:
-        async with db_pool.acquire() as conn:
-            rows = await conn.fetch("""
-                SELECT
-                    neighborhood,
-                    AVG(price_per_lot_sqft) AS avg_price,
-                    COUNT(*) AS comp_count,
-                    MAX(sale_date) AS latest_date
-                FROM comparable_sales
-                WHERE sale_date >= $1
-                  AND price_per_lot_sqft > 0
-                  AND neighborhood IS NOT NULL
-                GROUP BY neighborhood
-                HAVING COUNT(*) >= $2
-            """, cutoff, MIN_COMPARABLES)
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT
+                neighborhood,
+                AVG(price_per_lot_sqft) AS avg_price,
+                COUNT(*) AS comp_count,
+                MAX(sale_date) AS latest_date
+            FROM comparable_sales
+            WHERE sale_date >= $1
+              AND price_per_lot_sqft > 0
+              AND neighborhood IS NOT NULL
+            GROUP BY neighborhood
+            HAVING COUNT(*) >= $2
+        """, cutoff, MIN_COMPARABLES)
 
-            for row in rows:
-                averages[row["neighborhood"]] = {
-                    "avg_price_per_sqft": float(row["avg_price"]),
-                    "count": row["comp_count"],
-                    "latest_date": str(row["latest_date"]) if row["latest_date"] else None,
-                }
-    except Exception as e:
-        logger.warning("Failed to compute comp averages: %s", str(e)[:200])
+        for row in rows:
+            averages[row["neighborhood"]] = {
+                "avg_price_per_sqft": float(row["avg_price"]),
+                "count": row["comp_count"],
+                "latest_date": str(row["latest_date"]) if row["latest_date"] else None,
+            }
 
     return averages
 
@@ -134,63 +132,64 @@ async def generate_undervalued_alerts(
     from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
 
     alerts_created = 0
+    alerts_failed = 0
 
-    try:
-        async with db_pool.acquire() as conn:
-            # Get active watchlists with undervalued-related rules
-            watchlists = await conn.fetch("""
-                SELECT w.id, w.user_id, wr.rule_type, wr.rule_value
-                FROM watchlists w
-                JOIN watchlist_rules wr ON wr.watchlist_id = w.id
-                WHERE w.is_active = true
-                  AND wr.rule_type IN ('undervalued_discount', 'undervalued_lot_area', 'undervalued_tod_tier')
-            """)
+    async with db_pool.acquire() as conn:
+        # Get active watchlists with undervalued-related rules
+        watchlists = await conn.fetch("""
+            SELECT w.id, w.user_id, wr.rule_type, wr.rule_value
+            FROM watchlists w
+            JOIN watchlist_rules wr ON wr.watchlist_id = w.id
+            WHERE w.is_active = true
+              AND wr.rule_type IN ('undervalued_discount', 'undervalued_lot_area', 'undervalued_tod_tier')
+        """)
 
-            if not watchlists:
-                return 0
+        if not watchlists:
+            return 0
 
-            # Group rules by watchlist_id
-            wl_rules: dict = defaultdict(list)
-            for row in watchlists:
-                wl_rules[row["id"]].append(row)
+        # Group rules by watchlist_id
+        wl_rules: dict = defaultdict(list)
+        for row in watchlists:
+            wl_rules[row["id"]].append(row)
 
-            for parcel in scored_parcels:
-                if not parcel.get("is_undervalued"):
-                    continue
+        for parcel in scored_parcels:
+            if not parcel.get("is_undervalued"):
+                continue
 
-                signal = {
-                    "discount_pct": parcel.get("discount_pct", 0),
-                    "lot_area_sqft": parcel.get("lot_area_sqft", 0),
-                    "tod_tier": parcel.get("tod_tier"),
-                }
+            signal = {
+                "discount_pct": parcel.get("discount_pct", 0),
+                "lot_area_sqft": parcel.get("lot_area_sqft", 0),
+                "tod_tier": parcel.get("tod_tier"),
+            }
 
-                for wl_id, rules in wl_rules.items():
-                    rule_objs = [
-                        WatchlistRule(
-                            rule_type=RuleType(r["rule_type"]),
-                            rule_value=r["rule_value"],
+            for wl_id, rules in wl_rules.items():
+                rule_objs = [
+                    WatchlistRule(
+                        rule_type=RuleType(r["rule_type"]),
+                        rule_value=r["rule_value"],
+                    )
+                    for r in rules
+                ]
+                if AlertEngine.match_rules(signal, rule_objs):
+                    try:
+                        await conn.execute("""
+                            INSERT INTO alerts (
+                                watchlist_id, signal_id, alert_type,
+                                headline, summary, severity, created_at
+                            ) VALUES ($1, 0, 'undervalued_match', $2, $3, 'medium', NOW())
+                            ON CONFLICT DO NOTHING
+                        """,
+                            wl_id,
+                            f"Undervalued: {parcel.get('pid', '?')} ({parcel.get('discount_pct', 0):.0f}% below market)",
+                            f"Parcel {parcel.get('pid')} in {parcel.get('neighborhood', 'N/A')} flagged as undervalued.",
                         )
-                        for r in rules
-                    ]
-                    if AlertEngine.match_rules(signal, rule_objs):
-                        try:
-                            await conn.execute("""
-                                INSERT INTO alerts (
-                                    watchlist_id, signal_id, alert_type,
-                                    headline, summary, severity, created_at
-                                ) VALUES ($1, 0, 'undervalued_match', $2, $3, 'medium', NOW())
-                                ON CONFLICT DO NOTHING
-                            """,
-                                wl_id,
-                                f"Undervalued: {parcel.get('pid', '?')} ({parcel.get('discount_pct', 0):.0f}% below market)",
-                                f"Parcel {parcel.get('pid')} in {parcel.get('neighborhood', 'N/A')} flagged as undervalued.",
-                            )
-                            alerts_created += 1
-                        except Exception as e:
-                            logger.warning("Error creating undervalued alert: %s", e)
+                        alerts_created += 1
+                    except Exception as e:
+                        alerts_failed += 1
+                        logger.warning("Error creating undervalued alert (%s): %s", type(e).__name__, e)
 
-    except Exception as e:
-        logger.warning("Error in undervalued alert generation: %s", e)
+        if alerts_failed > 0 and alerts_created == 0:
+            logger.error("All %d alert creation attempts failed", alerts_failed)
 
     return alerts_created
 
@@ -322,11 +321,13 @@ async def score_parcels(
                     })
 
                 except Exception as e:
-                    logger.debug("Error scoring parcel %s: %s", parcel["pid"], str(e)[:100])
+                    logger.warning("Error scoring parcel %s (%s): %s", parcel["pid"], type(e).__name__, e)
                     stats["errors"] += 1
 
     except Exception as e:
-        logger.error("Scoring batch failed: %s", str(e)[:200])
+        logger.error("Scoring batch failed: %s", e, exc_info=True)
+        if isinstance(e, (asyncpg.InterfaceError, asyncpg.PostgresConnectionError, asyncio.TimeoutError)):
+            raise
 
     # Generate alerts for matched watchlist rules
     try:
@@ -348,29 +349,25 @@ async def get_top_opportunities(
 
     Excludes parcels with active applications.
     """
-    try:
-        async with db_pool.acquire() as conn:
-            rows = await conn.fetch("""
-                SELECT DISTINCT ON (us.pid)
-                    us.pid, us.neighborhood, us.assessed_value, us.implied_value,
-                    us.buildable_sqft, us.discount_pct, us.repeat_signal,
-                    us.has_contamination, us.has_heritage, us.caveats,
-                    us.comp_count, us.computed_at,
-                    p.civic_address, p.current_zoning
-                FROM undervalued_scores us
-                JOIN parcels p ON p.pid = us.pid
-                WHERE us.is_undervalued = TRUE
-                  AND us.has_active_application = FALSE
-                ORDER BY us.pid, us.computed_at DESC
-            """)
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT DISTINCT ON (us.pid)
+                us.pid, us.neighborhood, us.assessed_value, us.implied_value,
+                us.buildable_sqft, us.discount_pct, us.repeat_signal,
+                us.has_contamination, us.has_heritage, us.caveats,
+                us.comp_count, us.computed_at,
+                p.civic_address, p.current_zoning
+            FROM undervalued_scores us
+            JOIN parcels p ON p.pid = us.pid
+            WHERE us.is_undervalued = TRUE
+              AND us.has_active_application = FALSE
+            ORDER BY us.pid, us.computed_at DESC
+        """)
 
-            # Sort by discount and take top N
-            results = [dict(r) for r in rows]
-            results.sort(key=lambda x: float(x.get("discount_pct") or 0), reverse=True)
-            return results[:top_n]
-    except Exception as e:
-        logger.warning("Failed to get top opportunities: %s", str(e)[:200])
-        return []
+        # Sort by discount and take top N
+        results = [dict(r) for r in rows]
+        results.sort(key=lambda x: float(x.get("discount_pct") or 0), reverse=True)
+        return results[:top_n]
 
 
 async def get_parcel_undervaluation(
@@ -378,15 +375,11 @@ async def get_parcel_undervaluation(
     pid: str,
 ) -> Optional[dict]:
     """Get latest undervaluation score for a specific parcel."""
-    try:
-        async with db_pool.acquire() as conn:
-            row = await conn.fetchrow("""
-                SELECT * FROM undervalued_scores
-                WHERE pid = $1
-                ORDER BY computed_at DESC
-                LIMIT 1
-            """, pid)
-            return dict(row) if row else None
-    except Exception as e:
-        logger.debug("Error fetching undervaluation for %s: %s", pid, e)
-        return None
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT * FROM undervalued_scores
+            WHERE pid = $1
+            ORDER BY computed_at DESC
+            LIMIT 1
+        """, pid)
+        return dict(row) if row else None
