@@ -191,9 +191,9 @@ class TestChangeExtraction:
             "plain_english_summary": "FSR increased citywide.", "confidence": 0.92,
         })
         result = parse_extraction_response(sample)
-        assert result["change_type"] == "bylaw_amendment"
-        assert result["nlp_confidence_score"] == 0.92
-        assert result["requires_manual_review"] is False
+        assert result.change_type == "bylaw_amendment"
+        assert result.nlp_confidence_score == 0.92
+        assert result.requires_manual_review is False
     def test_parse_extraction_low_confidence_flags_review(self):
         from api.intelligence.change_extraction import parse_extraction_response
         sample = json.dumps({
@@ -202,7 +202,7 @@ class TestChangeExtraction:
             "plain_english_summary": "Minor clarification.", "confidence": 0.70,
         })
         result = parse_extraction_response(sample)
-        assert result["requires_manual_review"] is True
+        assert result.requires_manual_review is True
     def test_is_candidate_chunk_detects_bylaw(self):
         from api.intelligence.change_extraction import is_candidate_chunk
         assert is_candidate_chunk("The bylaw amendment to RS-1 zoning increases FSR from 0.6 to 1.2")
