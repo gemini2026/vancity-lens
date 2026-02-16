@@ -160,12 +160,13 @@ class TestRefreshFunctions:
             }
         ])
         conn.execute = AsyncMock()
+        conn.fetchval = AsyncMock(return_value=50)
 
         result = await refresh_all_views(mock_db_pool)
 
         assert result["all_success"] is True
-        assert len(result["views"]) == 2
-        assert result["total_duration_ms"] == 220
+        assert len(result["views"]) == 3  # toa_buffers + 2 neighborhood views
+        assert result["total_duration_ms"] >= 220
 
     async def test_refresh_all_views_partial_failure(self, mock_db_pool):
         """Test refresh when one view fails."""
@@ -187,11 +188,12 @@ class TestRefreshFunctions:
             }
         ])
         conn.execute = AsyncMock()
+        conn.fetchval = AsyncMock(return_value=50)
 
         result = await refresh_all_views(mock_db_pool)
 
         assert result["all_success"] is False
-        assert len(result["views"]) == 2
+        assert len(result["views"]) == 3  # toa_buffers + 2 neighborhood views
 
 
 # ── Test Rankings Retrieval ──────────────────────────────────────
