@@ -8,7 +8,8 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-_first_log_failure_reported = False
+_last_error_log_time: float = 0.0
+_ERROR_LOG_INTERVAL_S = 300  # Log at ERROR level at most once per 5 minutes
 
 
 class RetrievalTracker:
@@ -80,13 +81,14 @@ async def log_retrieval(db_pool, source_id: str, query_params: Optional[dict] = 
                         tracker.source_id,
                     )
         except Exception as log_err:
-            global _first_log_failure_reported
-            if not _first_log_failure_reported:
+            global _last_error_log_time
+            now = time.monotonic()
+            if now - _last_error_log_time >= _ERROR_LOG_INTERVAL_S:
                 logger.error(
                     "Failed to log retrieval for %s: %s",
                     source_id, log_err, exc_info=True,
                 )
-                _first_log_failure_reported = True
+                _last_error_log_time = now
             else:
                 logger.warning(
                     "Failed to log retrieval for %s: %s",

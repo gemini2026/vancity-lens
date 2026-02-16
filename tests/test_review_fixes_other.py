@@ -238,14 +238,14 @@ import api.retrieval_logging as retrieval_logging_mod
 
 
 class TestRetrievalLoggingFirstFailure:
-    """First log failure logs at ERROR, subsequent at WARNING."""
+    """First log failure logs at ERROR, subsequent within interval at WARNING."""
 
     @pytest.fixture(autouse=True)
-    def reset_flag(self):
-        """Reset the module-level flag before each test."""
-        retrieval_logging_mod._first_log_failure_reported = False
+    def reset_timer(self):
+        """Reset the module-level timer before each test."""
+        retrieval_logging_mod._last_error_log_time = 0.0
         yield
-        retrieval_logging_mod._first_log_failure_reported = False
+        retrieval_logging_mod._last_error_log_time = 0.0
 
     @pytest.mark.asyncio
     async def test_first_failure_logs_error(self, caplog):
@@ -262,17 +262,18 @@ class TestRetrievalLoggingFirstFailure:
             async with retrieval_logging_mod.log_retrieval(mock_pool, "DS-TEST") as tracker:
                 tracker.set_status(200)
 
-        # First failure should be logged at ERROR
+        # First failure should be logged at ERROR (timer was 0.0)
         error_records = [r for r in caplog.records if r.levelno == logging.ERROR]
         assert len(error_records) >= 1
         assert "Failed to log retrieval" in error_records[0].message
-        assert retrieval_logging_mod._first_log_failure_reported is True
+        assert retrieval_logging_mod._last_error_log_time > 0.0
 
     @pytest.mark.asyncio
     async def test_second_failure_logs_warning(self, caplog):
-        """Subsequent failures should log at WARNING level."""
-        # Set flag to simulate first failure already reported
-        retrieval_logging_mod._first_log_failure_reported = True
+        """Subsequent failures within interval should log at WARNING level."""
+        import time
+        # Set timer to simulate a recent ERROR log (within interval)
+        retrieval_logging_mod._last_error_log_time = time.monotonic()
 
         mock_pool = MagicMock()
         mock_conn = AsyncMock()

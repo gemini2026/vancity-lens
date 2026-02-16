@@ -147,5 +147,15 @@ async def scrape_council_agendas(max_pages: int = 3) -> list[AgendaItem]:
             if attempt == retries - 1:
                 raise
             await asyncio.sleep(2 ** attempt)
+        except Exception as e:
+            # Catch Playwright-specific errors (e.g. playwright._impl._errors.TimeoutError)
+            # which do NOT inherit from builtins.TimeoutError
+            if "Timeout" in type(e).__name__ or "playwright" in type(e).__module__:
+                logger.error(f"Attempt {attempt + 1}/{retries} failed (playwright): {e}")
+                if attempt == retries - 1:
+                    raise
+                await asyncio.sleep(2 ** attempt)
+            else:
+                raise
 
     return all_items

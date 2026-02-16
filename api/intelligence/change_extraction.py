@@ -210,8 +210,8 @@ async def store_change_record(db_pool, record: ChangeRecord) -> int:
             record.change_type,
             record.source_url,
             record.source_document_title,
-            getattr(record, "publication_date", None),
-            getattr(record, "effective_date", None),
+            None,  # publication_date — not on ChangeRecord model
+            None,  # effective_date — not on ChangeRecord model
             record.geographic_scope,
             json.dumps(record.affected_areas),
             json.dumps(record.entitlement_change),

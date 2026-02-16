@@ -213,7 +213,7 @@ class ReportGenerator:
             lot_area_sqm = Decimal(str(row["lot_area_sqm"]))
             lot_area_sqft = lot_area_sqm * Decimal("10.7639")
 
-            # Fetch entitlement data (table may not exist)
+            # Fetch entitlement data (table may not exist in some environments)
             try:
                 entitlement_row = await conn.fetchrow(
                     """
@@ -227,7 +227,10 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except Exception as e:
+            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError) as e:
+                logger.warning("Entitlement table/column not found for %s: %s", pid, e)
+                entitlement_row = None
+            except asyncpg.PostgresError as e:
                 logger.error("Failed to fetch entitlement data for %s: %s", pid, e, exc_info=True)
                 entitlement_row = None
 

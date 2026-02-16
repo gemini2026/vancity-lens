@@ -186,10 +186,10 @@ async def generate_undervalued_alerts(
                         alerts_created += 1
                     except Exception as e:
                         alerts_failed += 1
-                        logger.warning("Error creating undervalued alert (%s): %s", type(e).__name__, e)
+                        logger.warning("Error creating undervalued alert (%s): %s", type(e).__name__, e, exc_info=True)
 
         if alerts_failed > 0 and alerts_created == 0:
-            logger.error("All %d alert creation attempts failed", alerts_failed)
+            logger.error("All %d alert creation attempts failed (last: %s)", alerts_failed, type(e).__name__)
 
     return alerts_created
 
@@ -324,10 +324,10 @@ async def score_parcels(
                     logger.warning("Error scoring parcel %s (%s): %s", parcel["pid"], type(e).__name__, e)
                     stats["errors"] += 1
 
+    except (asyncpg.InterfaceError, asyncpg.PostgresConnectionError, asyncio.TimeoutError):
+        raise
     except Exception as e:
         logger.error("Scoring batch failed: %s", e, exc_info=True)
-        if isinstance(e, (asyncpg.InterfaceError, asyncpg.PostgresConnectionError, asyncio.TimeoutError)):
-            raise
 
     # Generate alerts for matched watchlist rules
     try:

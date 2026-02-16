@@ -11,6 +11,7 @@ Verifies that:
 
 import logging
 import pytest
+import asyncpg
 from decimal import Decimal
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -209,8 +210,8 @@ async def test_entitlement_fetch_failure_logs_error(generator, caplog):
         if call_count == 1:
             return parcel_row
         elif call_count == 2:
-            # Entitlement fetch
-            raise RuntimeError("entitlement table missing")
+            # Entitlement fetch — simulate a Postgres error (caught at ERROR level)
+            raise asyncpg.PostgresError("entitlement table error")
         else:
             return None
 

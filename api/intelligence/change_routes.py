@@ -87,7 +87,7 @@ def _row_to_response(row) -> ChangeRecordResponse:
         affected_areas=row["affected_areas"] or [],
         entitlement_change=entitlement_change,
         plain_english_summary=row["plain_english_summary"],
-        nlp_confidence_score=float(row["nlp_confidence_score"]) if row["nlp_confidence_score"] else None,
+        nlp_confidence_score=float(row["nlp_confidence_score"]) if row["nlp_confidence_score"] is not None else None,
         requires_manual_review=row["requires_manual_review"],
         extraction_timestamp=row["extraction_timestamp"].isoformat() if row["extraction_timestamp"] else None,
         created_at=row["created_at"].isoformat() if row["created_at"] else None,
