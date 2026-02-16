@@ -8,6 +8,7 @@ import ProFormaSection from "./ProFormaSection";
 import RiskFlagsSection from "./RiskFlagsSection";
 import ShareButton from "./ShareButton";
 import BeforeAfterComparison from "./BeforeAfterComparison";
+import HBUAnalysisPanel from "./HBUAnalysis";
 import { saveParcel, unsaveParcel, checkParcelSaved } from "@/lib/saved-parcels-api";
 import { cn } from "@/lib/utils";
 import { getApiBase } from "@/lib/api-base";
@@ -265,6 +266,11 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
             />
           </CollapsibleSection>
         )}
+
+        {/* Highest & Best Use Analysis */}
+        <CollapsibleSection title="Highest & Best Use" defaultOpen>
+          <HBUAnalysisPanel pid={data.pid} />
+        </CollapsibleSection>
 
         {/* Bill 44 Small-Scale Multi-Unit Housing */}
         {data.bill44?.is_eligible && (

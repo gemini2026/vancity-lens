@@ -235,3 +235,79 @@ class TestHBURoutes:
         with open("api/intelligence/routes.py") as f:
             content = f.read()
         assert "hbu_routes" in content
+
+
+class TestHBUFrontend:
+    """HBU frontend component tests."""
+
+    def test_component_exists(self):
+        assert os.path.exists("frontend/src/components/HBUAnalysis.tsx")
+
+    def test_is_client_component(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert '"use client"' in content
+
+    def test_api_client_exists(self):
+        assert os.path.exists("frontend/src/lib/hbu-api.ts")
+
+    def test_api_client_exports_functions(self):
+        with open("frontend/src/lib/hbu-api.ts") as f:
+            content = f.read()
+        assert "getHBUAnalysis" in content
+        assert "runHBUAnalysis" in content
+
+    def test_component_shows_key_metrics(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "max_height_storeys" in content
+        assert "max_fsr" in content
+        assert "estimated_units" in content
+        assert "buildable_sqft" in content
+
+    def test_component_shows_feasibility(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "feasibility_verdict" in content
+        assert "pencils" in content.lower()
+
+    def test_component_has_analyze_button(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "Analyze" in content
+        assert "handleAnalyze" in content
+
+    def test_component_shows_narrative(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "narrative" in content
+        assert "AI Analysis" in content
+
+    def test_component_shows_constraints(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "key_constraints" in content
+        assert "Constraints" in content
+
+    def test_component_shows_confidence(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "confidence_score" in content
+        assert "confidence" in content.lower()
+
+    def test_integrated_in_detail_panel(self):
+        with open("frontend/src/components/ParcelDetailPanel.tsx") as f:
+            content = f.read()
+        assert "HBUAnalysis" in content
+
+    def test_component_has_loading_state(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "loading" in content.lower()
+        assert "animate-pulse" in content
+
+    def test_component_has_error_state(self):
+        with open("frontend/src/components/HBUAnalysis.tsx") as f:
+            content = f.read()
+        assert "error" in content
+        assert "Retry" in content
