@@ -211,7 +211,7 @@ class TestComputeEntitlementBasic:
     async def test_01_single_toa_tier(self, mock_conn, parcel_single_toa_tier, entitlement_tier1):
         """Test 1: Normal parcel in single TOA tier - verify storeys, FSR, uplift."""
         # Setup mocks
-        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -239,7 +239,7 @@ class TestComputeEntitlementBasic:
     async def test_02_multiple_toa_tiers(self, mock_conn, parcel_multiple_toa_tiers, entitlement_tier1, entitlement_tier2):
         """Test 2: Parcel in multiple TOA tiers - verify best entitlement selected."""
         # Multiple overlapping tiers, Tier 1 should be best (highest storeys)
-        mock_conn.fetchrow.side_effect = [parcel_multiple_toa_tiers, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_multiple_toa_tiers, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1, entitlement_tier2], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -259,7 +259,7 @@ class TestComputeEntitlementBasic:
     @pytest.mark.asyncio
     async def test_03_outside_toa_zones(self, mock_conn, parcel_outside_toa):
         """Test 3: Parcel outside all TOA zones - verify in_toa=False, no entitlements."""
-        mock_conn.fetchrow.side_effect = [parcel_outside_toa, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_outside_toa, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[], []]  # no entitlements + no community plan
         mock_conn.fetchval.return_value = 0
 
@@ -286,7 +286,7 @@ class TestComputeEntitlementBasic:
         ent["current_height"] = 25
         ent["current_fsr"] = Decimal("6.5")
 
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -313,7 +313,7 @@ class TestComputeEntitlementBasic:
         ent["current_height"] = None
         ent["current_fsr"] = None
 
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -346,7 +346,7 @@ class TestValueEstimation:
     @pytest.mark.asyncio
     async def test_06_value_estimate_with_asking_price(self, mock_conn, parcel_single_toa_tier, entitlement_tier1):
         """Test 6: Value estimation with asking price - verify buildable_sqft, estimated_land_value, delta."""
-        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -400,7 +400,7 @@ class TestValueEstimation:
             "current_fsr": Decimal("2.0"),
         }
 
-        mock_conn.fetchrow.side_effect = [parcel, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -417,7 +417,7 @@ class TestValueEstimation:
     @pytest.mark.asyncio
     async def test_08_zero_lot_area_no_estimate(self, mock_conn, parcel_zero_lot_area, entitlement_tier1):
         """Test 8: Parcel with zero lot area - verify graceful handling."""
-        mock_conn.fetchrow.side_effect = [parcel_zero_lot_area, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_zero_lot_area, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -432,7 +432,7 @@ class TestValueEstimation:
     @pytest.mark.asyncio
     async def test_09_price_per_sqft_scaling(self, mock_conn, parcel_single_toa_tier, entitlement_tier1):
         """Test 9: Different price_per_sqft assumptions - verify calculation scales correctly."""
-        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -449,7 +449,7 @@ class TestValueEstimation:
         assert ve.estimated_land_value == expected_value_1000
 
         # Now test with $600/sqft
-        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -465,7 +465,7 @@ class TestValueEstimation:
     @pytest.mark.asyncio
     async def test_10_source_attribution(self, mock_conn, parcel_single_toa_tier, entitlement_tier1):
         """Test 10: Source attribution - verify all source links are generated."""
-        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -890,7 +890,7 @@ class TestEntitlementSignals:
     @pytest.mark.asyncio
     async def test_signal_high_alpha(self, mock_conn, parcel_single_toa_tier, entitlement_tier1):
         """Test signal generation for high alpha opportunity."""
-        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_single_toa_tier, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[entitlement_tier1], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 
@@ -906,7 +906,7 @@ class TestEntitlementSignals:
     @pytest.mark.asyncio
     async def test_signal_no_entitlement(self, mock_conn, parcel_outside_toa):
         """Test signal for parcel outside TOA."""
-        mock_conn.fetchrow.side_effect = [parcel_outside_toa, None, None, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel_outside_toa, None, None, None, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[], []]  # no entitlements + no community plan
         mock_conn.fetchval.return_value = 0
 

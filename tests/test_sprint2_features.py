@@ -533,7 +533,7 @@ class TestSetbackInEntitlement:
             "max_site_coverage": Decimal("0.55"),
         }
 
-        mock_conn.fetchrow.side_effect = [parcel, None, setback_row, None]  # parcel + view cone + setback + bill44
+        mock_conn.fetchrow.side_effect = [parcel, None, None, setback_row, None]  # parcel + view cone + heritage + setback + bill44
         mock_conn.fetch.side_effect = [[ent], []]  # entitlements + community plan
         mock_conn.fetchval.return_value = 0
 

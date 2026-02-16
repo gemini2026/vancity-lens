@@ -159,6 +159,9 @@ class ParcelEntitlementResponse(BaseModel):
     community_plan: Optional[dict] = Field(
         None, description="Community plan density bonus (plan name, bonus FSR/storeys, conditions)"
     )
+    # F01-A: Heritage designation
+    heritage_site: bool = Field(default=False, description="Is parcel a designated heritage site")
+    heritage_category: Optional[str] = Field(None, description="Heritage category: A, B, or C")
 
     @computed_field
     @property

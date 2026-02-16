@@ -146,6 +146,19 @@ SQL_VIEW_CONE_CAP = """
 """
 
 
+# F01-A: Heritage site proximity check (uses same ST_DWithin pattern as validation.py)
+SQL_HERITAGE_CHECK = """
+    SELECT hs.name, hs.category
+    FROM heritage_sites hs
+    WHERE ST_DWithin(
+        hs.geom,
+        (SELECT ST_Centroid(geom) FROM parcels WHERE pid = $1),
+        0.0003
+    )
+    ORDER BY hs.category ASC
+    LIMIT 1
+"""
+
 # ── Engine ───────────────────────────────────────────────────
 
 async def compute_entitlement(
@@ -210,6 +223,27 @@ async def compute_entitlement(
     view_cone_max_m: Optional[Decimal] = None
     if view_cone_row and view_cone_row["view_cone_max_m"] is not None:
         view_cone_max_m = Decimal(str(view_cone_row["view_cone_max_m"]))
+
+    # 2c. F01-A: Heritage site proximity check
+    heritage_row = await conn.fetchrow(SQL_HERITAGE_CHECK, pid)
+    heritage_site = heritage_row is not None
+    heritage_category: Optional[str] = None
+    if heritage_row:
+        heritage_category = heritage_row["category"]
+        if heritage_category == "A":
+            data_warnings.append(DataQualityWarning(
+                code="HERITAGE_CATEGORY_A",
+                message=f"Heritage Category A designation: '{heritage_row['name']}'. "
+                        "Demolition restricted; development requires Heritage Commission approval.",
+                field="heritage_site",
+            ))
+        else:
+            data_warnings.append(DataQualityWarning(
+                code=f"HERITAGE_CATEGORY_{heritage_category}",
+                message=f"Heritage Category {heritage_category} designation: '{heritage_row['name']}'. "
+                        "Additional review required; development subject to heritage regulations.",
+                field="heritage_site",
+            ))
 
     # 3. Build entitlement objects
     #    CRITICAL: Bill 47 sets MINIMUM density floors, not replacements.
@@ -354,6 +388,8 @@ async def compute_entitlement(
         setbacks=setbacks_dict,
         bill44=bill44_dict,
         community_plan=cp_dict,
+        heritage_site=heritage_site,
+        heritage_category=heritage_category,
     )
 
 
