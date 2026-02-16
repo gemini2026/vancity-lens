@@ -109,6 +109,20 @@ export default function MapView() {
   const [showFinancing, setShowFinancing] = useState(false);
   const [financingPid, setFinancingPid] = useState<string>("");
   const [showCaseStudies, setShowCaseStudies] = useState(true);
+  const [visibleTiers, setVisibleTiers] = useState<Record<number, boolean>>({ 1: true, 2: true, 3: true });
+
+  const toggleTier = useCallback((tier: number) => {
+    setVisibleTiers(prev => {
+      const next = { ...prev, [tier]: !prev[tier] };
+      const m = map.current;
+      if (m) {
+        const vis = next[tier] ? "visible" : "none";
+        if (m.getLayer(`toa-fill-t${tier}`)) m.setLayoutProperty(`toa-fill-t${tier}`, "visibility", vis);
+        if (m.getLayer(`toa-border-t${tier}`)) m.setLayoutProperty(`toa-border-t${tier}`, "visibility", vis);
+      }
+      return next;
+    });
+  }, []);
 
   const openDetailPanel = useCallback((data: ParcelEntitlement, nearbySignals?: IntelSignal[]) => {
     popupRef.current?.remove();
@@ -680,10 +694,21 @@ export default function MapView() {
           { tier:2, label:"200–400m: 12 storeys / 4.0 FSR", color:TIER_COLORS[2], border:TIER_BORDERS[2] },
           { tier:3, label:"400–800m: 8 storeys / 3.0 FSR", color:TIER_COLORS[3], border:TIER_BORDERS[3] },
         ].map(t => (
-          <div key={t.tier} className="flex items-center mt-1">
-            <div className="w-3.5 h-3.5 rounded-sm mr-2" style={{ background:t.color, border:`1px solid ${t.border}` }} />
-            <span>Tier {t.tier}: {t.label}</span>
-          </div>
+          <label key={t.tier} className="flex items-center mt-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={visibleTiers[t.tier]}
+              onChange={() => toggleTier(t.tier)}
+              className="sr-only peer"
+            />
+            <div
+              className="w-3.5 h-3.5 rounded-sm mr-2 flex items-center justify-center transition-opacity peer-checked:opacity-100 opacity-30"
+              style={{ background:t.color, border:`1px solid ${t.border}` }}
+            >
+              {visibleTiers[t.tier] && <span className="text-[8px] text-white/80">&#10003;</span>}
+            </div>
+            <span className={visibleTiers[t.tier] ? "" : "text-gray-600 line-through"}>Tier {t.tier}: {t.label}</span>
+          </label>
         ))}
         <div className="flex items-center mt-1.5 border-t border-gray-700 pt-1.5">
           <div className="w-3 h-3 rounded-full bg-green-500 border-2 border-white/85 mr-2" />
