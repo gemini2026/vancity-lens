@@ -805,3 +805,67 @@ class TestEntityResolution:
         conn.execute = AsyncMock()
         entity_id = await resolve_developer_entity(conn, "Brand New Developer Corp")
         assert entity_id == 42
+
+
+class TestClusteringAPI:
+    """F04-C: Clustering detection API endpoint."""
+
+    def test_cluster_routes_file_exists(self):
+        assert os.path.exists("api/intelligence/cluster_routes.py")
+
+    def test_cluster_router_has_get_endpoint(self):
+        from api.intelligence.cluster_routes import router
+        paths = [r.path for r in router.routes]
+        assert any("cluster" in p for p in paths)
+        methods = []
+        for r in router.routes:
+            methods.extend(getattr(r, "methods", []))
+        assert "GET" in methods
+
+    def test_cluster_routes_mounted(self):
+        with open("api/intelligence/routes.py") as f:
+            content = f.read()
+        assert "cluster_routes" in content
+
+    def test_cluster_endpoint_has_query_params(self):
+        from api.intelligence.cluster_routes import get_clusters
+        import inspect
+        sig = inspect.signature(get_clusters)
+        param_names = list(sig.parameters.keys())
+        assert "radius_m" in param_names
+        assert "window_days" in param_names
+        assert "min_apps" in param_names
+
+    def test_clustering_module_has_detect_clusters(self):
+        from api.intelligence.clustering import detect_clusters
+        assert callable(detect_clusters)
+
+    def test_development_cluster_is_pydantic_model(self):
+        from api.intelligence.clustering import DevelopmentCluster
+        assert hasattr(DevelopmentCluster, "model_dump")
+
+
+class TestRetrievalAuditLog:
+    """DI-005: Retrieval audit logging."""
+
+    def test_retrieval_log_migration_exists(self):
+        assert os.path.exists("db/045_retrieval_log.sql")
+
+    def test_freshness_migration_exists(self):
+        assert os.path.exists("db/046_data_freshness.sql")
+
+    def test_logging_module_exists(self):
+        assert os.path.exists("api/retrieval_logging.py")
+
+    def test_log_retrieval_is_callable(self):
+        from api.retrieval_logging import log_retrieval
+        assert callable(log_retrieval)
+
+    def test_retrieval_tracker_exists(self):
+        from api.retrieval_logging import RetrievalTracker
+        tracker = RetrievalTracker("DS-001", {"q": "test"})
+        tracker.set_status(200)
+        tracker.set_record_count(10)
+        assert tracker.http_status == 200
+        assert tracker.record_count == 10
+        assert tracker.duration_ms >= 0
