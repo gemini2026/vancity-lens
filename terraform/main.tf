@@ -12,6 +12,7 @@ resource "google_project_service" "required_apis" {
     "monitoring.googleapis.com",
     "run.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "aiplatform.googleapis.com",
   ])
 
   project = var.project_id
@@ -101,6 +102,13 @@ resource "google_project_iam_member" "gke_metric_writer" {
 resource "google_project_iam_member" "gke_monitoring_viewer" {
   project = var.project_id
   role    = "roles/monitoring.viewer"
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
+}
+
+# Vertex AI role for Gemini LLM generation
+resource "google_project_iam_member" "gke_vertex_ai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.gke_sa.email}"
 }
 

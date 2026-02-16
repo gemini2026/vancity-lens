@@ -3,7 +3,7 @@
 from datetime import date, datetime
 import json
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from api.intelligence.local_rag.chunker import chunk_document
 from api.intelligence.models import ExtractedSignal, SignalType, Decision, Sentiment, Severity
 
@@ -40,34 +40,26 @@ Project: 25-storey mixed-use tower with 300 units."""
             "source_url": "https://example.com"
         }
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value = mock_client
+        json_text = json.dumps([{
+            "signal_type": "rezoning_decision",
+            "summary": "Rezoning approved for 1234 Main Street",
+            "headline": "1234 Main rezoned",
+            "addresses": ["1234 Main Street"],
+            "neighborhood": "Downtown",
+            "zoning_from": "RS-1",
+            "zoning_to": "CD-1",
+            "height_after": 80.0,
+            "unit_count": 300,
+            "decision": "approved",
+            "vote_for": 10,
+            "vote_against": 1,
+            "sentiment": "positive_for_development",
+            "severity": "high",
+            "confidence": 0.95,
+            "event_date": "2024-01-15"
+        }])
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = json.dumps([{
-                "signal_type": "rezoning_decision",
-                "summary": "Rezoning approved for 1234 Main Street",
-                "headline": "1234 Main rezoned",
-                "addresses": ["1234 Main Street"],
-                "neighborhood": "Downtown",
-                "zoning_from": "RS-1",
-                "zoning_to": "CD-1",
-                "height_after": 80.0,
-                "unit_count": 300,
-                "decision": "approved",
-                "vote_for": 10,
-                "vote_against": 1,
-                "sentiment": "positive_for_development",
-                "severity": "high",
-                "confidence": 0.95,
-                "event_date": "2024-01-15"
-            }])
-
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=(json_text, "gemini-2.5-flash", 1.5)):
             from api.intelligence.extractor import extract_signals_from_chunk
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
@@ -127,34 +119,26 @@ Neighborhood: Downtown."""
         assert len(chunks) > 0
 
         # Stage 2: Extract signals (mocked)
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value = mock_client
+        json_text = json.dumps([{
+            "signal_type": "rezoning_decision",
+            "summary": "Rezoning approved",
+            "headline": "Main Street rezoned",
+            "addresses": ["1234 Main Street"],
+            "neighborhood": "Downtown",
+            "zoning_from": "RS-1",
+            "zoning_to": "CD-1",
+            "height_after": 80.0,
+            "unit_count": 300,
+            "decision": "approved",
+            "vote_for": 10,
+            "vote_against": 1,
+            "sentiment": "positive_for_development",
+            "severity": "high",
+            "confidence": 0.95,
+            "event_date": "2024-01-15"
+        }])
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = json.dumps([{
-                "signal_type": "rezoning_decision",
-                "summary": "Rezoning approved",
-                "headline": "Main Street rezoned",
-                "addresses": ["1234 Main Street"],
-                "neighborhood": "Downtown",
-                "zoning_from": "RS-1",
-                "zoning_to": "CD-1",
-                "height_after": 80.0,
-                "unit_count": 300,
-                "decision": "approved",
-                "vote_for": 10,
-                "vote_against": 1,
-                "sentiment": "positive_for_development",
-                "severity": "high",
-                "confidence": 0.95,
-                "event_date": "2024-01-15"
-            }])
-
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=(json_text, "gemini-2.5-flash", 1.5)):
             from api.intelligence.extractor import extract_signals_from_chunk
             signals = await extract_signals_from_chunk(
                 chunks[0]["chunk_text"],
@@ -360,34 +344,26 @@ class TestE2EPipelineWithMocks:
         assert len(chunks) > 0
 
         # Stage 3: Mock LLM extraction
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value = mock_client
+        json_text = json.dumps([{
+            "signal_type": "rezoning_decision",
+            "summary": "Rezoning approved",
+            "headline": "Main Street rezoned",
+            "addresses": ["1234 Main Street"],
+            "neighborhood": "Downtown",
+            "zoning_from": "RS-1",
+            "zoning_to": "CD-1",
+            "height_after": 80.0,
+            "unit_count": 300,
+            "decision": "approved",
+            "vote_for": 10,
+            "vote_against": 1,
+            "sentiment": "positive_for_development",
+            "severity": "high",
+            "confidence": 0.95,
+            "event_date": "2024-01-15"
+        }])
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = json.dumps([{
-                "signal_type": "rezoning_decision",
-                "summary": "Rezoning approved",
-                "headline": "Main Street rezoned",
-                "addresses": ["1234 Main Street"],
-                "neighborhood": "Downtown",
-                "zoning_from": "RS-1",
-                "zoning_to": "CD-1",
-                "height_after": 80.0,
-                "unit_count": 300,
-                "decision": "approved",
-                "vote_for": 10,
-                "vote_against": 1,
-                "sentiment": "positive_for_development",
-                "severity": "high",
-                "confidence": 0.95,
-                "event_date": "2024-01-15"
-            }])
-
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=(json_text, "gemini-2.5-flash", 1.5)):
             from api.intelligence.extractor import extract_signals_from_chunk
             signals = await extract_signals_from_chunk(
                 chunks[0]["chunk_text"],

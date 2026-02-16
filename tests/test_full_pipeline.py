@@ -702,27 +702,14 @@ class TestPipelineChatQuery:
     @pytest.mark.e2e_pipeline
     async def test_chat_generates_answer(self, mock_db_pool):
         """Integration: Chat query generates answer from context."""
-        # Mock Anthropic client
-        with patch('api.intelligence.chat.AsyncAnthropic') as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_anthropic.return_value = mock_client
-
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "City Council approved rezoning of 1234 Main Street from RS-1 to CD-1 on January 15, 2024, with a 10-1 vote."
-
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
-            with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
-                with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=[]):
-                        with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
-                            result = await chat.handle_chat(
-                                mock_db_pool,
-                                "What rezoning decisions were made?",
-                                anthropic_api_key="test-key",
-                            )
+        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("City Council approved rezoning of 1234 Main Street from RS-1 to CD-1 on January 15, 2024, with a 10-1 vote.", "gemini-2.5-flash", 1.5)):
+            with patch('api.intelligence.chat.retrieve_document_chunks', return_value=[]):
+                with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
+                    result = await chat.handle_chat(
+                        mock_db_pool,
+                        "What rezoning decisions were made?",
+                        anthropic_api_key="test-key",
+                    )
 
             assert isinstance(result, ChatResponse)
             assert len(result.answer) > 0
@@ -730,42 +717,30 @@ class TestPipelineChatQuery:
     @pytest.mark.e2e_pipeline
     async def test_chat_extracts_citations(self, mock_db_pool):
         """Integration: Chat response includes citations from source chunks."""
-        with patch('api.intelligence.chat.AsyncAnthropic') as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_anthropic.return_value = mock_client
+        mock_chunks = [
+            {
+                'chunk_id': 101,
+                'chunk_text': 'Council approved rezoning...',
+                'document_title': 'Council Meeting January 15',
+                'source_url': 'https://council.vancouver.ca/',
+                'source_type': 'council_minutes',
+                'published_date': date(2024, 1, 15),
+                'final_score': 0.92,
+                'rrf_score': 0.92,
+            },
+        ]
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "The rezoning was approved."
+        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("The rezoning was approved.", "gemini-2.5-flash", 1.5)):
+            with patch('api.intelligence.chat.retrieve_document_chunks', return_value=mock_chunks):
+                with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
+                    result = await chat.handle_chat(
+                        mock_db_pool,
+                        "What rezoning decisions?",
+                        anthropic_api_key="test-key",
+                    )
 
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
-            mock_chunks = [
-                {
-                    'chunk_id': 101,
-                    'chunk_text': 'Council approved rezoning...',
-                    'document_title': 'Council Meeting January 15',
-                    'source_url': 'https://council.vancouver.ca/',
-                    'source_type': 'council_minutes',
-                    'published_date': date(2024, 1, 15),
-                    'final_score': 0.92,
-                    'rrf_score': 0.92,
-                },
-            ]
-
-            with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
-                with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=mock_chunks):
-                        with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
-                            result = await chat.handle_chat(
-                                mock_db_pool,
-                                "What rezoning decisions?",
-                                anthropic_api_key="test-key",
-                            )
-
-            assert len(result.citations) > 0
-            assert result.citations[0].document_title == 'Council Meeting January 15'
+        assert len(result.citations) > 0
+        assert result.citations[0].document_title == 'Council Meeting January 15'
 
     @pytest.mark.e2e_pipeline
     async def test_chat_includes_signals(self, mock_db_pool):
@@ -791,29 +766,17 @@ class TestPipelineChatQuery:
             source_date=date(2024, 1, 15),
         )
 
-        with patch('api.intelligence.chat.AsyncAnthropic') as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_anthropic.return_value = mock_client
+        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("Answer.", "gemini-2.5-flash", 1.5)):
+            with patch('api.intelligence.chat.retrieve_document_chunks', return_value=[]):
+                with patch('api.intelligence.chat.get_relevant_signals', return_value=[mock_signal]):
+                    result = await chat.handle_chat(
+                        mock_db_pool,
+                        "Rezoning?",
+                        anthropic_api_key="test-key",
+                    )
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "Answer."
-
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
-            with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
-                with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=[]):
-                        with patch('api.intelligence.chat.get_relevant_signals', return_value=[mock_signal]):
-                            result = await chat.handle_chat(
-                                mock_db_pool,
-                                "Rezoning?",
-                                anthropic_api_key="test-key",
-                            )
-
-            assert len(result.related_signals) > 0
-            assert result.related_signals[0].signal_type == 'rezoning_decision'
+        assert len(result.related_signals) > 0
+        assert result.related_signals[0].signal_type == 'rezoning_decision'
 
     @pytest.mark.e2e_pipeline
     async def test_chat_citation_accuracy(self, mock_db_pool):
@@ -831,30 +794,18 @@ class TestPipelineChatQuery:
             },
         ]
 
-        with patch('api.intelligence.chat.AsyncAnthropic') as mock_anthropic:
-            mock_client = AsyncMock()
-            mock_anthropic.return_value = mock_client
+        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("The rezoning was approved by council.", "gemini-2.5-flash", 1.5)):
+            with patch('api.intelligence.chat.retrieve_document_chunks', return_value=mock_chunks):
+                with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
+                    result = await chat.handle_chat(
+                        mock_db_pool,
+                        "Tell me about the rezoning",
+                        anthropic_api_key="test-key",
+                    )
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "The rezoning was approved by council."
-
-            mock_client.messages.create = AsyncMock(return_value=mock_response)
-            mock_client.close = AsyncMock()
-
-            with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
-                with patch('asyncio.wait_for', return_value=mock_response):
-                    with patch('api.intelligence.chat.retrieve_document_chunks', return_value=mock_chunks):
-                        with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
-                            result = await chat.handle_chat(
-                                mock_db_pool,
-                                "Tell me about the rezoning",
-                                anthropic_api_key="test-key",
-                            )
-
-            # Citation should match retrieved chunk
-            assert result.citations[0].excerpt == mock_chunks[0]['chunk_text'][:300]
-            assert result.citations[0].document_url == mock_chunks[0]['source_url']
+        # Citation should match retrieved chunk
+        assert result.citations[0].excerpt == mock_chunks[0]['chunk_text'][:300]
+        assert result.citations[0].document_url == mock_chunks[0]['source_url']
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -917,17 +868,7 @@ class TestPipelineEndToEnd:
         # Step 7: Query with chat
         with patch('api.intelligence.chat.retrieve_document_chunks') as mock_search:
             with patch('api.intelligence.chat.get_relevant_signals', return_value=[]):
-                with patch('api.intelligence.chat.AsyncAnthropic') as mock_anthropic:
-                    mock_client = AsyncMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Answer based on documents."
-
-                    mock_client.messages.create = AsyncMock(return_value=mock_response)
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("Answer based on documents.", "gemini-2.5-flash", 1.5)):
                     mock_search.return_value = [
                         {
                             'chunk_id': 101,
@@ -941,13 +882,11 @@ class TestPipelineEndToEnd:
                         }
                     ]
 
-                    with patch('api.intelligence.chat.ANTHROPIC_SEMAPHORE', new_callable=MagicMock):
-                        with patch('asyncio.wait_for', return_value=mock_response):
-                            result = await chat.handle_chat(
-                                mock_db_pool,
-                                "What rezoning happened?",
-                                anthropic_api_key="test-key",
-                            )
+                    result = await chat.handle_chat(
+                        mock_db_pool,
+                        "What rezoning happened?",
+                        anthropic_api_key="test-key",
+                    )
 
         assert result is not None
         assert len(result.answer) > 0

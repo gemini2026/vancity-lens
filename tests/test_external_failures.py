@@ -59,16 +59,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    # Simulate timeout by raising asyncio.TimeoutError
-                    mock_client.messages.create = AsyncMock(
-                        side_effect=asyncio.TimeoutError("Request timed out")
-                    )
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, side_effect=asyncio.TimeoutError("Request timed out")):
                     with pytest.raises(asyncio.TimeoutError):
                         await handle_chat(
                             mock_pool,
@@ -91,16 +82,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    # Simulate rate limit error (429)
-                    mock_client.messages.create = AsyncMock(
-                        side_effect=Exception("429 Rate limit exceeded")
-                    )
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, side_effect=Exception("429 Rate limit exceeded")):
                     with pytest.raises(Exception):
                         await handle_chat(
                             mock_pool,
@@ -123,15 +105,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_client.messages.create = AsyncMock(
-                        side_effect=Exception("401 Authentication Error - Invalid API key")
-                    )
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, side_effect=Exception("401 Authentication Error - Invalid API key")):
                     with pytest.raises(Exception):
                         await handle_chat(
                             mock_pool,
@@ -144,7 +118,7 @@ class TestAnthropicAPIFailures:
     async def test_anthropic_malformed_response_empty_content(self, mock_db_pool):
         """Test handling of malformed response with empty content.
 
-        Verifies graceful handling when response.content is empty.
+        Verifies graceful handling when LLM backend returns empty content.
         """
         mock_pool = mock_db_pool
         mock_pool.acquire = MagicMock()
@@ -154,15 +128,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = []  # Empty content
-                    mock_client.messages.create = AsyncMock(return_value=mock_response)
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, side_effect=IndexError("Empty content in response")):
                     with pytest.raises((IndexError, AttributeError)):
                         await handle_chat(
                             mock_pool,
@@ -173,7 +139,7 @@ class TestAnthropicAPIFailures:
 
     @pytest.mark.asyncio
     async def test_anthropic_partial_response_none_text(self, mock_db_pool):
-        """Test handling of partial response where content[0].text is None.
+        """Test handling of partial response where LLM returns None text.
 
         Verifies graceful handling when response text is None.
         """
@@ -187,16 +153,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = None  # None text
-                    mock_client.messages.create = AsyncMock(return_value=mock_response)
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=(None, "gemini-2.5-flash", 1.5)):
                     with pytest.raises((TypeError, AttributeError, ValidationError, Exception)):
                         await handle_chat(
                             mock_pool,
@@ -219,15 +176,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_client.messages.create = AsyncMock(
-                        side_effect=ConnectionError("Network unreachable")
-                    )
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, side_effect=ConnectionError("Network unreachable")):
                     with pytest.raises(ConnectionError):
                         await handle_chat(
                             mock_pool,
@@ -247,21 +196,12 @@ class TestAnthropicAPIFailures:
         test_chunk = "Test document chunk about rezoning"
         doc_context = {"source_type": "council_minutes", "title": "Test Meeting"}
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_anthropic:
-            mock_client = MagicMock()
-            mock_anthropic.return_value = mock_client
-
-            mock_client.messages.create = AsyncMock(
-                side_effect=asyncio.TimeoutError("Extraction timeout")
-            )
-            mock_client.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, side_effect=asyncio.TimeoutError("Extraction timeout")):
             # extract_signals_from_chunk catches timeouts and returns empty list
             result = await extract_signals_from_chunk(
                 test_chunk,
                 doc_context,
                 mock_api_key,
-                client=mock_client,
             )
 
             assert result == []
@@ -308,15 +248,7 @@ class TestAnthropicAPIFailures:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [None]  # Non-empty but None element
-                    mock_client.messages.create = AsyncMock(return_value=mock_response)
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, side_effect=AttributeError("NoneType has no attribute 'text'")):
                     with pytest.raises((AttributeError, TypeError)):
                         await handle_chat(
                             mock_pool,
@@ -686,19 +618,14 @@ class TestCombinedFailureScenarios:
             # Retrieval fails due to upstream search error (e.g., Cohere embeddings)
             mock_search.side_effect = Exception("Cohere embedding failed")
 
-            with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                mock_client = MagicMock()
-                mock_anthropic.return_value = mock_client
-                mock_client.close = AsyncMock()
-
-                # When search fails, chat should fail
-                with pytest.raises(Exception):
-                    await handle_chat(
-                        mock_pool,
-                        "Test query",
-                        "test-key",
-                        "test-cohere-key",
-                    )
+            # When search fails, chat should fail before reaching generate_chat
+            with pytest.raises(Exception):
+                await handle_chat(
+                    mock_pool,
+                    "Test query",
+                    "test-key",
+                    "test-cohere-key",
+                )
 
     @pytest.mark.asyncio
     async def test_anthropic_succeeds_but_database_fails_to_store(self, mock_db_pool):
@@ -719,16 +646,7 @@ class TestCombinedFailureScenarios:
 
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
-                with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                    mock_client = MagicMock()
-                    mock_anthropic.return_value = mock_client
-
-                    mock_response = MagicMock()
-                    mock_response.content = [MagicMock()]
-                    mock_response.content[0].text = "Test answer"
-                    mock_client.messages.create = AsyncMock(return_value=mock_response)
-                    mock_client.close = AsyncMock()
-
+                with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("Test answer", "gemini-2.5-flash", 1.5)):
                     # Should return answer even if storage fails
                     result = await handle_chat(
                         mock_pool,
@@ -760,24 +678,14 @@ class TestCombinedFailureScenarios:
             # Retrieval times out (e.g., upstream embedding/search timeout)
             mock_search.side_effect = asyncio.TimeoutError("Cohere timeout")
 
-            with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                mock_client = MagicMock()
-                mock_anthropic.return_value = mock_client
-                mock_client.close = AsyncMock()
-
-                # Anthropic would also timeout
-                mock_client.messages.create = AsyncMock(
-                    side_effect=asyncio.TimeoutError("Claude timeout")
+            # Should raise error from retrieval before reaching generate_chat
+            with pytest.raises(asyncio.TimeoutError):
+                await handle_chat(
+                    mock_pool,
+                    "Test query",
+                    "test-key",
+                    "test-cohere-key",
                 )
-
-                # Should raise error (could be from any service depending on order)
-                with pytest.raises(asyncio.TimeoutError):
-                    await handle_chat(
-                        mock_pool,
-                        "Test query",
-                        "test-key",
-                        "test-cohere-key",
-                    )
 
     @pytest.mark.asyncio
     async def test_hybrid_search_with_embedding_failure_and_no_fallback(self, mock_db_pool):

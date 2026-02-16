@@ -14,33 +14,12 @@ from typing import Optional, Tuple
 from difflib import SequenceMatcher
 
 import aiohttp
-import anthropic
 import asyncpg
 
-from .external_clients import ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
+from .llm_backend import generate_extraction
 from .models import ExtractedSignal
 
 logger = logging.getLogger(__name__)
-
-# Cache the first successful extraction model to avoid repeating 404 fallbacks
-# on every chunk when an account doesn't have access to some model IDs.
-_EXTRACTION_MODEL_HINT: Optional[str] = None
-_EXTRACTION_DEFAULT_MODELS = [
-    "claude-3-5-sonnet-20240620",
-    "claude-3-5-haiku-20241022",
-    "claude-3-haiku-20240307",
-]
-
-
-def _dedupe_ordered(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        ordered.append(value)
-    return ordered
 
 # ──────────────────────────────────────────────────────────────────────────
 # SYSTEM PROMPT FOR LLM
@@ -139,14 +118,14 @@ async def extract_signals_from_chunk(
     document_context: dict,
     api_key: str,
     *,
-    client: Optional[anthropic.AsyncAnthropic] = None,
+    client=None,  # kept for signature compat; ignored when using llm_backend
 ) -> list[ExtractedSignal]:
-    """Extract intelligence signals from a document chunk using Claude.
+    """Extract intelligence signals from a document chunk using the configured LLM.
 
     Args:
         chunk_text: The text content of the document chunk
         document_context: Dict with keys: source_type, source_url, title, meeting_date
-        api_key: Anthropic API key
+        api_key: Anthropic API key (used only when LLM_BACKEND=anthropic)
 
     Returns:
         List of ExtractedSignal objects. Empty list if no signals found.
@@ -167,123 +146,62 @@ Document Chunk:
 Extract all real estate intelligence signals from this chunk. Return valid JSON only."""
 
     max_retries = 3
-    backoff_factor = 2  # exponential backoff: 2, 4, 8 seconds
+    backoff_factor = 2
 
-    created_client = False
-    if client is None:
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        created_client = True
+    for attempt in range(max_retries):
+        try:
+            response_text, model_used, latency = await generate_extraction(
+                system_prompt=EXTRACTION_SYSTEM_PROMPT,
+                user_message=user_message,
+                max_tokens=2000,
+                anthropic_api_key=api_key,
+            )
 
-    try:
-        global _EXTRACTION_MODEL_HINT
+            response_text = response_text.strip()
+            # Strip markdown code fences if the model wraps JSON
+            if response_text.startswith("```"):
+                lines = response_text.split("\n")
+                lines = [l for l in lines if not l.startswith("```")]
+                response_text = "\n".join(lines).strip()
 
-        # Prefer configured model, then a cached known-good model, then fallbacks.
-        model_candidates: list[str] = []
-        configured_model = (os.environ.get("ANTHROPIC_MODEL") or "").strip()
-        if configured_model:
-            model_candidates.append(configured_model)
-        if _EXTRACTION_MODEL_HINT:
-            model_candidates.append(_EXTRACTION_MODEL_HINT)
-        model_candidates.extend(_EXTRACTION_DEFAULT_MODELS)
-        model_candidates = _dedupe_ordered(model_candidates)
+            signals_data = json.loads(response_text)
 
-        response_text = ""
-        for model in model_candidates:
-            for attempt in range(max_retries):
+            if not signals_data:
+                logger.debug("LLM returned empty signal list for chunk")
+                return []
+
+            if not isinstance(signals_data, list):
+                signals_data = [signals_data]
+
+            signals: list[ExtractedSignal] = []
+            for signal_dict in signals_data:
                 try:
-                    logger.debug(
-                        f"Calling Claude API (model={model}, attempt {attempt + 1}/{max_retries}) for chunk extraction"
-                    )
-
-                    async with ANTHROPIC_SEMAPHORE:
-                        response = await asyncio.wait_for(
-                            client.messages.create(
-                                model=model,
-                                max_tokens=2000,
-                                system=EXTRACTION_SYSTEM_PROMPT,
-                                messages=[{"role": "user", "content": user_message}],
-                            ),
-                            timeout=ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS,
-                        )
-
-                    response_text = response.content[0].text.strip()
-                    logger.debug(f"Claude API response: {response_text[:200]}...")
-
-                    # Parse the JSON response
-                    signals_data = json.loads(response_text)
-
-                    # Handle case where model returns an empty array
-                    if not signals_data:
-                        logger.debug("Claude returned empty signal list for chunk")
-                        return []
-
-                    # Ensure it's a list
-                    if not isinstance(signals_data, list):
-                        signals_data = [signals_data]
-
-                    # Convert to ExtractedSignal objects with validation
-                    signals: list[ExtractedSignal] = []
-                    for signal_dict in signals_data:
-                        try:
-                            signal = ExtractedSignal(**signal_dict)
-                            signals.append(signal)
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to parse signal object: {e}. Data: {signal_dict}"
-                            )
-                            # Skip invalid signals but continue processing
-                            continue
-
-                    if _EXTRACTION_MODEL_HINT != model:
-                        _EXTRACTION_MODEL_HINT = model
-                        logger.info("Extraction model selected: %s", model)
-
-                    logger.info(f"Extracted {len(signals)} signals from chunk")
-                    return signals
-
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse Claude JSON response (attempt {attempt + 1}): {e}")
-                    logger.debug(f"Response text: {response_text}")
-                    if attempt < max_retries - 1:
-                        wait_time = backoff_factor ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds...")
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error("Max retries exceeded for JSON parsing")
-                        break
-
-                except anthropic.APIError as e:
-                    msg = str(e)
-                    # If the model isn't available for this key/org, try the next candidate.
-                    if "Error code: 404" in msg and ("model:" in msg or "not_found_error" in msg):
-                        if _EXTRACTION_MODEL_HINT == model and not configured_model:
-                            _EXTRACTION_MODEL_HINT = None
-                        logger.warning(f"Anthropic model not found: {model}; trying fallback.")
-                        break
-
-                    logger.error(f"Anthropic API error on attempt {attempt + 1}: {e}")
-                    if attempt < max_retries - 1:
-                        wait_time = backoff_factor ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds...")
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error("Max retries exceeded for API calls")
-                        break
-
+                    signal = ExtractedSignal(**signal_dict)
+                    signals.append(signal)
                 except Exception as e:
-                    logger.error(f"Unexpected error during extraction (attempt {attempt + 1}): {e}")
-                    if attempt < max_retries - 1:
-                        wait_time = backoff_factor ** attempt
-                        logger.info(f"Retrying in {wait_time} seconds...")
-                        await asyncio.sleep(wait_time)
-                    else:
-                        logger.error("Max retries exceeded")
-                        break
+                    logger.warning("Failed to parse signal object: %s. Data: %s", e, signal_dict)
+                    continue
 
-        return []
-    finally:
-        if created_client:
-            await client.close()
+            logger.info("Extracted %d signals from chunk in %.1fs (model=%s)", len(signals), latency, model_used)
+            return signals
+
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse LLM JSON response (attempt %d): %s", attempt + 1, e)
+            if attempt < max_retries - 1:
+                wait_time = backoff_factor ** attempt
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error("Max retries exceeded for JSON parsing")
+
+        except Exception as e:
+            logger.error("Extraction error (attempt %d): %s", attempt + 1, e)
+            if attempt < max_retries - 1:
+                wait_time = backoff_factor ** attempt
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error("Max retries exceeded")
+
+    return []
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -474,27 +392,23 @@ async def process_document(
         # Extract signals from each chunk
         total_signals = 0
         extracted_signals_by_chunk = {}
-        llm_client = anthropic.AsyncAnthropic(api_key=api_key)
-        try:
-            async def _extract_for_chunk(chunk_row):
-                chunk_id = chunk_row["id"]
-                chunk_text = chunk_row["chunk_text"]
-                logger.debug(f"Extracting signals from chunk {chunk_id}")
-                try:
-                    return await extract_signals_from_chunk(
-                        chunk_text,
-                        doc_context,
-                        api_key,
-                        client=llm_client,
-                    )
-                except Exception as e:
-                    logger.error(f"Chunk {chunk_id} extraction failed: {e}")
-                    return []
 
-            tasks = [_extract_for_chunk(chunk) for chunk in chunks]
-            results = await asyncio.gather(*tasks)
-        finally:
-            await llm_client.close()
+        async def _extract_for_chunk(chunk_row):
+            chunk_id = chunk_row["id"]
+            chunk_text = chunk_row["chunk_text"]
+            logger.debug(f"Extracting signals from chunk {chunk_id}")
+            try:
+                return await extract_signals_from_chunk(
+                    chunk_text,
+                    doc_context,
+                    api_key,
+                )
+            except Exception as e:
+                logger.error(f"Chunk {chunk_id} extraction failed: {e}")
+                return []
+
+        tasks = [_extract_for_chunk(chunk) for chunk in chunks]
+        results = await asyncio.gather(*tasks)
 
         for chunk_row, signals in zip(chunks, results):
             chunk_id = chunk_row["id"]
@@ -571,7 +485,7 @@ async def process_document(
                             signal.confidence,
                             signal.event_date,
                             geom if geom else "SRID=4326;POINT(0 0)",  # default point if geocoding failed
-                            (os.environ.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-20240620"),
+                            os.environ.get("GEMINI_MODEL", os.environ.get("ANTHROPIC_MODEL", "gemini-2.5-flash")),
                             datetime.now(timezone.utc),
                             review_status,
                         )

@@ -5,6 +5,8 @@ metadata:
   namespace: vancity-lens
 data:
   cors-origins: "http://staging.vancitylens.com,https://staging.vancitylens.com,http://staging.vancitylense.com,https://staging.vancitylense.com"
+  llm-backend: "gemini"
+  gemini-model: "gemini-2.5-flash"
   rag-backend: "k2"
   k2-shadow-validate: "true"
   k2-shadow-validate-sample-rate: "0.20"

@@ -57,6 +57,26 @@ spec:
         
         # Environment variables from ConfigMap and Secrets
         env:
+        - name: LLM_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: llm-backend
+        - name: GEMINI_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: gemini-model
+        - name: GCP_PROJECT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: gcp-project-id
+        - name: GCP_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: vancity-lens-config
+              key: gcp-region
         - name: RAG_BACKEND
           valueFrom:
             configMapKeyRef:

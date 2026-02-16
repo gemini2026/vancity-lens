@@ -1,9 +1,8 @@
 """Tests for the LLM extraction pipeline."""
 
 from datetime import date
-import json
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock  # MagicMock still used in geocoding tests
 from api.intelligence.extractor import (
     EXTRACTION_SYSTEM_PROMPT,
     extract_signals_from_chunk,
@@ -11,7 +10,7 @@ from api.intelligence.extractor import (
     process_document,
     process_all_unprocessed,
 )
-from api.intelligence.models import ExtractedSignal, SignalType, Decision, Sentiment, Severity
+from api.intelligence.models import ExtractedSignal, SignalType
 
 
 class TestExtractionSystemPrompt:
@@ -41,13 +40,12 @@ class TestExtractSignalsFromChunk:
     @pytest.mark.asyncio
     async def test_extract_empty_chunk(self):
         """Test extraction from empty chunk."""
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client:
-            signals = await extract_signals_from_chunk("", {}, "test-key")
-            assert signals == []
+        signals = await extract_signals_from_chunk("", {}, "test-key")
+        assert signals == []
 
     @pytest.mark.asyncio
-    async def test_extract_with_valid_response(self, mock_anthropic_client):
-        """Test extraction with mocked Claude API returning valid JSON."""
+    async def test_extract_with_valid_response(self):
+        """Test extraction with mocked LLM returning valid JSON."""
         chunk_text = "City Council approved rezoning of 1234 Main Street from RS-1 to CD-1"
         doc_context = {
             "source_type": "council_minutes",
@@ -56,33 +54,24 @@ class TestExtractSignalsFromChunk:
             "source_url": "https://example.com"
         }
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_client_class.return_value = mock_client_instance
+        json_text = """[{
+            "signal_type": "rezoning_decision",
+            "summary": "City Council approved rezoning",
+            "headline": "1234 Main rezoned",
+            "addresses": ["1234 Main Street"],
+            "neighborhood": "Downtown",
+            "zoning_from": "RS-1",
+            "zoning_to": "CD-1",
+            "decision": "approved",
+            "vote_for": 10,
+            "vote_against": 1,
+            "sentiment": "positive_for_development",
+            "severity": "high",
+            "confidence": 0.95,
+            "event_date": "2024-01-15"
+        }]"""
 
-            # Mock response
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = """[{
-                "signal_type": "rezoning_decision",
-                "summary": "City Council approved rezoning",
-                "headline": "1234 Main rezoned",
-                "addresses": ["1234 Main Street"],
-                "neighborhood": "Downtown",
-                "zoning_from": "RS-1",
-                "zoning_to": "CD-1",
-                "decision": "approved",
-                "vote_for": 10,
-                "vote_against": 1,
-                "sentiment": "positive_for_development",
-                "severity": "high",
-                "confidence": 0.95,
-                "event_date": "2024-01-15"
-            }]"""
-
-            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
-            mock_client_instance.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=(json_text, "gemini-2.5-flash", 1.5)):
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
             assert len(signals) == 1
@@ -92,21 +81,11 @@ class TestExtractSignalsFromChunk:
 
     @pytest.mark.asyncio
     async def test_extract_empty_array_response(self):
-        """Test extraction when Claude returns empty array."""
+        """Test extraction when LLM returns empty array."""
         chunk_text = "This is just regular meeting notes with no actionable signals."
         doc_context = {"source_type": "council_minutes"}
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_client_class.return_value = mock_client_instance
-
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "[]"
-
-            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
-            mock_client_instance.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=("[]", "gemini-2.5-flash", 0.8)):
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
             assert signals == []
@@ -117,17 +96,7 @@ class TestExtractSignalsFromChunk:
         chunk_text = "Some text"
         doc_context = {}
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_client_class.return_value = mock_client_instance
-
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "This is not valid JSON"
-
-            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
-            mock_client_instance.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=("This is not valid JSON", "gemini-2.5-flash", 0.5)):
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
             # Should return empty list on JSON parse error
@@ -139,21 +108,11 @@ class TestExtractSignalsFromChunk:
         chunk_text = "Test chunk"
         doc_context = {}
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_client_class.return_value = mock_client_instance
-
-            # First call fails, second succeeds
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = "[]"
-
-            mock_client_instance.messages.create = AsyncMock(side_effect=[
-                Exception("API Error"),
-                mock_response
-            ])
-            mock_client_instance.close = AsyncMock()
-
+        # First call fails, second succeeds
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, side_effect=[
+            Exception("API Error"),
+            ("[]", "gemini-2.5-flash", 0.8),
+        ]):
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
             # Should succeed after retry
@@ -359,39 +318,31 @@ Project value estimated at $150 million."""
             "source_url": "https://council.vancouver.ca/20240115/regulagenda20240115.htm"
         }
 
-        with patch("api.intelligence.extractor.anthropic.AsyncAnthropic") as mock_client_class:
-            mock_client_instance = MagicMock()
-            mock_client_class.return_value = mock_client_instance
+        json_text = """[{
+            "signal_type": "rezoning_decision",
+            "summary": "City Council approved rezoning of 1234 Main Street from RS-1 to CD-1, permitting a 25-storey mixed-use tower with 300 units",
+            "headline": "1234 Main rezoned to 25-storey mixed-use",
+            "addresses": ["1234 Main Street"],
+            "neighborhood": "Downtown",
+            "zoning_from": "RS-1",
+            "zoning_to": "CD-1 (123)",
+            "height_before": 10.5,
+            "height_after": 80.0,
+            "fsr_before": 1.0,
+            "fsr_after": 8.5,
+            "unit_count": 300,
+            "project_value_dollars": 150000000,
+            "decision": "approved",
+            "vote_for": 10,
+            "vote_against": 1,
+            "conditions": ["Public plaza minimum 1500 sq m", "Rental housing 20%"],
+            "sentiment": "positive_for_development",
+            "severity": "high",
+            "confidence": 0.95,
+            "event_date": "2024-01-15"
+        }]"""
 
-            mock_response = MagicMock()
-            mock_response.content = [MagicMock()]
-            mock_response.content[0].text = """[{
-                "signal_type": "rezoning_decision",
-                "summary": "City Council approved rezoning of 1234 Main Street from RS-1 to CD-1, permitting a 25-storey mixed-use tower with 300 units",
-                "headline": "1234 Main rezoned to 25-storey mixed-use",
-                "addresses": ["1234 Main Street"],
-                "neighborhood": "Downtown",
-                "zoning_from": "RS-1",
-                "zoning_to": "CD-1 (123)",
-                "height_before": 10.5,
-                "height_after": 80.0,
-                "fsr_before": 1.0,
-                "fsr_after": 8.5,
-                "unit_count": 300,
-                "project_value_dollars": 150000000,
-                "decision": "approved",
-                "vote_for": 10,
-                "vote_against": 1,
-                "conditions": ["Public plaza minimum 1500 sq m", "Rental housing 20%"],
-                "sentiment": "positive_for_development",
-                "severity": "high",
-                "confidence": 0.95,
-                "event_date": "2024-01-15"
-            }]"""
-
-            mock_client_instance.messages.create = AsyncMock(return_value=mock_response)
-            mock_client_instance.close = AsyncMock()
-
+        with patch("api.intelligence.extractor.generate_extraction", new_callable=AsyncMock, return_value=(json_text, "gemini-2.5-flash", 2.1)):
             signals = await extract_signals_from_chunk(chunk_text, doc_context, "test-key")
 
             assert len(signals) == 1

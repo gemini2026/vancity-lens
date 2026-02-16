@@ -245,13 +245,13 @@ class TestHandleChatDemoMode:
         with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
-                    with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
+                    with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("unused", "gemini-2.5-flash", 1.5)) as mock_generate:
                         await handle_chat(
                             mock_pool,
                             "test",
                             anthropic_api_key=None,
                         )
-                        mock_anthropic.assert_not_called()
+                        mock_generate.assert_not_called()
 
 
 class TestHandleChatFullModeWithAnthropic:
@@ -266,15 +266,7 @@ class TestHandleChatFullModeWithAnthropic:
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.build_context_window", return_value=""):
-                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                            mock_client = MagicMock()
-                            mock_anthropic.return_value = mock_client
-                            mock_response = MagicMock()
-                            mock_response.content = [MagicMock()]
-                            mock_response.content[0].text = "AI answer"
-                            mock_client.messages.create = AsyncMock(return_value=mock_response)
-                            mock_client.close = AsyncMock()
-
+                        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("AI answer", "gemini-2.5-flash", 1.5)):
                             response = await handle_chat(
                                 mock_pool,
                                 "test query",
@@ -292,15 +284,7 @@ class TestHandleChatFullModeWithAnthropic:
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.build_context_window", return_value=""):
-                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                            mock_client = MagicMock()
-                            mock_anthropic.return_value = mock_client
-                            mock_response = MagicMock()
-                            mock_response.content = [MagicMock()]
-                            mock_response.content[0].text = "Claude's answer"
-                            mock_client.messages.create = AsyncMock(return_value=mock_response)
-                            mock_client.close = AsyncMock()
-
+                        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("Claude's answer", "gemini-2.5-flash", 1.5)) as mock_generate:
                             response = await handle_chat(
                                 mock_pool,
                                 "test query",
@@ -308,7 +292,7 @@ class TestHandleChatFullModeWithAnthropic:
                             )
 
         assert response.answer == "Claude's answer"
-        mock_anthropic.assert_called_once_with(api_key="sk-ant-test")
+        mock_generate.assert_called_once()
 
 
 class TestHandleChatFullMode:
@@ -323,15 +307,7 @@ class TestHandleChatFullMode:
             with patch("api.intelligence.chat.get_relevant_signals", return_value=[]):
                 with patch("api.intelligence.chat.create_session", return_value=_make_mock_session()):
                     with patch("api.intelligence.chat.build_context_window", return_value=""):
-                        with patch("api.intelligence.chat.AsyncAnthropic") as mock_anthropic:
-                            mock_client = MagicMock()
-                            mock_anthropic.return_value = mock_client
-                            mock_response = MagicMock()
-                            mock_response.content = [MagicMock()]
-                            mock_response.content[0].text = "Full answer"
-                            mock_client.messages.create = AsyncMock(return_value=mock_response)
-                            mock_client.close = AsyncMock()
-
+                        with patch("api.intelligence.chat.generate_chat", new_callable=AsyncMock, return_value=("Full answer", "gemini-2.5-flash", 1.5)):
                             response = await handle_chat(
                                 mock_pool,
                                 "test query",

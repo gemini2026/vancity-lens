@@ -13,14 +13,14 @@ Search pipeline uses K2 search (with local BM25 fallback).
 import asyncio
 import logging
 import os
+import time
 import uuid
 from datetime import datetime, date, timezone
 from typing import Optional, List
 
 import asyncpg
-from anthropic import AsyncAnthropic, NotFoundError
 
-from .external_clients import ANTHROPIC_CHAT_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
+from .llm_backend import generate_chat
 from .models import ChatResponse, SourceCitation, SignalResponse
 from .prepared_queries import QueryBuilder
 from .retrieval_backend import retrieve_document_chunks
@@ -178,16 +178,13 @@ async def handle_chat(
             # Demo mode: format retrieval results without LLM
             answer = _build_demo_answer(query, chunks, signals)
         else:
-            # Full or partial mode: call Claude API
+            # Full mode: call LLM (Gemini or Anthropic based on LLM_BACKEND)
             logger.info("Building multi-turn context...")
             history_context = ""
             try:
                 history_context = await build_context_window(db_pool, session_id, max_messages=10)
             except Exception as e:
                 logger.warning(f"Could not build context window: {e}")
-
-            logger.info("Calling Claude API...")
-            client = AsyncAnthropic(api_key=anthropic_api_key)
 
             user_content = f"""Context information:
 
@@ -197,61 +194,14 @@ async def handle_chat(
 
 User query: {query}"""
 
-            messages = [
-                {
-                    "role": "user",
-                    "content": user_content
-                }
-            ]
-
-            try:
-                # Prefer configured model, but fall back to known-good Claude model IDs.
-                model_candidates: list[str] = []
-                configured_model = (os.environ.get("ANTHROPIC_MODEL") or "").strip()
-                if configured_model:
-                    model_candidates.append(configured_model)
-                model_candidates.extend(
-                    [
-                        # Prefer broadly-available models; keep fallbacks short to avoid long 404 chains.
-                        "claude-3-5-sonnet-20240620",
-                        "claude-3-5-haiku-20241022",
-                        "claude-3-haiku-20240307",
-                    ]
-                )
-
-                last_exc: Exception | None = None
-                for model in model_candidates:
-                    try:
-                        async with ANTHROPIC_SEMAPHORE:
-                            response = await asyncio.wait_for(
-                                client.messages.create(
-                                    model=model,
-                                    max_tokens=2000,
-                                    system=CHAT_SYSTEM_PROMPT,
-                                    messages=messages,
-                                ),
-                                timeout=ANTHROPIC_CHAT_TIMEOUT_SECONDS,
-                            )
-                        break
-                    except NotFoundError as e:
-                        last_exc = e
-                        logger.warning(f"Anthropic model not found: {model}; trying fallback.")
-                        continue
-                    except Exception as e:
-                        last_exc = e
-                        # If the configured/default model isn't available, try the next candidate.
-                        msg = str(e)
-                        if "Error code: 404" in msg and ("model:" in msg or "not_found_error" in msg):
-                            logger.warning(f"Anthropic model not found: {model}; trying fallback.")
-                            continue
-                        raise
-                else:
-                    assert last_exc is not None
-                    raise last_exc
-            finally:
-                await client.close()
-
-            answer = response.content[0].text
+            logger.info("Calling LLM...")
+            answer, model_used, llm_latency = await generate_chat(
+                system_prompt=CHAT_SYSTEM_PROMPT,
+                user_message=user_content,
+                max_tokens=2000,
+                anthropic_api_key=anthropic_api_key,
+            )
+            logger.info("LLM responded in %.1fs (model=%s)", llm_latency, model_used)
 
         # Step 5: Extract citations from used chunks with provenance (RAG-005)
         citations: List[SourceCitation] = []

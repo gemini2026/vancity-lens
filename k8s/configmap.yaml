@@ -13,6 +13,12 @@ data:
   rate-limit-general: "1000"
   rate-limit-llm: "30"
 
+  # LLM backend for RAG generation: gemini (Vertex AI, fast) or anthropic
+  llm-backend: "gemini"
+  gemini-model: "gemini-2.5-flash"
+  gcp-project-id: "openclaw-antonmishel-03460"
+  gcp-region: "us-west1"
+
   # RAG backend switch
   rag-backend: "local" # local|k2
 

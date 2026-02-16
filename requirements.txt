@@ -7,6 +7,7 @@ pydantic==2.10.4
 sentry-sdk[fastapi]>=2.0.0
 
 # V2 Intelligence Layer — LLM & Extraction
+google-genai>=1.0.0
 anthropic>=0.40.0
 pdfplumber>=0.11.0
 aiohttp>=3.10.0
