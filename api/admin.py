@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .auth import require_admin
 from .db import db
@@ -2366,3 +2366,125 @@ async def data_freshness():
         },
         "generated_at": now.isoformat(),
     }
+
+
+# ── Pipeline Health Dashboard Endpoints ──────────────────────
+
+
+@router.get("/scraper-health")
+async def scraper_health(request: Request):
+    """
+    Per-scraper health overview: last run time, status, doc counts,
+    cron schedule, next run time.  Plus aggregate totals for documents
+    and intelligence signals.
+    """
+    from datetime import datetime
+
+    pool = request.app.state.pool
+    scheduler = getattr(request.app.state, "scheduler", None)
+
+    # ------------------------------------------------------------------
+    # 1.  Build per-scraper info from the scheduler's registered scrapers
+    # ------------------------------------------------------------------
+    scrapers_info = []
+    if scheduler is not None:
+        for name, (func, schedule) in scheduler.scrapers.items():
+            entry: dict = {
+                "name": name,
+                "enabled": schedule.enabled,
+                "cron": schedule.cron_expression,
+                "has_function": func is not None,
+                "last_run": None,
+                "status": "never_run",
+                "documents_found": 0,
+                "documents_new": 0,
+                "next_run": None,
+            }
+
+            # Pull the latest run from DB (more reliable than in-memory)
+            try:
+                row = await pool.fetchrow(
+                    """
+                    SELECT status, started_at, completed_at,
+                           documents_found, documents_new
+                    FROM scraper_runs
+                    WHERE scraper_name = $1
+                    ORDER BY started_at DESC
+                    LIMIT 1
+                    """,
+                    name,
+                )
+                if row:
+                    entry["status"] = row["status"]
+                    entry["last_run"] = row["started_at"].isoformat() if row["started_at"] else None
+                    entry["documents_found"] = row["documents_found"] or 0
+                    entry["documents_new"] = row["documents_new"] or 0
+            except Exception:
+                pass  # DB table may not exist yet
+
+            # Next run from scheduler cache
+            if schedule.next_run:
+                entry["next_run"] = schedule.next_run.isoformat()
+            else:
+                # Calculate next run from now
+                try:
+                    entry["next_run"] = scheduler._calculate_next_run(
+                        name, datetime.now()
+                    ).isoformat()
+                except Exception:
+                    pass
+
+            scrapers_info.append(entry)
+
+    # ------------------------------------------------------------------
+    # 2.  Aggregate totals: documents + intelligence_signals
+    # ------------------------------------------------------------------
+    total_documents = 0
+    total_signals = 0
+    try:
+        total_documents = await pool.fetchval(
+            "SELECT COUNT(*) FROM documents"
+        ) or 0
+    except Exception:
+        pass
+    try:
+        total_signals = await pool.fetchval(
+            "SELECT COUNT(*) FROM intelligence_signals"
+        ) or 0
+    except Exception:
+        pass
+
+    return {
+        "scrapers": scrapers_info,
+        "totals": {
+            "documents": total_documents,
+            "signals": total_signals,
+        },
+    }
+
+
+@router.post("/scraper/{name}/run")
+async def scraper_run(name: str, request: Request):
+    """
+    Manually trigger a scraper by name via the scheduler's run_scraper()
+    method.  Returns the ScraperResult dict on success.
+    """
+    scheduler = getattr(request.app.state, "scheduler", None)
+    if scheduler is None:
+        raise HTTPException(status_code=503, detail="Scheduler not initialized")
+
+    if name not in scheduler.scrapers:
+        raise HTTPException(status_code=404, detail=f"Unknown scraper: {name}")
+
+    func, _schedule = scheduler.scrapers[name]
+    if func is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Scraper '{name}' has no function registered",
+        )
+
+    try:
+        result = await scheduler.run_scraper(name)
+        return {"ok": True, "result": result.to_dict()}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
