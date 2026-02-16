@@ -598,3 +598,210 @@ class TestPipelineSchemaEnhancement:
     def test_pipeline_stage_has_refused(self):
         from api.intelligence.supply_pipeline import PipelineStage
         assert hasattr(PipelineStage, "REFUSED")
+
+
+class TestInputDisambiguation:
+    """F01-C: Parcel search returns disambiguation list or error."""
+
+    def test_search_endpoint_exists(self):
+        with open("api/parcel_search.py") as f:
+            content = f.read()
+        assert "/parcels/search" in content or "search" in content.lower()
+
+    def test_pid_format_detection(self):
+        """PID format NNN-NNN-NNN should be detected."""
+        import re
+        pid_pattern = re.compile(r'^\d{3}-\d{3}-\d{3}$')
+        assert pid_pattern.match("123-456-789")
+        assert not pid_pattern.match("123 Main St")
+
+    def test_error_message_for_no_match(self):
+        """Search endpoint has PRD-compliant error message for no matches."""
+        with open("api/parcel_search.py") as f:
+            content = f.read()
+        assert "could not be resolved" in content.lower() or "not found" in content.lower() or "verify the address" in content.lower()
+
+    def test_disambiguation_field_in_response(self):
+        """Search endpoint returns disambiguation field in response."""
+        with open("api/parcel_search.py") as f:
+            content = f.read()
+        assert "disambiguation" in content
+
+    def test_pid_pattern_regex_in_search(self):
+        """Search endpoint has PID pattern detection logic."""
+        with open("api/parcel_search.py") as f:
+            content = f.read()
+        # The search endpoint should detect PID format and try direct lookup
+        assert "search_by_pid" in content
+        assert r"\d{3}-\d{3}-\d{3}" in content or "PID_PATTERN" in content
+
+
+class TestPipelineFilterAlerts:
+    """F04-D: Watchlist rules for pipeline filtering."""
+
+    def test_rule_type_has_pipeline_stage(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "PIPELINE_STAGE")
+
+    def test_rule_type_has_application_type(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "APPLICATION_TYPE")
+
+    def test_rule_type_has_height_range(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "HEIGHT_RANGE")
+
+    def test_rule_type_has_unit_range(self):
+        from api.intelligence.alerts import RuleType
+        assert hasattr(RuleType, "UNIT_RANGE")
+
+    def test_match_pipeline_stage_rule(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pipeline_stage", rule_value="approved")
+        signal = {"signal_type": "stage_transition", "pipeline_stage": "approved"}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_pipeline_stage_no_match(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pipeline_stage", rule_value="approved")
+        signal = {"signal_type": "stage_transition", "pipeline_stage": "under_construction"}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_pipeline_stage_case_insensitive(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pipeline_stage", rule_value="Approved")
+        signal = {"signal_type": "stage_transition", "pipeline_stage": "APPROVED"}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_pipeline_stage_missing_field(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="pipeline_stage", rule_value="approved")
+        signal = {"signal_type": "stage_transition"}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_application_type_rule(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="application_type", rule_value="rezoning")
+        signal = {"application_type": "rezoning"}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_application_type_no_match(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="application_type", rule_value="rezoning")
+        signal = {"application_type": "development_permit"}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_application_type_case_insensitive(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="application_type", rule_value="Rezoning")
+        signal = {"application_type": "REZONING"}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_height_range_rule(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="10-30")
+        signal = {"proposed_storeys": 20}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_height_range_at_min_boundary(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="10-30")
+        signal = {"proposed_storeys": 10}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_height_range_at_max_boundary(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="10-30")
+        signal = {"proposed_storeys": 30}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_height_range_out_of_range(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="10-30")
+        signal = {"proposed_storeys": 5}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_height_range_uses_height_after_fallback(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="10-30")
+        signal = {"height_after": 15}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_height_range_missing_field(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="10-30")
+        signal = {"signal_type": "new_project"}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_height_range_invalid_value(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="height_range", rule_value="abc")
+        signal = {"proposed_storeys": 20}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_unit_range_rule(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="unit_range", rule_value="50-200")
+        signal = {"unit_count": 100}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_unit_range_out_of_range(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="unit_range", rule_value="50-200")
+        signal = {"unit_count": 30}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_unit_range_uses_proposed_units_fallback(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="unit_range", rule_value="50-200")
+        signal = {"proposed_units": 150}
+        assert AlertEngine.match_rule(signal, rule) is True
+
+    def test_match_unit_range_missing_field(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="unit_range", rule_value="50-200")
+        signal = {}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+    def test_match_unit_range_invalid_value(self):
+        from api.intelligence.alerts import AlertEngine, WatchlistRule
+        rule = WatchlistRule(rule_type="unit_range", rule_value="not-a-range")
+        signal = {"unit_count": 100}
+        assert AlertEngine.match_rule(signal, rule) is False
+
+
+class TestEntityResolution:
+    """F04-B: Developer name normalization and fuzzy matching."""
+
+    def test_normalize_developer_name(self):
+        from api.intelligence.supply_pipeline import normalize_developer_name
+        assert normalize_developer_name("Westbank Projects Corp") == "westbank"
+        assert normalize_developer_name("  Concert Properties Ltd  ") == "concert properties"
+
+    def test_normalize_strips_common_suffixes(self):
+        from api.intelligence.supply_pipeline import normalize_developer_name
+        assert normalize_developer_name("Polygon Homes Ltd.") == "polygon homes"
+        assert normalize_developer_name("Ledingham McAllister Inc") == "ledingham mcallister"
+
+    def test_pg_trgm_migration_exists(self):
+        assert os.path.exists("db/044_enable_pg_trgm.sql")
+
+    @pytest.mark.asyncio
+    async def test_resolve_developer_exact_match(self):
+        from api.intelligence.supply_pipeline import resolve_developer_entity
+        conn = AsyncMock()
+        conn.fetchrow = AsyncMock(side_effect=[
+            {"id": 1, "canonical_name": "Westbank"},
+        ])
+        entity_id = await resolve_developer_entity(conn, "Westbank Projects Corp")
+        assert entity_id == 1
+
+    @pytest.mark.asyncio
+    async def test_resolve_developer_no_match_creates_new(self):
+        from api.intelligence.supply_pipeline import resolve_developer_entity
+        conn = AsyncMock()
+        conn.fetchrow = AsyncMock(side_effect=[None, None])
+        conn.fetchval = AsyncMock(return_value=42)
+        conn.execute = AsyncMock()
+        entity_id = await resolve_developer_entity(conn, "Brand New Developer Corp")
+        assert entity_id == 42

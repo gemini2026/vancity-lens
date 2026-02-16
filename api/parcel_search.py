@@ -25,6 +25,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/parcels", tags=["parcel-search"])
 
+# Pattern to detect PID format: NNN-NNN-NNN (3 groups of 3 digits separated by hyphens)
+PID_PATTERN = re.compile(r"^\d{3}-\d{3}-\d{3}$")
+
 
 @dataclass
 class ParcelSearchResult:
@@ -369,21 +372,50 @@ async def search_parcels(
     service: ParcelSearchService = Depends(get_search_service),
 ) -> dict:
     """
-    Full-text search for parcels by address.
+    Full-text search for parcels by address or PID.
+
+    If the query matches PID format (NNN-NNN-NNN), a direct PID lookup is
+    attempted first. Otherwise, full-text address search is performed.
+
+    Returns a structured disambiguation response:
+    - ``disambiguation: true`` when multiple matches are found
+    - ``disambiguation: false`` when exactly one match is found
+    - 404 with PRD-compliant error message when no matches are found
 
     Query parameters:
-        q: Address search query (required, 1-200 chars)
+        q: Address or PID search query (required, 1-200 chars)
         limit: Max results (1-100, default 10)
 
     Returns:
-        JSON object with results array and metadata
+        JSON object with results array, count, and disambiguation flag
     """
-    results = await service.search_by_address(q, limit)
+    results: list[ParcelSearchResult] = []
+
+    # PID format detection: if input matches NNN-NNN-NNN, try direct PID lookup first
+    if PID_PATTERN.match(q.strip()):
+        pid_result = await service.search_by_pid(q.strip())
+        if pid_result:
+            results = [pid_result]
+
+    # If no PID match (or not a PID query), fall back to address search
+    if not results:
+        results = await service.search_by_address(q, limit)
+
+    # Zero results: return 404 with PRD-compliant error message
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Address could not be resolved to a valid Vancouver parcel. "
+                "Please verify the address and try again."
+            ),
+        )
 
     return {
         "query": q,
         "limit": limit,
         "count": len(results),
+        "disambiguation": len(results) > 1,
         "results": [
             {
                 "parcel_id": r.parcel_id,
