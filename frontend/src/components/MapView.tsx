@@ -101,8 +101,11 @@ export default function MapView() {
   const popupRef = useRef<mapboxgl.Popup | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const signalMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const clusterMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSignals, setShowSignals] = useState(true);
+  const [showClusters, setShowClusters] = useState(true);
+  const [clusters, setClusters] = useState<any[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelEntitlement | null>(null);
   const [selectedSignals, setSelectedSignals] = useState<IntelSignal[]>([]);
@@ -638,6 +641,52 @@ export default function MapView() {
         }
       } catch (err) { console.error("Failed to load signal markers:", err); }
 
+      // Load development cluster markers
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/intel/clusters`);
+        if (res.ok) {
+          const data = await res.json();
+          setClusters(data.clusters || []);
+          (data.clusters || []).forEach((cluster: any) => {
+            const el = document.createElement("div");
+            el.style.cssText = `
+              width: 32px; height: 32px; border-radius: 50%;
+              background: rgba(168, 85, 247, 0.35);
+              border: 2px solid rgba(168, 85, 247, 0.8);
+              cursor: pointer; display: flex; align-items: center;
+              justify-content: center; font-size: 12px; font-weight: 700;
+              color: #e9d5ff; animation: cluster-pulse 2s ease-in-out infinite;
+            `;
+            el.textContent = String(cluster.member_count);
+            el.title = `Cluster: ${cluster.member_count} apps near ${cluster.center_address}`;
+            el.dataset.clusterMarker = "true";
+
+            const popup = new mapboxgl.Popup({ offset: 20, closeButton: true, maxWidth: "280px" })
+              .setHTML(`
+                <div style="font-family:system-ui,sans-serif;padding:8px;background:#111827;color:#f3f4f6;border-radius:6px">
+                  <div style="font-size:12px;font-weight:700;color:#c084fc;margin-bottom:4px">
+                    Development Cluster
+                  </div>
+                  <div style="font-size:11px;color:#d1d5db;margin-bottom:4px">
+                    ${escapeHtml(cluster.center_address)}
+                  </div>
+                  <div style="font-size:10px;color:#9ca3af;margin-bottom:2px">
+                    ${cluster.member_count} applications within ${cluster.radius_m}m
+                  </div>
+                  ${cluster.total_proposed_units > 0 ? `<div style="font-size:10px;color:#86efac">Total proposed units: ${cluster.total_proposed_units}</div>` : ""}
+                  ${cluster.neighborhoods?.length ? `<div style="font-size:9px;color:#6b7280;margin-top:4px">${cluster.neighborhoods.join(", ")}</div>` : ""}
+                </div>
+              `);
+
+            const marker = new mapboxgl.Marker({ element: el })
+              .setLngLat([cluster.center_lng, cluster.center_lat])
+              .setPopup(popup)
+              .addTo(m);
+            clusterMarkersRef.current.push(marker);
+          });
+        }
+      } catch (err) { console.error("Failed to load cluster markers:", err); }
+
       // Click anywhere in TOA zone
       m.on("click", handleMapClick);
     });
@@ -647,6 +696,8 @@ export default function MapView() {
       markersRef.current = [];
       signalMarkersRef.current.forEach(mk => mk.remove());
       signalMarkersRef.current = [];
+      clusterMarkersRef.current.forEach(mk => mk.remove());
+      clusterMarkersRef.current = [];
       m.remove();
       map.current = null;
     };
@@ -660,8 +711,22 @@ export default function MapView() {
     });
   }, [showSignals]);
 
+  // Toggle cluster markers visibility
+  useEffect(() => {
+    clusterMarkersRef.current.forEach(mk => {
+      const el = mk.getElement();
+      if (el) el.style.display = showClusters ? "flex" : "none";
+    });
+  }, [showClusters]);
+
   return (
     <div className="relative w-full h-full">
+      <style>{`
+        @keyframes cluster-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.5); }
+          50% { box-shadow: 0 0 0 10px rgba(168,85,247,0); }
+        }
+      `}</style>
       <div ref={mapContainer} className="w-full h-full bg-[#0a0a0a]" />
 
       {/* Fallback when map cannot initialize */}
@@ -723,7 +788,7 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Signal layer toggle + Examples button */}
+      {/* Signal layer toggle + Cluster toggle + Examples button */}
       <div className="absolute top-20 md:top-[90px] right-4 z-10 flex flex-col gap-2">
         <button
           onClick={() => setShowSignals(!showSignals)}
@@ -734,7 +799,18 @@ export default function MapView() {
               : "bg-gray-900/92 border border-white/10 text-gray-400"
           )}
         >
-          🧠 {showSignals ? "Hide" : "Show"} Signals
+          {showSignals ? "Hide" : "Show"} Signals
+        </button>
+        <button
+          onClick={() => setShowClusters(!showClusters)}
+          className={cn(
+            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            showClusters
+              ? "bg-purple-500/90 border border-purple-400 text-white"
+              : "bg-gray-900/92 border border-white/10 text-gray-400"
+          )}
+        >
+          {showClusters ? "Hide" : "Show"} Clusters{clusters.length > 0 ? ` (${clusters.length})` : ""}
         </button>
         {!showCaseStudies && (
           <button
