@@ -31,13 +31,27 @@ logger = logging.getLogger(__name__)
 
 class PipelineStage(str, Enum):
     """Development stages in the supply pipeline."""
-    REZONING_APPLICATION = "rezoning_application"
-    PUBLIC_HEARING = "public_hearing"
-    COUNCIL_DECISION = "council_decision"
-    DEVELOPMENT_PERMIT = "development_permit"
-    BUILDING_PERMIT = "building_permit"
+    ENQUIRY = "enquiry"
+    APPLICATION_SUBMITTED = "application_submitted"
+    UNDER_STAFF_REVIEW = "under_staff_review"
+    REFERRED_TO_PUBLIC_HEARING = "referred_to_public_hearing"
+    APPROVED = "approved"
     UNDER_CONSTRUCTION = "under_construction"
     COMPLETED = "completed"
+    REFUSED = "refused"
+    WITHDRAWN = "withdrawn"
+
+
+# Backward-compatibility map: old stage names -> new PipelineStage values
+STAGE_MIGRATION_MAP = {
+    "rezoning_application": PipelineStage.APPLICATION_SUBMITTED,
+    "public_hearing": PipelineStage.REFERRED_TO_PUBLIC_HEARING,
+    "council_decision": PipelineStage.APPROVED,
+    "development_permit": PipelineStage.UNDER_STAFF_REVIEW,
+    "building_permit": PipelineStage.APPLICATION_SUBMITTED,
+    "under_construction": PipelineStage.UNDER_CONSTRUCTION,
+    "completed": PipelineStage.COMPLETED,
+}
 
 
 class PipelineEntry(BaseModel):
@@ -165,7 +179,7 @@ class PipelineStats(BaseModel):
     average_storeys_per_project: Optional[float] = None
     projects_by_stage: dict = Field(default_factory=dict)
     projects_by_neighborhood: dict = Field(default_factory=dict)
-    near_completion_count: int  # projects in building_permit or under_construction
+    near_completion_count: int  # projects in approved or under_construction
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -861,7 +875,7 @@ class SupplyPipelineTracker:
                     parcel_pid=parcel_pid,
                     address=address,
                     neighborhood=neighborhood,
-                    pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                    pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
                     current_zoning=signal.get('zoning_from'),
                     proposed_zoning=signal.get('zoning_to'),
                     proposed_storeys=signal.get('height_after'),
@@ -956,7 +970,7 @@ class SupplyPipelineTracker:
             near_completion_query = f"""
                 SELECT COUNT(*) as count
                 FROM supply_pipeline
-                WHERE pipeline_stage IN ('building_permit', 'under_construction')
+                WHERE pipeline_stage IN ('approved', 'under_construction')
                 {"AND neighborhood = $1" if neighborhood else ""}
             """
 
@@ -1036,12 +1050,17 @@ class SupplyPipelineTracker:
 
 def _row_to_entry(row) -> PipelineEntry:
     """Convert database row to PipelineEntry model."""
+    raw_stage = row['pipeline_stage']
+    if raw_stage in STAGE_MIGRATION_MAP:
+        stage = STAGE_MIGRATION_MAP[raw_stage]
+    else:
+        stage = PipelineStage(raw_stage)
     return PipelineEntry(
         id=row['id'],
         parcel_pid=row['parcel_pid'],
         address=row['address'],
         neighborhood=row['neighborhood'],
-        pipeline_stage=PipelineStage(row['pipeline_stage']),
+        pipeline_stage=stage,
         current_zoning=row['current_zoning'],
         proposed_zoning=row['proposed_zoning'],
         proposed_storeys=row['proposed_storeys'],
@@ -1081,7 +1100,7 @@ async def _generate_stage_transition_alerts(
     severity = "info"
     if new_stage in ("under_construction", "completed"):
         severity = "high"
-    elif new_stage in ("building_permit", "development_permit"):
+    elif new_stage in ("approved", "under_staff_review"):
         severity = "medium"
 
     # Find matching watchlists (neighborhood or signal_type rules)

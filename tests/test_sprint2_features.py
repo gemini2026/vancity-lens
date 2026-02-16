@@ -293,7 +293,7 @@ class TestPipelineEntryValidation:
         entry = PipelineEntryCreate(
             parcel_pid="001-234-567",
             address="123 Main St",
-            pipeline_stage=PipelineStage.REZONING_APPLICATION,
+            pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
         )
         assert entry.parcel_pid == "001-234-567"
 
@@ -303,7 +303,7 @@ class TestPipelineEntryValidation:
             PipelineEntryCreate(
                 parcel_pid="BADPID",
                 address="123 Main St",
-                pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
             )
 
     def test_storeys_too_high_rejected(self):
@@ -312,7 +312,7 @@ class TestPipelineEntryValidation:
             PipelineEntryCreate(
                 parcel_pid="001-234-567",
                 address="123 Main St",
-                pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
                 proposed_storeys=200,
             )
 
@@ -322,7 +322,7 @@ class TestPipelineEntryValidation:
             PipelineEntryCreate(
                 parcel_pid="001-234-567",
                 address="123 Main St",
-                pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
                 proposed_storeys=0,
             )
 
@@ -332,7 +332,7 @@ class TestPipelineEntryValidation:
             PipelineEntryCreate(
                 parcel_pid="001-234-567",
                 address="123 Main St",
-                pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
                 proposed_units=10000,
             )
 
@@ -342,7 +342,7 @@ class TestPipelineEntryValidation:
             PipelineEntryCreate(
                 parcel_pid="001-234-567",
                 address="123 Main St",
-                pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
                 estimated_completion=date(2019, 6, 1),
             )
 
@@ -352,7 +352,7 @@ class TestPipelineEntryValidation:
             PipelineEntryCreate(
                 parcel_pid="001-234-567",
                 address="123 Main St",
-                pipeline_stage=PipelineStage.REZONING_APPLICATION,
+                pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
                 estimated_completion=date(2051, 1, 1),
             )
 
@@ -360,7 +360,7 @@ class TestPipelineEntryValidation:
         entry = PipelineEntryCreate(
             parcel_pid="001-234-567",
             address="123 Main St",
-            pipeline_stage=PipelineStage.REZONING_APPLICATION,
+            pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
             proposed_storeys=50,
         )
         assert entry.proposed_storeys == 50
@@ -369,7 +369,7 @@ class TestPipelineEntryValidation:
         entry = PipelineEntryCreate(
             parcel_pid="001-234-567",
             address="123 Main St",
-            pipeline_stage=PipelineStage.REZONING_APPLICATION,
+            pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
             estimated_completion=date(2028, 6, 1),
         )
         assert entry.estimated_completion == date(2028, 6, 1)
@@ -379,7 +379,7 @@ class TestPipelineEntryValidation:
         entry = PipelineEntryCreate(
             parcel_pid="001-234-567",
             address="123 Main St",
-            pipeline_stage=PipelineStage.REZONING_APPLICATION,
+            pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
             proposed_storeys=None,
             proposed_units=None,
             estimated_completion=None,

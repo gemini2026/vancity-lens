@@ -54,7 +54,7 @@ def sample_entry_create():
         parcel_pid="000-123-456",
         address="1234 Main Street",
         neighborhood="Downtown",
-        pipeline_stage=PipelineStage.REZONING_APPLICATION,
+        pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
         current_zoning="RS-1",
         proposed_zoning="CD-1",
         proposed_storeys=25,
@@ -139,7 +139,7 @@ async def test_add_entry_success(mock_db_pool, sample_entry_create, sample_pipel
     assert result.parcel_pid == '000-123-456'
     assert result.address == '1234 Main Street'
     assert result.proposed_units == 300
-    assert result.pipeline_stage == PipelineStage.REZONING_APPLICATION
+    assert result.pipeline_stage == PipelineStage.APPLICATION_SUBMITTED
 
 
 @pytest.mark.asyncio
@@ -234,12 +234,12 @@ async def test_update_stage_success(mock_db_pool, sample_pipeline_row):
     result = await SupplyPipelineTracker.update_stage(
         mock_db_pool,
         1,
-        PipelineStage.PUBLIC_HEARING,
+        PipelineStage.REFERRED_TO_PUBLIC_HEARING,
         signal_id=5,
         notes="Hearing scheduled"
     )
 
-    assert result.pipeline_stage == PipelineStage.PUBLIC_HEARING
+    assert result.pipeline_stage == PipelineStage.REFERRED_TO_PUBLIC_HEARING
 
 
 @pytest.mark.asyncio
@@ -250,7 +250,7 @@ async def test_update_stage_not_found(mock_db_pool):
 
     with pytest.raises(ValueError, match="not found"):
         await SupplyPipelineTracker.update_stage(
-            mock_db_pool, 999, PipelineStage.PUBLIC_HEARING
+            mock_db_pool, 999, PipelineStage.REFERRED_TO_PUBLIC_HEARING
         )
 
 
@@ -285,7 +285,7 @@ async def test_stage_history_tracking(mock_db_pool):
     }
 
     await SupplyPipelineTracker.update_stage(
-        mock_db_pool, 1, PipelineStage.PUBLIC_HEARING, signal_id=5
+        mock_db_pool, 1, PipelineStage.REFERRED_TO_PUBLIC_HEARING, signal_id=5
     )
 
     # Verify execute was called for history record
@@ -605,26 +605,31 @@ async def test_ingest_from_signal_missing_addresses(mock_db_pool):
 
 @pytest.mark.asyncio
 async def test_all_pipeline_stages(mock_db_pool, sample_entry_create):
-    """Test all seven pipeline stages are valid."""
+    """Test all nine pipeline stages are valid."""
     stages = [
-        PipelineStage.REZONING_APPLICATION,
-        PipelineStage.PUBLIC_HEARING,
-        PipelineStage.COUNCIL_DECISION,
-        PipelineStage.DEVELOPMENT_PERMIT,
-        PipelineStage.BUILDING_PERMIT,
+        PipelineStage.ENQUIRY,
+        PipelineStage.APPLICATION_SUBMITTED,
+        PipelineStage.UNDER_STAFF_REVIEW,
+        PipelineStage.REFERRED_TO_PUBLIC_HEARING,
+        PipelineStage.APPROVED,
         PipelineStage.UNDER_CONSTRUCTION,
         PipelineStage.COMPLETED,
+        PipelineStage.REFUSED,
+        PipelineStage.WITHDRAWN,
     ]
 
+    assert len(stages) == 9
     for stage in stages:
         assert stage.value in [
-            'rezoning_application',
-            'public_hearing',
-            'council_decision',
-            'development_permit',
-            'building_permit',
+            'enquiry',
+            'application_submitted',
+            'under_staff_review',
+            'referred_to_public_hearing',
+            'approved',
             'under_construction',
-            'completed'
+            'completed',
+            'refused',
+            'withdrawn',
         ]
 
 
@@ -738,14 +743,13 @@ async def test_complete_project_lifecycle(mock_db_pool):
     mock_conn.fetchrow.return_value = create_row
 
     entry = _row_to_entry(create_row)
-    assert entry.pipeline_stage == PipelineStage.REZONING_APPLICATION
+    assert entry.pipeline_stage == PipelineStage.APPLICATION_SUBMITTED
 
     # Simulate stage progression
     stages_to_traverse = [
-        PipelineStage.PUBLIC_HEARING,
-        PipelineStage.COUNCIL_DECISION,
-        PipelineStage.DEVELOPMENT_PERMIT,
-        PipelineStage.BUILDING_PERMIT,
+        PipelineStage.UNDER_STAFF_REVIEW,
+        PipelineStage.REFERRED_TO_PUBLIC_HEARING,
+        PipelineStage.APPROVED,
         PipelineStage.UNDER_CONSTRUCTION,
         PipelineStage.COMPLETED,
     ]
@@ -892,7 +896,7 @@ async def test_entry_create_validation():
     with pytest.raises(ValidationError):
         PipelineEntryCreate(
             parcel_pid="000-123-456",
-            pipeline_stage=PipelineStage.REZONING_APPLICATION
+            pipeline_stage=PipelineStage.APPLICATION_SUBMITTED
             # address is missing
         )
 

@@ -532,7 +532,7 @@ class TestStageTransitionAlerts:
 
     @pytest.mark.asyncio
     async def test_alert_severity_medium_for_permit(self):
-        """development_permit or building_permit → severity 'medium'."""
+        """approved or under_staff_review → severity 'medium'."""
         conn = AsyncMock()
         pipeline_row = {
             "id": 4,
@@ -546,7 +546,7 @@ class TestStageTransitionAlerts:
         conn.execute.return_value = "INSERT 0 1"
 
         await _generate_stage_transition_alerts(
-            conn, pipeline_row, "council_decision", "development_permit"
+            conn, pipeline_row, "application_submitted", "under_staff_review"
         )
 
         call_args = conn.execute.call_args[0]
