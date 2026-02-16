@@ -36,6 +36,8 @@ class RuleType(str, Enum):
     APPLICATION_TYPE = "application_type"
     HEIGHT_RANGE = "height_range"
     UNIT_RANGE = "unit_range"
+    GEOGRAPHIC_SCOPE = "geographic_scope"
+    CHANGE_TYPE = "change_type"
 
 
 class WatchlistRule(BaseModel):
@@ -617,6 +619,17 @@ class AlertEngine:
                     return range_min <= int(units) <= range_max
                 except (ValueError, IndexError):
                     return False
+
+            elif rule_type == RuleType.GEOGRAPHIC_SCOPE:
+                geo_scope = (signal.get("geographic_scope") or "").lower()
+                if geo_scope == "citywide":
+                    return rule_value == "citywide"
+                affected = [a.lower() for a in (signal.get("affected_areas") or [])]
+                return rule_value in affected
+
+            elif rule_type == RuleType.CHANGE_TYPE:
+                change_type = (signal.get("change_type") or "").lower()
+                return rule_value == change_type
 
             else:
                 logger.warning(f"Unknown rule type: {rule_type}")
