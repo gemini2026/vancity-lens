@@ -135,6 +135,7 @@ class ReportGenerator:
         self._build_executive_summary(pdf, parcel_data)
         self._build_parcel_overview(pdf, parcel_data)
         self._build_before_after_section(pdf, parcel_data)
+        self._build_hbu_section(pdf, parcel_data)
         self._build_title_ownership(pdf, parcel_data)
         self._build_entitlement_analysis(pdf, parcel_data)
         self._build_pro_forma(pdf, parcel_data)
@@ -549,6 +550,107 @@ class ReportGenerator:
             else:
                 pdf.cell(col_widths[3], 6, uplift, border=1)
             pdf.ln()
+
+        pdf.ln(4)
+
+    def _build_hbu_section(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Build Highest & Best Use analysis section."""
+        hbu = getattr(parcel_data, "hbu_analysis", None)
+        if not hbu:
+            return
+
+        analysis = hbu.get("highest_best_use", {}) if isinstance(hbu, dict) else {}
+        if not analysis.get("recommended_use"):
+            return
+
+        # Section header
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Highest & Best Use Analysis", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(
+            self.left_margin, pdf.get_y(),
+            self.page_width - self.right_margin, pdf.get_y(),
+        )
+        pdf.ln(4)
+
+        # Recommendation
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_fill_color(230, 230, 255)
+        rec_text = f"  Recommended: {analysis['recommended_use']}"
+        pdf.cell(0, 7, rec_text[:90], fill=True, ln=True)
+        pdf.set_font("Helvetica", "", 8)
+        basis = analysis.get("zoning_basis", "N/A")
+        pdf.cell(0, 5, f"  Basis: {basis}", ln=True)
+        pdf.ln(3)
+
+        # Key metrics table
+        avail = self.page_width - self.left_margin - self.right_margin
+        col_w = int(avail / 4)
+        headers = ["Height", "FSR", "Est. Units", "Buildable SF"]
+        values = [
+            f"{analysis.get('max_height_storeys', '?')} storeys",
+            f"{analysis.get('max_fsr', '?')}",
+            f"~{analysis.get('estimated_units', '?')}",
+            f"{int(analysis.get('buildable_sqft', 0)):,}" if analysis.get("buildable_sqft") else "?",
+        ]
+
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_fill_color(240, 240, 240)
+        for h in headers:
+            pdf.cell(col_w, 6, h, border=1, fill=True)
+        pdf.ln()
+
+        pdf.set_font("Helvetica", "", 8)
+        for v in values:
+            pdf.cell(col_w, 6, v, border=1)
+        pdf.ln(4)
+
+        # Feasibility verdict
+        verdict = analysis.get("feasibility_verdict", "unknown")
+        verdict_map = {
+            "pencils": "Pencils",
+            "marginal": "Marginal",
+            "does_not_pencil": "Does Not Pencil",
+        }
+        verdict_label = verdict_map.get(verdict, verdict)
+        if verdict == "pencils":
+            pdf.set_fill_color(200, 255, 200)
+        elif verdict == "marginal":
+            pdf.set_fill_color(255, 255, 200)
+        else:
+            pdf.set_fill_color(255, 220, 220)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 6, f"  Feasibility: {verdict_label}", fill=True, ln=True)
+        pdf.ln(3)
+
+        # Constraints
+        constraints = analysis.get("key_constraints", [])
+        if constraints:
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(0, 5, "Constraints:", ln=True)
+            pdf.set_font("Helvetica", "", 8)
+            for c in constraints[:5]:
+                text = c[:120] if isinstance(c, str) else str(c)[:120]
+                pdf.cell(0, 4, f"  - {text}", ln=True)
+            pdf.ln(2)
+
+        # Narrative (truncated)
+        narrative = analysis.get("narrative", "")
+        if narrative:
+            pdf.set_font("Helvetica", "I", 8)
+            truncated = narrative[:800] if len(narrative) > 800 else narrative
+            pdf.multi_cell(0, 4, truncated)
+            pdf.ln(2)
+
+        # Sources
+        sources = hbu.get("sources", []) if isinstance(hbu, dict) else []
+        if sources:
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(120, 120, 120)
+            source_titles = [s.get("title", "") for s in sources[:5] if isinstance(s, dict)]
+            source_text = "Sources: " + ", ".join(source_titles)
+            pdf.cell(0, 4, source_text[:120], ln=True)
+            pdf.set_text_color(0, 0, 0)
 
         pdf.ln(4)
 

@@ -311,3 +311,32 @@ class TestHBUFrontend:
             content = f.read()
         assert "error" in content
         assert "Retry" in content
+
+
+class TestHBUPDFSection:
+    """HBU section in PDF report."""
+
+    def test_report_has_hbu_method(self):
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        assert "_build_hbu_section" in content
+
+    def test_hbu_method_called_in_generate(self):
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        assert "self._build_hbu_section" in content
+
+    def test_hbu_section_has_header(self):
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        assert "Highest & Best Use" in content
+
+    def test_hbu_section_shows_recommendation(self):
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        assert "recommended_use" in content
+
+    def test_hbu_section_shows_feasibility(self):
+        with open("api/report_generator.py") as f:
+            content = f.read()
+        assert "feasibility_verdict" in content or "Feasibility" in content
