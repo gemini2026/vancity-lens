@@ -175,7 +175,7 @@ async def store_change_record(db_pool, record: dict[str, Any]) -> int:
         # Check for duplicate (same source_url + change_type + summary)
         existing = await conn.fetchval(
             """
-            SELECT id FROM change_records
+            SELECT change_id FROM change_records
             WHERE source_url = $1
               AND change_type = $2
               AND plain_english_summary = $3
@@ -202,7 +202,7 @@ async def store_change_record(db_pool, record: dict[str, Any]) -> int:
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()
             )
-            RETURNING id
+            RETURNING change_id
             """,
             record["change_type"],
             record["source_url"],

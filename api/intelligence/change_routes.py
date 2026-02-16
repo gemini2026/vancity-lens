@@ -75,7 +75,7 @@ async def get_changes(
             param_idx += 1
 
         if affected_area:
-            conditions.append(f"${param_idx} ILIKE ANY(affected_areas)")
+            conditions.append(f"EXISTS (SELECT 1 FROM unnest(affected_areas) AS a WHERE a ILIKE ${param_idx})")
             params.append(f"%{affected_area}%")
             param_idx += 1
 

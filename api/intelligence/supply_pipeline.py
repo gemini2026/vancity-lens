@@ -843,7 +843,7 @@ class SupplyPipelineTracker:
                     UPDATE supply_pipeline
                     SET
                         neighborhood = COALESCE($2, neighborhood),
-                        zoning_to = COALESCE($3, zoning_to),
+                        proposed_zoning = COALESCE($3, proposed_zoning),
                         proposed_units = COALESCE($4, proposed_units),
                         signal_ids = array_append(signal_ids, $5),
                         updated_at = now()

@@ -262,6 +262,12 @@ async def compute_entitlement(
     else:
         price_per_sqft = Decimal("800")
         market_data_date = MARKET_DATA_DATE
+        data_warnings.append(DataQualityWarning(
+            code="market_data_default",
+            message=f"No neighbourhood-specific market data for '{neighbourhood}'. Using default $800/sqft.",
+            severity="medium",
+            field="price_per_sqft",
+        ))
 
     # 3. Build entitlement objects
     #    CRITICAL: Bill 47 sets MINIMUM density floors, not replacements.

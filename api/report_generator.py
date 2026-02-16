@@ -409,7 +409,7 @@ class ReportGenerator:
         """Render a graceful degradation message when a section's data is unavailable."""
         from datetime import datetime, timezone
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        msg = f"Data unavailable -- {source_name} timeout at {timestamp}"
+        msg = f"Data unavailable -- {source_name} error at {timestamp}"
         if error:
             msg += f" ({error})"
         pdf.set_font("Helvetica", "I", 9)
