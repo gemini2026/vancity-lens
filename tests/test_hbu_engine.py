@@ -204,3 +204,34 @@ class TestHBUEngine:
         assert result["pid"] == "100-001-006"
         assert result["confidence_score"] == 0.4
         assert "rule-engine" in result["highest_best_use"]["recommended_use"].lower()
+
+
+class TestHBURoutes:
+    """HBU API route registration tests."""
+
+    def test_routes_file_exists(self):
+        assert os.path.exists("api/intelligence/hbu_routes.py")
+
+    def test_router_has_analyze_endpoint(self):
+        from api.intelligence.hbu_routes import router
+        paths = [r.path for r in router.routes]
+        assert any("hbu" in p for p in paths)
+
+    def test_router_has_get_endpoint(self):
+        from api.intelligence.hbu_routes import router
+        methods = []
+        for r in router.routes:
+            methods.extend(getattr(r, "methods", []))
+        assert "GET" in methods
+
+    def test_router_has_post_endpoint(self):
+        from api.intelligence.hbu_routes import router
+        methods = []
+        for r in router.routes:
+            methods.extend(getattr(r, "methods", []))
+        assert "POST" in methods
+
+    def test_hbu_routes_mounted_in_intelligence(self):
+        with open("api/intelligence/routes.py") as f:
+            content = f.read()
+        assert "hbu_routes" in content

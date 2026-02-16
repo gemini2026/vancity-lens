@@ -62,6 +62,7 @@ from . import opportunity_routes
 from . import digest_routes
 from . import pipeline_routes
 from . import scraper_schools_routes
+from . import hbu_routes
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,9 @@ router.include_router(pipeline_routes.router)
 
 # Include scraper schools routes
 router.include_router(scraper_schools_routes.router)
+
+# Include HBU routes
+router.include_router(hbu_routes.router)
 
 
 # ── Utility: Get API keys from environment ────────────────────────────
