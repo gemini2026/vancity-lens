@@ -24,6 +24,22 @@ logger = logging.getLogger(__name__)
 # Models
 # ────────────────────────────────────────────────────────────────────────────
 
+class Severity(str, Enum):
+    """Alert severity levels."""
+    INFO = "info"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class AlertType(str, Enum):
+    """Alert type categories."""
+    SIGNAL_MATCH = "signal_match"
+    STAGE_TRANSITION = "stage_transition"
+    UNDERVALUED_MATCH = "undervalued_match"
+
+
 class RuleType(str, Enum):
     """Types of watchlist rules."""
     NEIGHBORHOOD = "neighborhood"
@@ -85,10 +101,10 @@ class AlertCreate(BaseModel):
     """Request model for creating an alert."""
     watchlist_id: int
     signal_id: int
-    alert_type: str = "signal_match"
+    alert_type: AlertType = AlertType.SIGNAL_MATCH
     headline: str
     summary: Optional[str] = None
-    severity: str
+    severity: Severity
 
 
 class Alert(BaseModel):
@@ -96,10 +112,10 @@ class Alert(BaseModel):
     id: int
     watchlist_id: int
     signal_id: int
-    alert_type: str
+    alert_type: AlertType
     headline: str
     summary: Optional[str]
-    severity: str
+    severity: Severity
     is_read: bool
     created_at: datetime
     read_at: Optional[datetime] = None
@@ -565,107 +581,102 @@ class AlertEngine:
         rule_type = rule.rule_type
         rule_value = rule.rule_value.lower()
 
-        try:
-            if rule_type == RuleType.NEIGHBORHOOD:
-                signal_neighborhood = signal.get('neighborhood', '').lower()
-                return rule_value in signal_neighborhood or signal_neighborhood in rule_value
+        if rule_type == RuleType.NEIGHBORHOOD:
+            signal_neighborhood = signal.get('neighborhood', '').lower()
+            return rule_value in signal_neighborhood or signal_neighborhood in rule_value
 
-            elif rule_type == RuleType.ADDRESS:
-                addresses = signal.get('addresses', [])
-                return any(rule_value in addr.lower() for addr in addresses)
+        elif rule_type == RuleType.ADDRESS:
+            addresses = signal.get('addresses', [])
+            return any(rule_value in addr.lower() for addr in addresses)
 
-            elif rule_type == RuleType.ZONING:
-                # Match zoning_from or zoning_to
-                zoning_from = (signal.get('zoning_from') or '').lower()
-                zoning_to = (signal.get('zoning_to') or '').lower()
-                return rule_value in zoning_from or rule_value in zoning_to
+        elif rule_type == RuleType.ZONING:
+            # Match zoning_from or zoning_to
+            zoning_from = (signal.get('zoning_from') or '').lower()
+            zoning_to = (signal.get('zoning_to') or '').lower()
+            return rule_value in zoning_from or rule_value in zoning_to
 
-            elif rule_type == RuleType.SIGNAL_TYPE:
-                signal_type = signal.get('signal_type', '').lower()
-                return rule_value == signal_type
+        elif rule_type == RuleType.SIGNAL_TYPE:
+            signal_type = signal.get('signal_type', '').lower()
+            return rule_value == signal_type
 
-            elif rule_type == RuleType.KEYWORD:
-                headline = (signal.get('headline') or '').lower()
-                summary = (signal.get('summary') or '').lower()
-                return rule_value in headline or rule_value in summary
+        elif rule_type == RuleType.KEYWORD:
+            headline = (signal.get('headline') or '').lower()
+            summary = (signal.get('summary') or '').lower()
+            return rule_value in headline or rule_value in summary
 
-            elif rule_type == RuleType.SEVERITY:
-                signal_severity = signal.get('severity', '').lower()
-                return rule_value == signal_severity
+        elif rule_type == RuleType.SEVERITY:
+            signal_severity = signal.get('severity', '').lower()
+            return rule_value == signal_severity
 
-            elif rule_type == RuleType.PIPELINE_STAGE:
-                pipeline_stage = (signal.get("pipeline_stage") or "").lower()
-                return rule_value == pipeline_stage
+        elif rule_type == RuleType.PIPELINE_STAGE:
+            pipeline_stage = (signal.get("pipeline_stage") or "").lower()
+            return rule_value == pipeline_stage
 
-            elif rule_type == RuleType.APPLICATION_TYPE:
-                app_type = (signal.get("application_type") or "").lower()
-                return rule_value == app_type
+        elif rule_type == RuleType.APPLICATION_TYPE:
+            app_type = (signal.get("application_type") or "").lower()
+            return rule_value == app_type
 
-            elif rule_type == RuleType.HEIGHT_RANGE:
-                try:
-                    parts = rule_value.split("-")
-                    range_min, range_max = int(parts[0]), int(parts[1])
-                    storeys = signal.get("proposed_storeys") or signal.get("height_after")
-                    if storeys is None:
-                        return False
-                    return range_min <= int(storeys) <= range_max
-                except (ValueError, IndexError):
+        elif rule_type == RuleType.HEIGHT_RANGE:
+            try:
+                parts = rule_value.split("-")
+                range_min, range_max = int(parts[0]), int(parts[1])
+                storeys = signal.get("proposed_storeys") or signal.get("height_after")
+                if storeys is None:
                     return False
-
-            elif rule_type == RuleType.UNIT_RANGE:
-                try:
-                    parts = rule_value.split("-")
-                    range_min, range_max = int(parts[0]), int(parts[1])
-                    units = signal.get("unit_count") or signal.get("proposed_units")
-                    if units is None:
-                        return False
-                    return range_min <= int(units) <= range_max
-                except (ValueError, IndexError):
-                    return False
-
-            elif rule_type == RuleType.GEOGRAPHIC_SCOPE:
-                geo_scope = (signal.get("geographic_scope") or "").lower()
-                if geo_scope == "citywide":
-                    return rule_value == "citywide"
-                affected = [a.lower() for a in (signal.get("affected_areas") or [])]
-                return rule_value in affected
-
-            elif rule_type == RuleType.CHANGE_TYPE:
-                change_type = (signal.get("change_type") or "").lower()
-                return rule_value == change_type
-
-            elif rule_type == RuleType.UNDERVALUED_DISCOUNT:
-                try:
-                    min_discount = float(rule_value)
-                    discount = signal.get("discount_pct", 0)
-                    return float(discount) >= min_discount
-                except (ValueError, TypeError):
-                    return False
-
-            elif rule_type == RuleType.UNDERVALUED_LOT_AREA:
-                try:
-                    min_area = float(rule_value)
-                    area = signal.get("lot_area_sqft", 0)
-                    return float(area) >= min_area
-                except (ValueError, TypeError):
-                    return False
-
-            elif rule_type == RuleType.UNDERVALUED_TOD_TIER:
-                try:
-                    tier_val = int(rule_value)
-                    signal_tier = signal.get("tod_tier")
-                    if signal_tier is None:
-                        return False
-                    return int(signal_tier) == tier_val
-                except (ValueError, TypeError):
-                    return False
-
-            else:
-                logger.warning(f"Unknown rule type: {rule_type}")
+                return range_min <= int(storeys) <= range_max
+            except (ValueError, IndexError):
                 return False
 
-        except Exception as e:
-            logger.warning(f"Error matching rule {rule_type}={rule_value}: {e}")
+        elif rule_type == RuleType.UNIT_RANGE:
+            try:
+                parts = rule_value.split("-")
+                range_min, range_max = int(parts[0]), int(parts[1])
+                units = signal.get("unit_count") or signal.get("proposed_units")
+                if units is None:
+                    return False
+                return range_min <= int(units) <= range_max
+            except (ValueError, IndexError):
+                return False
+
+        elif rule_type == RuleType.GEOGRAPHIC_SCOPE:
+            geo_scope = (signal.get("geographic_scope") or "").lower()
+            if geo_scope == "citywide":
+                return rule_value == "citywide"
+            affected = [a.lower() for a in (signal.get("affected_areas") or [])]
+            return rule_value in affected
+
+        elif rule_type == RuleType.CHANGE_TYPE:
+            change_type = (signal.get("change_type") or "").lower()
+            return rule_value == change_type
+
+        elif rule_type == RuleType.UNDERVALUED_DISCOUNT:
+            try:
+                min_discount = float(rule_value)
+                discount = signal.get("discount_pct", 0)
+                return float(discount) >= min_discount
+            except (ValueError, TypeError):
+                return False
+
+        elif rule_type == RuleType.UNDERVALUED_LOT_AREA:
+            try:
+                min_area = float(rule_value)
+                area = signal.get("lot_area_sqft", 0)
+                return float(area) >= min_area
+            except (ValueError, TypeError):
+                return False
+
+        elif rule_type == RuleType.UNDERVALUED_TOD_TIER:
+            try:
+                tier_val = int(rule_value)
+                signal_tier = signal.get("tod_tier")
+                if signal_tier is None:
+                    return False
+                return int(signal_tier) == tier_val
+            except (ValueError, TypeError):
+                return False
+
+        else:
+            logger.warning(f"Unknown rule type: {rule_type}")
             return False
 
     @staticmethod
@@ -685,22 +696,17 @@ class AlertEngine:
         Returns:
             True if alert exists, False otherwise
         """
-        try:
-            async with db_pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    """
-                    SELECT id FROM alerts
-                    WHERE watchlist_id = $1 AND signal_id = $2
-                    LIMIT 1
-                    """,
-                    watchlist_id, signal_id
-                )
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id FROM alerts
+                WHERE watchlist_id = $1 AND signal_id = $2
+                LIMIT 1
+                """,
+                watchlist_id, signal_id
+            )
 
-            return row is not None
-
-        except Exception as e:
-            logger.error(f"Error checking alert existence: {e}")
-            return False
+        return row is not None
 
     @staticmethod
     async def create_alert(
