@@ -46,6 +46,13 @@ export interface SourceAttribution {
   disclaimer: string;
 }
 
+export interface DataQualityWarning {
+  code: string;
+  message: string;
+  severity: string;
+  field: string | null;
+}
+
 export interface RiskFlag {
   code: string;
   severity: "red" | "yellow" | "green";
@@ -125,11 +132,11 @@ export interface ThreeScenarioProForma {
   bear: ScenarioProForma;
   hidden_costs: HiddenCostItem[];
   hidden_costs_total: number;
-  grade_scenario: string;
+  grade_scenario: "bull" | "base" | "bear";
 }
 
 export interface DealValidation {
-  deal_grade: string;
+  deal_grade: "A" | "B" | "C" | "D" | "F";
   deal_score: number;
   confidence_level: "high" | "medium" | "low";
   // V2: Multi-axis grading
@@ -203,4 +210,8 @@ export interface ParcelEntitlement {
   bill44?: Bill44Entitlement | null;
   community_plan?: CommunityPlanResult | null;
   setbacks?: Record<string, unknown> | null;
+  heritage_site: boolean;
+  heritage_category: "A" | "B" | "C" | null;
+  market_data_date: string | null;
+  data_warnings: DataQualityWarning[];
 }
