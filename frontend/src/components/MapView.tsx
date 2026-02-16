@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import mapboxgl from "mapbox-gl";
 import { cn } from "@/lib/utils";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { fetchTOAGeoJSON, fetchEntitlement, fetchNearestParcel, fetchOpportunities } from "@/lib/api";
+import { fetchTOAGeoJSON, fetchEntitlement, fetchNearestParcel, fetchOpportunities, fetchTopOpportunities } from "@/lib/api";
+import TopOpportunitiesPanel from "./TopOpportunitiesPanel";
 import { getSignalsForParcel, getSignalsGeoJSON } from "@/lib/intel-api";
 import { fetchNeighborhoodRiskScores, type NeighborhoodRisk } from "@/lib/political-risk-api";
 import type { ParcelEntitlement, EntitlementSignal } from "@/lib/types";
@@ -127,6 +128,7 @@ export default function MapView() {
   const [riskScores, setRiskScores] = useState<NeighborhoodRisk[]>([]);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showTopDeals, setShowTopDeals] = useState(false);
   const { resolvedTheme } = useTheme();
   const mapStyle = resolvedTheme === "dark" ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
 
@@ -533,6 +535,24 @@ export default function MapView() {
       openDetailPanel(data, signals);
     } catch (err) {
       console.error("Case study lookup failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [openDetailPanel]);
+
+  const handleTopDealSelect = useCallback(async (pid: string, lng: number, lat: number) => {
+    if (map.current) {
+      map.current.flyTo({ center: [lng, lat], zoom: 16, duration: 1500 });
+    }
+    setLoading(true);
+    try {
+      const [data, signals] = await Promise.all([
+        fetchEntitlement(pid),
+        getSignalsForParcel(pid, 500).catch(() => [] as IntelSignal[]),
+      ]);
+      openDetailPanel(data, signals);
+    } catch (err) {
+      console.error("Top deal lookup failed:", err);
     } finally {
       setLoading(false);
     }
@@ -951,6 +971,19 @@ export default function MapView() {
           <span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />
           Heatmap
         </button>
+        <button
+          onClick={() => setShowTopDeals(prev => !prev)}
+          className={cn(
+            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            showTopDeals
+              ? "bg-emerald-600/20 border border-emerald-500/30 text-emerald-400"
+              : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+          )}
+          title="Toggle top opportunities panel"
+        >
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
+          Top Deals
+        </button>
         {!showCaseStudies && (
           <button
             onClick={() => setShowCaseStudies(true)}
@@ -1021,6 +1054,19 @@ export default function MapView() {
               <span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />
               Heatmap
             </button>
+            <button
+              onClick={() => setShowTopDeals(prev => !prev)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                showTopDeals
+                  ? "bg-emerald-600/20 border border-emerald-500/30 text-emerald-400"
+                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+              )}
+              title="Toggle top opportunities panel"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
+              Top Deals
+            </button>
             {!showCaseStudies && (
               <button
                 onClick={() => setShowCaseStudies(true)}
@@ -1032,6 +1078,14 @@ export default function MapView() {
           </div>
         )}
       </div>
+
+      {/* Top Opportunities Panel */}
+      {showTopDeals && (
+        <TopOpportunitiesPanel
+          onClose={() => setShowTopDeals(false)}
+          onSelectParcel={handleTopDealSelect}
+        />
+      )}
 
       {/* Loading overlay */}
       {loading && (

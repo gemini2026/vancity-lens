@@ -567,6 +567,58 @@ async def nearest_parcel(
 
 
 @app.get(
+    "/api/v1/opportunities/top",
+    summary="Top opportunities ranked by composite score",
+)
+async def top_opportunities_ranked(
+    limit: int = Query(default=10, ge=1, le=50, description="Number of top opportunities"),
+    response: Response = None,
+):
+    """Returns top parcels ranked by composite_score = storey_uplift * (1 - ILR).
+
+    The composite score identifies parcels with both high density uplift
+    AND low improvement-to-land ratio (teardown candidates).
+    """
+    if response:
+        response.headers["X-API-Version"] = "1"
+
+    async with db.acquire() as conn:
+        rows = await conn.fetch("""
+            WITH deduped AS (
+                SELECT DISTINCT ON (p.pid)
+                    p.pid,
+                    p.civic_address,
+                    p.current_zoning,
+                    b.tier,
+                    b.station_name,
+                    GREATEST(0, b.max_storeys - COALESCE(p.current_height, 0)) AS storey_uplift,
+                    ROUND((p.improvement_value / NULLIF(p.land_value + p.improvement_value, 0)::numeric), 4) AS ilr,
+                    (SELECT count(*) FROM intelligence_signals
+                     WHERE neighborhood = p.geo_local_area
+                     AND extracted_at > NOW() - INTERVAL '90 days') AS signal_count,
+                    p.asking_price,
+                    ROUND((p.lot_area_sqm * GREATEST(b.max_fsr, COALESCE(p.current_fsr, 0)) * 10.7639 * 800)::numeric, 0) AS est_value,
+                    ST_X(ST_Centroid(p.geom)) AS lng,
+                    ST_Y(ST_Centroid(p.geom)) AS lat
+                FROM parcels p
+                JOIN toa_buffers b ON ST_Intersects(p.geom, b.geom)
+                JOIN transit_stations s ON s.id = b.station_id
+                WHERE p.lot_area_sqm BETWEEN 200 AND 10000
+                ORDER BY p.pid, b.tier
+            )
+            SELECT *,
+                ROUND(
+                    (GREATEST(storey_uplift, 0) * (1.0 - COALESCE(ilr, 0.5)))::numeric,
+                4) AS composite_score
+            FROM deduped
+            ORDER BY GREATEST(storey_uplift, 0) * (1.0 - COALESCE(ilr, 0.5)) DESC
+            LIMIT $1
+        """, limit)
+
+        return [dict(r) for r in rows]
+
+
+@app.get(
     "/api/v1/opportunities",
     summary="Top alpha opportunities for map markers",
 )

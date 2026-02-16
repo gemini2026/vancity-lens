@@ -30,6 +30,29 @@ export async function fetchOpportunities(limit = 50) {
   return Array.isArray(data) ? data : data.items || [];
 }
 
+export interface TopOpportunity {
+  pid: string;
+  civic_address: string | null;
+  current_zoning: string | null;
+  tier: number;
+  station_name: string;
+  storey_uplift: number;
+  ilr: number | null;
+  signal_count: number;
+  composite_score: number;
+  asking_price: number | null;
+  est_value: number | null;
+  lng: number;
+  lat: number;
+}
+
+export async function fetchTopOpportunities(limit = 10): Promise<TopOpportunity[]> {
+  const res = await fetch(`${API_BASE}/api/v1/opportunities/top?limit=${limit}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
 export async function downloadReport(pid: string, token?: string): Promise<void> {
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
