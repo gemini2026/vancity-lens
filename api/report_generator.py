@@ -132,22 +132,21 @@ class ReportGenerator:
 
         # Build report sections
         self._build_header_section(pdf, parcel_data)
-        self._build_executive_summary(pdf, parcel_data)
-        self._build_parcel_overview(pdf, parcel_data)
-        self._build_before_after_section(pdf, parcel_data)
-        self._build_hbu_section(pdf, parcel_data)
+        await self._build_executive_summary(pdf, parcel_data)
         self._build_title_ownership(pdf, parcel_data)
         self._build_entitlement_analysis(pdf, parcel_data)
-        self._build_pro_forma(pdf, parcel_data)
         await self._build_environmental_section(pdf, parcel_data, db_pool)
+        self._build_heritage_section(pdf, parcel_data)
+        self._build_before_after_section(pdf, parcel_data)
+        await self._build_nearby_development(pdf, parcel_data, db_pool)
         await self._build_market_context(pdf, db_pool)
         await self._build_demographic_profile(pdf, parcel_data, db_pool)
-        await self._build_nearby_development(pdf, parcel_data, db_pool)
-        self._build_risk_assessment(pdf, parcel_data)
+        self._build_red_flags_summary(pdf, parcel_data)
+        await self._build_data_currency(pdf, db_pool)
+        self._build_pro_forma(pdf, parcel_data)
         self._build_due_diligence(pdf, parcel_data)
         if parcel_data.comparables:
             self._build_comparable_sales(pdf, parcel_data)
-        await self._build_data_currency(pdf, db_pool)
         self._build_sources(pdf, parcel_data)
         self._build_footer(pdf, parcel_data)
 
@@ -1017,8 +1016,8 @@ class ReportGenerator:
 
     # ── Sprint 6: New Due Diligence Report Sections ─────────────────────
 
-    def _build_executive_summary(self, pdf: FPDF, parcel_data: ParcelReport):
-        """Auto-generated executive summary (<300 words)."""
+    async def _build_executive_summary(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Auto-generated executive summary with optional LLM enhancement (<300 words)."""
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Executive Summary", ln=True)
         pdf.set_draw_color(100, 100, 100)
@@ -1029,6 +1028,7 @@ class ReportGenerator:
         addr = parcel_data.civic_address or parcel_data.pid
         zoning = parcel_data.current_zoning or "N/A"
 
+        # Build template-based summary
         parts = [
             f"This report analyzes {addr} (PID: {parcel_data.pid}), "
             f"a {parcel_data.lot_area_sqft:.0f} sqft lot "
@@ -1064,9 +1064,12 @@ class ReportGenerator:
                 f"upside relative to current assessment."
             )
 
-        risk_count = len(parcel_data.risk_flags)
+        # Collect red flags and include in template
+        red_flags = self._collect_red_flags(parcel_data)
+        risk_count = len(parcel_data.risk_flags) + len(red_flags)
         if risk_count > 0:
             high_risks = sum(1 for r in parcel_data.risk_flags if r.severity in ("high", "critical"))
+            high_risks += sum(1 for f in red_flags if f.get("severity") in ("high", "critical"))
             risk_detail = f", including {high_risks} high/critical" if high_risks else ""
             parts.append(
                 f"{risk_count} risk factor{'s' if risk_count != 1 else ''} identified{risk_detail}."
@@ -1077,8 +1080,48 @@ class ReportGenerator:
             "Independent verification of all data points is recommended before making investment decisions."
         )
 
-        summary = " ".join(parts)
-        pdf.multi_cell(0, 5, summary)
+        template_summary = " ".join(parts)
+
+        # Try LLM enhancement if available
+        final_summary = template_summary
+        try:
+            from .intelligence.llm_backend import generate_chat
+
+            # Build context for LLM
+            system_prompt = (
+                "You are a real estate analyst creating executive summaries for property reports. "
+                "Create clear, professional summaries under 300 words. Focus on key opportunities and risks."
+            )
+
+            user_message = (
+                f"Create a professional executive summary (max 300 words) for this property analysis:\n\n"
+                f"{template_summary}\n\n"
+                f"Enhance the clarity and professionalism while keeping all factual content intact. "
+                f"Keep it under 300 words."
+            )
+
+            llm_text, model, latency = await generate_chat(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                max_tokens=500,
+            )
+
+            # Validate word count (~300 words max)
+            word_count = len(llm_text.split())
+            if word_count <= 350:  # Allow 50 word buffer
+                final_summary = llm_text
+                logger.info(
+                    "LLM-enhanced executive summary generated (model=%s, %d words, %.1fs)",
+                    model, word_count, latency
+                )
+            else:
+                logger.warning(
+                    "LLM summary too long (%d words), falling back to template", word_count
+                )
+        except Exception as e:
+            logger.warning("LLM enhancement failed, using template summary: %s", e)
+
+        pdf.multi_cell(0, 5, final_summary)
         pdf.ln(4)
 
     def _build_title_ownership(self, pdf: FPDF, parcel_data: ParcelReport):
@@ -1181,6 +1224,81 @@ class ReportGenerator:
                 if contam:
                     line += f", {contam}"
                 pdf.cell(0, 5, line, ln=True)
+
+        pdf.ln(4)
+
+    def _build_heritage_section(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Heritage designation section — standalone heritage analysis."""
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Heritage Designation", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        heritage = getattr(parcel_data, "heritage_designation", None)
+
+        pdf.set_font("Helvetica", "", 10)
+
+        if not heritage:
+            pdf.set_fill_color(200, 255, 200)
+            pdf.cell(0, 6, "  No heritage designation on record", fill=True, ln=True)
+        else:
+            # Severity coloring
+            severity_map = {"A": "high", "B": "medium", "C": "low"}
+            severity = severity_map.get(heritage, "medium")
+
+            if severity == "high":
+                pdf.set_fill_color(255, 200, 200)
+            elif severity == "medium":
+                pdf.set_fill_color(255, 230, 100)
+            else:
+                pdf.set_fill_color(255, 255, 200)
+
+            pdf.cell(0, 6, f"  Heritage Designation Category: {heritage}", fill=True, ln=True)
+            pdf.ln(2)
+
+            pdf.set_font("Helvetica", "", 9)
+
+            # Category significance
+            significance = {
+                "A": "Primary significance - highest level of heritage protection",
+                "B": "Significant heritage value - moderate protection requirements",
+                "C": "Contextual or character value - limited protection"
+            }
+            pdf.cell(0, 5, f"Significance: {significance.get(heritage, 'See city heritage registry')}", ln=True)
+            pdf.ln(2)
+
+            # Development implications
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(0, 5, "Development Implications:", ln=True)
+            pdf.set_font("Helvetica", "", 9)
+
+            implications = {
+                "A": [
+                    "- Heritage alteration permit required for all exterior changes",
+                    "- Demolition generally prohibited; facade retention likely mandatory",
+                    "- Development timelines extended 6-12 months for heritage review",
+                    "- Material and design specifications must match historical character"
+                ],
+                "B": [
+                    "- Heritage alteration permit required for significant changes",
+                    "- Partial facade retention may be required",
+                    "- Heritage review adds 3-6 months to approval timeline",
+                    "- Some flexibility in materials and design approach"
+                ],
+                "C": [
+                    "- Heritage considerations apply but more flexible",
+                    "- Focus on contextual fit rather than preservation",
+                    "- Minor timeline impact (1-3 months)",
+                    "- Opportunities for density bonusing with heritage features"
+                ]
+            }
+
+            for line in implications.get(heritage, []):
+                pdf.cell(0, 4, line, ln=True)
 
         pdf.ln(4)
 
@@ -1391,6 +1509,63 @@ class ReportGenerator:
                 pdf.ln()
 
         pdf.ln(4)
+
+    def _build_red_flags_summary(self, pdf: FPDF, parcel_data: ParcelReport):
+        """Red flags summary section — auto-aggregated risk flags with severity coloring."""
+        flags = self._collect_red_flags(parcel_data)
+
+        if not flags:
+            return  # Skip section if no red flags
+
+        if pdf.get_y() > 240:
+            pdf.add_page()
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Red Flags Summary", ln=True)
+        pdf.set_draw_color(100, 100, 100)
+        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.ln(4)
+
+        pdf.set_font("Helvetica", "", 9)
+
+        severity_colors = {
+            "high": (255, 100, 100),
+            "medium": (255, 200, 100),
+            "low": (255, 255, 150),
+        }
+
+        # Table header
+        col_widths = [35, 55, 100]
+        avail = self.page_width - self.left_margin - self.right_margin
+        scale = avail / sum(col_widths)
+        col_widths = [int(w * scale) for w in col_widths]
+
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(240, 240, 240)
+        pdf.cell(col_widths[0], 6, "Severity", border=1, fill=True)
+        pdf.cell(col_widths[1], 6, "Category", border=1, fill=True)
+        pdf.cell(col_widths[2], 6, "Details", border=1, fill=True)
+        pdf.ln()
+
+        # Flag rows
+        pdf.set_font("Helvetica", "", 8)
+        for flag in flags[:10]:  # Limit to 10 flags to avoid page overflow
+            severity = flag.get("severity", "low")
+            flag_name = flag.get("flag_name", "Unknown")
+            detail = flag.get("detail", "")
+
+            # Severity cell with color
+            color = severity_colors.get(severity, (200, 200, 200))
+            pdf.set_fill_color(*color)
+            pdf.cell(col_widths[0], 6, severity.upper(), border=1, fill=True)
+
+            # Category and details
+            pdf.set_fill_color(255, 255, 255)
+            pdf.cell(col_widths[1], 6, flag_name[:30], border=1)
+            pdf.cell(col_widths[2], 6, detail[:80], border=1)
+            pdf.ln()
+
+        pdf.ln(3)
 
     async def _build_data_currency(self, pdf: FPDF, db_pool: asyncpg.Pool):
         """Data currency section — retrieval dates per source."""
