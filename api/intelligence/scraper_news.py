@@ -78,6 +78,30 @@ NEWS_FEEDS = [
         'source_type': 'community_plan',
         'priority': 'medium',
     },
+    # The Tyee - investigative journalism
+    {
+        'name': 'The Tyee',
+        'url': 'https://thetyee.ca/Topic/Housing/',
+        'rss_url': 'https://thetyee.ca/rss2.xml',
+        'source_type': 'staff_report',
+        'priority': 'medium',
+    },
+    # Storeys - Canadian real estate news
+    {
+        'name': 'Storeys',
+        'url': 'https://storeys.com/category/vancouver/',
+        'rss_url': 'https://storeys.com/feed/',
+        'source_type': 'staff_report',
+        'priority': 'medium',
+    },
+    # Western Investor - BC commercial real estate
+    {
+        'name': 'Western Investor',
+        'url': 'https://westerninvestor.com/',
+        'rss_url': 'https://westerninvestor.com/feed/',
+        'source_type': 'staff_report',
+        'priority': 'medium',
+    },
 ]
 
 # Keywords that indicate articles relevant to real estate intelligence
