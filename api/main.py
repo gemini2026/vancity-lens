@@ -210,6 +210,7 @@ async def lifespan(app: FastAPI):
     from .intelligence.scraper_contaminated import scrape_and_store as scrape_contaminated
     from .statscan_client import scrape_and_store as scrape_statscan
     from .cmhc_client import scrape_and_store as scrape_cmhc
+    from .intelligence.tavily_search import search_and_store as tavily_search
 
     scheduler.register_scraper("council", scrape_council, "0 6 * * *", enabled=True)
     scheduler.register_scraper("dpb", scrape_dpb, "0 7 * * *", enabled=True)
@@ -221,6 +222,7 @@ async def lifespan(app: FastAPI):
     scheduler.register_scraper("contaminated", scrape_contaminated, "0 4 1 * *", enabled=True)
     scheduler.register_scraper("statscan", scrape_statscan, "0 3 1 * *", enabled=True)
     scheduler.register_scraper("cmhc", scrape_cmhc, "0 3 15 * *", enabled=True)
+    scheduler.register_scraper("tavily_search", tavily_search, "0 */8 * * *", enabled=True)
 
     # F06-002: Register weekly undervalued email digest
     # Monday 08:00 PT = 15:00 UTC  (day_of_week 0 = Monday in scheduler)

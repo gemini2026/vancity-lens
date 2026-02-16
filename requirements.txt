@@ -25,6 +25,9 @@ docling>=2.0.0
 # V2 Intelligence Layer — News Feed Scraping
 feedparser>=6.0.0
 
+# V2 Intelligence Layer — Tavily Search (AI-native web search)
+tavily-python>=0.5.0
+
 # Authentication (VCL-74 / BIZ-001)
 passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.0,<5.0.0
