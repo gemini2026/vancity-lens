@@ -1136,3 +1136,64 @@ async def _generate_stage_transition_alerts(
     except Exception as e:
         # Don't fail the stage update if alert generation fails
         logger.warning(f"Failed to generate stage transition alerts: {e}")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# ENTITY RESOLUTION
+# ════════════════════════════════════════════════════════════════════════════
+
+DEVELOPER_SUFFIXES = re.compile(
+    r"\b(corp\.?|corporation|ltd\.?|limited|inc\.?|incorporated|"
+    r"projects?|holdings?|developments?|group|llc)\b",
+    re.IGNORECASE,
+)
+
+
+def normalize_developer_name(name: str) -> str:
+    """Normalize developer name for matching."""
+    name = name.strip().lower()
+    name = DEVELOPER_SUFFIXES.sub("", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    name = name.rstrip(".").strip()
+    return name
+
+
+async def resolve_developer_entity(conn, developer_name: str) -> int:
+    """Resolve developer name to developer_entities.id.
+
+    1. Normalize name
+    2. Exact match against aliases or canonical_name
+    3. Fuzzy match via pg_trgm (threshold 0.6)
+    4. No match: create new entity
+    """
+    normalized = normalize_developer_name(developer_name)
+
+    row = await conn.fetchrow(
+        "SELECT id, canonical_name FROM developer_entities "
+        "WHERE $1 = ANY(aliases) OR lower(canonical_name) = $1",
+        normalized,
+    )
+    if row:
+        return row["id"]
+
+    row = await conn.fetchrow(
+        "SELECT id, canonical_name, similarity(lower(canonical_name), $1) AS sim "
+        "FROM developer_entities "
+        "WHERE similarity(lower(canonical_name), $1) > 0.6 "
+        "ORDER BY sim DESC LIMIT 1",
+        normalized,
+    )
+    if row:
+        await conn.execute(
+            "UPDATE developer_entities "
+            "SET aliases = array_append(aliases, $1) WHERE id = $2",
+            normalized, row["id"],
+        )
+        return row["id"]
+
+    new_id = await conn.fetchval(
+        "INSERT INTO developer_entities (canonical_name, aliases) "
+        "VALUES ($1, $2) RETURNING id",
+        normalized, [normalized],
+    )
+    return new_id
