@@ -167,6 +167,7 @@ class ReportGenerator:
             self._render_unavailable_section(pdf, "Data Currency", "Data currency tracking source", str(e))
 
         self._build_pro_forma(pdf, parcel_data)
+        self._build_hbu_section(pdf, parcel_data)
         self._build_due_diligence(pdf, parcel_data)
         if parcel_data.comparables:
             self._build_comparable_sales(pdf, parcel_data)
