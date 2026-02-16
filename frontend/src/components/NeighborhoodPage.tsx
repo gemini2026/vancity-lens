@@ -21,7 +21,9 @@ import {
   getNeighborhoodScorecards,
   getNeighborhoodScorecard,
   compareNeighborhoods,
+  getNeighborhoodInvestmentMetrics,
 } from "@/lib/intel-api";
+import type { NeighborhoodInvestmentMetrics } from "@/lib/intel-api";
 import type {
   NeighborhoodSummary,
   NeighborhoodScorecard,
@@ -353,7 +355,51 @@ interface ScorecardDetailProps {
   onBack: () => void;
 }
 
+function getMomentumColor(momentum: number | null): string {
+  if (momentum === null) return "text-gray-500";
+  if (momentum >= 1.5) return "text-emerald-500";
+  if (momentum >= 0.5) return "text-amber-500";
+  return "text-red-500";
+}
+
+function getMomentumBg(momentum: number | null): string {
+  if (momentum === null) return "bg-gray-500/10 border-gray-500/20";
+  if (momentum >= 1.5) return "bg-emerald-500/10 border-emerald-500/20";
+  if (momentum >= 0.5) return "bg-amber-500/10 border-amber-500/20";
+  return "bg-red-500/10 border-red-500/20";
+}
+
+function getMomentumLabel(momentum: number | null): string {
+  if (momentum === null) return "No data";
+  if (momentum >= 1.5) return "Strong growth";
+  if (momentum >= 0.5) return "Stable";
+  return "Cooling";
+}
+
 function ScorecardDetail({ scorecard, onBack }: ScorecardDetailProps) {
+  const [investmentMetrics, setInvestmentMetrics] = useState<NeighborhoodInvestmentMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMetricsLoading(true);
+    getNeighborhoodInvestmentMetrics(scorecard.neighborhood.slug)
+      .then((data) => {
+        if (!cancelled) {
+          setInvestmentMetrics(data);
+          setMetricsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMetricsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scorecard.neighborhood.slug]);
+
   return (
     <div className="p-4 sm:p-6">
       {/* Header */}
@@ -418,6 +464,89 @@ function ScorecardDetail({ scorecard, onBack }: ScorecardDetailProps) {
             Recent Permits
           </div>
         </div>
+      </div>
+
+      {/* Investment Metrics */}
+      <div className="mb-6">
+        <h3 className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
+          Investment Metrics
+        </h3>
+        {metricsLoading ? (
+          <div className="flex items-center justify-center h-[100px] text-gray-500 text-sm">
+            Loading investment metrics...
+          </div>
+        ) : !investmentMetrics ? (
+          <div className="bg-white/[0.03] border border-white/[0.06] rounded-[10px] p-4 text-center text-[13px] text-gray-500">
+            Investment metrics not available for this neighborhood
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Active Projects */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-[10px] p-4 text-center">
+                <div className="text-2xl font-bold text-blue-500">
+                  {investmentMetrics.active_projects}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Active Projects
+                </div>
+              </div>
+
+              {/* Proposed Units */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-[10px] p-4 text-center">
+                <div className="text-2xl font-bold text-purple-500">
+                  {investmentMetrics.proposed_units.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Proposed Units
+                </div>
+              </div>
+
+              {/* Avg Approval Timeline */}
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-[10px] p-4 text-center">
+                <div className="text-2xl font-bold text-amber-500">
+                  {investmentMetrics.avg_approval_months !== null
+                    ? `${investmentMetrics.avg_approval_months}`
+                    : "N/A"}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Avg Approval (months)
+                </div>
+              </div>
+
+              {/* Development Momentum */}
+              <div className={cn(
+                "rounded-[10px] p-4 text-center border",
+                getMomentumBg(investmentMetrics.development_momentum),
+              )}>
+                <div className={cn(
+                  "text-2xl font-bold",
+                  getMomentumColor(investmentMetrics.development_momentum),
+                )}>
+                  {investmentMetrics.development_momentum !== null
+                    ? `${investmentMetrics.development_momentum}x`
+                    : "N/A"}
+                </div>
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Dev Momentum{" "}
+                  <span className={cn(
+                    "text-[10px]",
+                    getMomentumColor(investmentMetrics.development_momentum),
+                  )}>
+                    ({getMomentumLabel(investmentMetrics.development_momentum)})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Supply Pressure Footnote */}
+            {investmentMetrics.supply_pressure !== null && (
+              <div className="mt-2 text-[11px] text-gray-500 text-center">
+                Supply pressure: {investmentMetrics.supply_pressure} proposed units per parcel
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Methodology */}

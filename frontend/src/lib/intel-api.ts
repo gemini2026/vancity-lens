@@ -127,6 +127,24 @@ export async function compareNeighborhoods(slugs: string[]): Promise<Neighborhoo
   return res.json();
 }
 
+// ── Neighborhood Investment Metrics API ────────────
+
+export interface NeighborhoodInvestmentMetrics {
+  neighborhood: string;
+  slug: string;
+  active_projects: number;
+  proposed_units: number;
+  avg_approval_months: number | null;
+  supply_pressure: number | null;
+  development_momentum: number | null;
+}
+
+export async function getNeighborhoodInvestmentMetrics(slug: string): Promise<NeighborhoodInvestmentMetrics | null> {
+  const res = await fetch(`${API_BASE}/api/v1/intel/neighborhoods/${encodeURIComponent(slug)}/investment-metrics`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 // ── RAG-001: Document Viewer API ──────────────────
 
 export async function getDocumentView(documentId: number): Promise<DocumentView | null> {

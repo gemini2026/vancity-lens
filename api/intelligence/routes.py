@@ -1553,6 +1553,23 @@ async def get_single_neighborhood_scorecard(slug: str, request: Request):
     return result
 
 
+@router.get("/neighborhoods/{slug}/investment-metrics")
+async def get_neighborhood_investment_metrics_endpoint(slug: str, request: Request):
+    """Get investment-oriented metrics for a neighborhood.
+
+    Returns supply pipeline count, proposed units, average approval timeline,
+    supply pressure, and development momentum.
+    """
+    from api.intelligence.neighborhood_investment import get_neighborhood_investment_metrics
+
+    db_pool = get_db_pool(request)
+    async with db_pool.acquire() as conn:
+        result = await get_neighborhood_investment_metrics(conn, slug)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Neighborhood '{slug}' not found")
+    return result
+
+
 # ── Chat Session Management Endpoints ────────────────────────────
 
 
