@@ -64,6 +64,7 @@ from . import pipeline_routes
 from . import scraper_schools_routes
 from . import hbu_routes
 from . import cluster_routes
+from . import change_routes
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,9 @@ router.include_router(hbu_routes.router)
 
 # Include cluster routes
 router.include_router(cluster_routes.router)
+
+# Include change routes
+router.include_router(change_routes.router)
 
 
 # ── Utility: Get API keys from environment ────────────────────────────
