@@ -18,6 +18,12 @@
   --color-border: #e5e7eb;
   --color-accent: #0066cc;
 
+  --color-panel: rgba(255, 255, 255, 0.95);
+  --color-panel-border: rgba(0, 0, 0, 0.08);
+  --color-card: #ffffff;
+  --color-card-hover: #f9fafb;
+  --color-overlay: rgba(255, 255, 255, 0.9);
+
   --transition-speed: 0.2s;
 }
 
@@ -36,6 +42,12 @@
 
   --color-border: #404040;
   --color-accent: #3b82f6;
+
+  --color-panel: rgba(10, 10, 10, 0.92);
+  --color-panel-border: rgba(255, 255, 255, 0.1);
+  --color-card: rgba(30, 30, 30, 0.8);
+  --color-card-hover: rgba(40, 40, 40, 0.85);
+  --color-overlay: rgba(10, 10, 10, 0.9);
 }
 
 /* ── Base resets ── */

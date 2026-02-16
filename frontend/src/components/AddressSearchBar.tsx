@@ -183,7 +183,7 @@ export default function AddressSearchBar({
             if (query === "") setIsOpen(true);
           }}
           placeholder={placeholder}
-          className="w-full px-4 py-2 pr-10 bg-slate-900 text-white placeholder-slate-400 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full px-4 py-2 pr-10 bg-[var(--color-surface-secondary)] text-[var(--color-foreground)] placeholder-[var(--color-foreground-muted)] border border-[var(--color-border)] rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 focus:shadow-[0_0_12px_rgba(59,130,246,0.15)]"
           aria-autocomplete="list"
           aria-controls="address-dropdown"
           aria-activedescendant={
@@ -211,7 +211,7 @@ export default function AddressSearchBar({
           ref={dropdownRef}
           id="address-dropdown"
           role="listbox"
-          className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
+          className="absolute top-full left-0 right-0 mt-1 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto"
         >
           {displayResults.map((result, index) => (
             <div

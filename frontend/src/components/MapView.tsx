@@ -15,6 +15,8 @@ import FinancingCalculator from "./FinancingCalculator";
 import CaseStudyCarousel from "./CaseStudyCarousel";
 import type { GeocodingResult } from "@/lib/geocoding";
 import { getApiBase } from "@/lib/api-base";
+import { useTheme } from "@/lib/theme-context";
+import { Layers } from "lucide-react";
 
 const API_BASE = getApiBase();
 
@@ -108,6 +110,7 @@ export default function MapView() {
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const signalMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const clusterMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const selectionMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSignals, setShowSignals] = useState(true);
   const [showClusters, setShowClusters] = useState(true);
@@ -121,6 +124,9 @@ export default function MapView() {
   const [visibleTiers, setVisibleTiers] = useState<Record<number, boolean>>({ 1: true, 2: true, 3: true });
   const [showRiskChoropleth, setShowRiskChoropleth] = useState(false);
   const [riskScores, setRiskScores] = useState<NeighborhoodRisk[]>([]);
+  const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const mapStyle = resolvedTheme === "dark" ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
 
   const toggleTier = useCallback((tier: number) => {
     setVisibleTiers(prev => {
@@ -499,6 +505,11 @@ export default function MapView() {
         getSignalsForParcel(nearest.pid, 500).catch(() => [] as IntelSignal[]),
       ]);
       openDetailPanel(data, signals);
+      // Add pulsing selection marker at click location
+      if (selectionMarkerRef.current) selectionMarkerRef.current.remove();
+      const selEl = document.createElement("div");
+      selEl.style.cssText = "width:24px;height:24px;border-radius:50%;border:3px solid #3b82f6;background:rgba(59,130,246,0.15);box-shadow:0 0 12px rgba(59,130,246,0.4);pointer-events:none";
+      selectionMarkerRef.current = new mapboxgl.Marker({ element: selEl }).setLngLat(e.lngLat).addTo(map.current!);
     } catch (err) {
       console.error("Click lookup failed:", err);
     } finally {
@@ -543,7 +554,7 @@ export default function MapView() {
       mapboxgl.accessToken = token;
       m = new mapboxgl.Map({
         container: mapContainer.current,
-        style: "mapbox://styles/mapbox/dark-v11",
+        style: mapStyle,
         center: [-123.1148, 49.2632],
         zoom: 13,
       });
@@ -706,9 +717,12 @@ export default function MapView() {
       signalMarkersRef.current = [];
       clusterMarkersRef.current.forEach(mk => mk.remove());
       clusterMarkersRef.current = [];
+      if (selectionMarkerRef.current) selectionMarkerRef.current.remove();
+      selectionMarkerRef.current = null;
       m.remove();
       map.current = null;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleMapClick, openDetailPanel]);
 
   // Toggle signal markers visibility
@@ -742,14 +756,14 @@ export default function MapView() {
           50% { box-shadow: 0 0 0 10px rgba(168,85,247,0); }
         }
       `}</style>
-      <div ref={mapContainer} className="w-full h-full bg-[#0a0a0a]" />
+      <div ref={mapContainer} className="w-full h-full bg-[var(--color-surface)]" />
 
       {/* Fallback when map cannot initialize */}
       {mapError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0a] text-gray-500 text-sm z-5">
+        <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-foreground-muted)] text-sm z-5">
           <div className="text-center">
             <div className="text-5xl mb-4">🗺️</div>
-            <div className="text-gray-400 mb-1">Map unavailable</div>
+            <div className="text-[var(--color-foreground-muted)] mb-1">Map unavailable</div>
             <div className="text-xs">{mapError}</div>
           </div>
         </div>
@@ -757,9 +771,9 @@ export default function MapView() {
 
       {/* Address Search — top-left overlay */}
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-        <div className="hidden md:block bg-gray-900/92 backdrop-blur-md rounded-lg px-4 py-3 border border-white/10">
-          <div className="text-gray-100 font-bold text-lg">VanCity Lens</div>
-          <div className="text-gray-400 text-[11px] mt-0.5">Bill 47 Entitlement Engine · 92K parcels</div>
+        <div className="hidden md:block bg-[var(--color-panel)] backdrop-blur-md rounded-lg px-4 py-3 border border-[var(--color-panel-border)]">
+          <div className="text-[var(--color-foreground)] font-bold text-lg">VanCity Lens</div>
+          <div className="text-[var(--color-foreground-muted)] text-[11px] mt-0.5">Bill 47 Entitlement Engine · 92K parcels</div>
         </div>
         <div className="w-[280px] md:w-[320px]">
           <AddressSearchBar onSelect={handleAddressSelect} placeholder="Search address in Vancouver" />
@@ -767,8 +781,8 @@ export default function MapView() {
       </div>
 
       {/* Legend — hidden on mobile, shown on desktop */}
-      <div className="hidden md:block absolute bottom-8 left-4 z-10 bg-gray-900/92 backdrop-blur-md rounded-lg px-4 py-3 border border-white/10 text-[11px] text-gray-300">
-        <div className="font-semibold mb-1.5 text-gray-100">TOA Zones (Bill 47)</div>
+      <div className="hidden md:block absolute bottom-8 left-4 z-10 bg-[var(--color-panel)] backdrop-blur-md rounded-lg px-4 py-3 border border-[var(--color-panel-border)] text-[11px] text-[var(--color-foreground-muted)]">
+        <div className="font-semibold mb-1.5 text-[var(--color-foreground)]">TOA Zones (Bill 47)</div>
         {[
           { tier:1, label:"0–200m: 20 storeys / 5.5 FSR", color:TIER_COLORS[1], border:TIER_BORDERS[1] },
           { tier:2, label:"200–400m: 12 storeys / 4.0 FSR", color:TIER_COLORS[2], border:TIER_BORDERS[2] },
@@ -803,17 +817,18 @@ export default function MapView() {
         </div>
       </div>
 
-      {/* Signal layer toggle + Cluster toggle + Examples button */}
-      <div className="absolute top-20 md:top-[90px] right-4 z-10 flex flex-col gap-2">
+      {/* Desktop: individual toggles */}
+      <div className="hidden md:flex absolute top-[90px] right-4 z-10 flex-col gap-2">
         <button
           onClick={() => setShowSignals(!showSignals)}
           className={cn(
             "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showSignals
-              ? "bg-blue-500/90 border border-blue-400 text-white"
-              : "bg-gray-900/92 border border-white/10 text-gray-400"
+              ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+              : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
           )}
         >
+          <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
           {showSignals ? "Hide" : "Show"} Signals
         </button>
         <button
@@ -821,10 +836,11 @@ export default function MapView() {
           className={cn(
             "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showClusters
-              ? "bg-purple-500/90 border border-purple-400 text-white"
-              : "bg-gray-900/92 border border-white/10 text-gray-400"
+              ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+              : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
           )}
         >
+          <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1.5" />
           {showClusters ? "Hide" : "Show"} Clusters{clusters.length > 0 ? ` (${clusters.length})` : ""}
         </button>
         <button
@@ -832,26 +848,86 @@ export default function MapView() {
           className={cn(
             "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showRiskChoropleth
-              ? "bg-red-600/90 border border-red-400 text-white"
-              : "bg-gray-900/92 border border-white/10 text-gray-400"
+              ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+              : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
           )}
           title="Toggle neighborhood risk overlay"
         >
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
           Risk Map
         </button>
         {!showCaseStudies && (
           <button
             onClick={() => setShowCaseStudies(true)}
-            className="px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-gray-900/92 border border-white/10 text-gray-400 hover:text-gray-200"
+            className="px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
           >
             Examples
           </button>
         )}
       </div>
 
+      {/* Mobile: Layers FAB */}
+      <div className="md:hidden absolute bottom-20 right-4 z-10">
+        <button
+          onClick={() => setShowLayerMenu(!showLayerMenu)}
+          className="w-12 h-12 rounded-full bg-[var(--color-panel)] border border-[var(--color-panel-border)] backdrop-blur-md flex items-center justify-center text-[var(--color-foreground-muted)] shadow-lg"
+        >
+          <Layers className="w-5 h-5" />
+        </button>
+        {showLayerMenu && (
+          <div className="absolute bottom-14 right-0 bg-[var(--color-panel)] border border-[var(--color-panel-border)] backdrop-blur-md rounded-xl p-3 flex flex-col gap-2 min-w-[160px] shadow-xl">
+            <button
+              onClick={() => setShowSignals(!showSignals)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                showSignals
+                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+              )}
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
+              {showSignals ? "Hide" : "Show"} Signals
+            </button>
+            <button
+              onClick={() => setShowClusters(!showClusters)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                showClusters
+                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+              )}
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1.5" />
+              {showClusters ? "Hide" : "Show"} Clusters{clusters.length > 0 ? ` (${clusters.length})` : ""}
+            </button>
+            <button
+              onClick={() => setShowRiskChoropleth(prev => !prev)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                showRiskChoropleth
+                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+              )}
+              title="Toggle neighborhood risk overlay"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
+              Risk Map
+            </button>
+            {!showCaseStudies && (
+              <button
+                onClick={() => setShowCaseStudies(true)}
+                className="px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
+              >
+                Examples
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Loading overlay */}
       {loading && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 rounded-lg px-6 py-4 text-gray-100 text-sm z-20">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--color-panel)] backdrop-blur-md rounded-lg px-6 py-4 text-[var(--color-foreground)] text-sm z-20 border border-[var(--color-panel-border)]">
           Analyzing parcel…
         </div>
       )}
@@ -861,7 +937,7 @@ export default function MapView() {
         <ParcelDetailPanel
           data={selectedParcel}
           nearbySignals={selectedSignals}
-          onClose={() => { setSelectedParcel(null); setSelectedSignals([]); }}
+          onClose={() => { setSelectedParcel(null); setSelectedSignals([]); if (selectionMarkerRef.current) { selectionMarkerRef.current.remove(); selectionMarkerRef.current = null; } }}
           onRunDealModel={(pid) => { setFinancingPid(pid); setShowFinancing(true); }}
         />
       )}

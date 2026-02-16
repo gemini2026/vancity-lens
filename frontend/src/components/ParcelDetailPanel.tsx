@@ -144,7 +144,7 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
   const handleDownloadMemo = () => window.open(`${API_BASE}/api/v1/parcels/${data.pid}/memo.pdf`, "_blank");
 
   return (
-    <div className="absolute inset-0 md:inset-y-0 md:left-auto md:right-0 md:w-[440px] bg-gray-900 md:border-l md:border-white/10 z-30 flex flex-col text-gray-100 shadow-[-4px_0_20px_rgba(0,0,0,0.3)]">
+    <div className="absolute inset-0 md:inset-y-0 md:left-auto md:right-0 md:w-[440px] bg-[var(--color-surface)] md:border-l md:border-[var(--color-panel-border)] z-30 flex flex-col text-gray-100 shadow-[-4px_0_20px_rgba(0,0,0,0.3)]">
       {/* Header */}
       <div className="flex justify-between items-center px-4 py-3 text-white" style={{ background: color }}>
         <span className="font-bold text-sm">
@@ -428,10 +428,10 @@ export default function ParcelDetailPanel({ data, nearbySignals, onClose, onRunD
           <CollapsibleSection
             title="Risk Assessment"
             badge={
-              <span className="text-[10px] text-gray-500 ml-1.5">
-                {v.red_flag_count ? <span className="text-red-400">{v.red_flag_count} red </span> : null}
-                {v.yellow_flag_count ? <span className="text-amber-300">{v.yellow_flag_count} yellow </span> : null}
-                {v.green_flag_count ? <span className="text-green-300">{v.green_flag_count} green</span> : null}
+              <span className="flex gap-1.5 ml-1.5">
+                {v.red_flag_count ? <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-medium">{v.red_flag_count} Risk</span> : null}
+                {v.yellow_flag_count ? <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">{v.yellow_flag_count} Caution</span> : null}
+                {v.green_flag_count ? <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-medium">{v.green_flag_count} Clear</span> : null}
               </span>
             }
           >

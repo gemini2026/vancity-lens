@@ -321,7 +321,7 @@ function NeighborhoodCard({
         <div className="text-xl font-bold leading-none" style={{ color }}>
           {summary.overall_score.toFixed(1)}
         </div>
-        <div className="text-[10px] text-gray-500">
+        <div className="text-xs font-medium" style={{ color: getScoreColor(summary.overall_score) }}>
           {getScoreLabel(summary.overall_score)}
         </div>
       </div>
@@ -581,6 +581,8 @@ export default function NeighborhoodPage() {
   const [error, setError] = useState<string | null>(null);
   const [compareSet, setCompareSet] = useState<Set<string>>(new Set());
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState("");
+  const [sortBy, setSortBy] = useState<"score-desc" | "score-asc" | "name-asc">("score-desc");
 
   // Load neighborhood list
   useEffect(() => {
@@ -681,32 +683,51 @@ export default function NeighborhoodPage() {
     setComparison(null);
   }, []);
 
+  const filteredSummaries = summaries
+    .filter(s => s.name.toLowerCase().includes(searchText.toLowerCase()))
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "score-asc": return a.overall_score - b.overall_score;
+        case "name-asc": return a.name.localeCompare(b.name);
+        default: return b.overall_score - a.overall_score;
+      }
+    });
+
   // ── Render ───────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col bg-slate-900 text-gray-100">
+    <div className="h-full flex flex-col bg-[var(--color-surface)] text-[var(--color-foreground)]">
       {/* Page Header */}
-      <div className="px-4 sm:px-6 pt-5 pb-3 border-b border-white/[0.06]">
+      <div className="px-4 sm:px-6 pt-5 pb-3 border-b border-[var(--color-border)]">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-gray-100 m-0">
+            <h1 className="text-lg font-bold text-[var(--color-foreground)] m-0">
               Neighborhood Scorecards
             </h1>
-            <p className="text-xs text-gray-500 mt-1 mb-0">
+            <p className="text-xs text-[var(--color-foreground-muted)] mt-1 mb-0">
               Quality-of-life ratings across 22 Vancouver neighborhoods
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {view.type === "list" && compareSet.size >= 2 && (
-              <button
-                onClick={handleCompare}
-                className="bg-blue-500 border-none rounded-lg text-white px-4 py-2 text-[13px] font-semibold cursor-pointer transition-colors hover:bg-blue-600"
-              >
-                Compare ({compareSet.size})
-              </button>
-            )}
+          {view.type === "list" && (
+            <div className="flex items-center gap-2">
+              {compareSet.size >= 2 ? (
+                <button
+                  onClick={handleCompare}
+                  className="bg-blue-500 border-none rounded-lg text-white px-4 py-2 text-[13px] font-semibold cursor-pointer transition-colors hover:bg-blue-600"
+                >
+                  Compare Selected ({compareSet.size})
+                </button>
+              ) : (
+                <span className="text-[11px] text-[var(--color-foreground-muted)]">
+                  Select 2-4 to compare
+                </span>
+              )}
+              <ExportButton exportType="neighborhoods" label="Export CSV" />
+            </div>
+          )}
+          {view.type !== "list" && (
             <ExportButton exportType="neighborhoods" label="Export CSV" />
-          </div>
+          )}
         </div>
       </div>
 
@@ -725,30 +746,57 @@ export default function NeighborhoodPage() {
         )}
 
         {!loading && !error && view.type === "list" && (
-          <div className="flex flex-col gap-2 px-4 sm:px-6 py-4">
-            {summaries.length === 0 ? (
-              <div className="text-center py-12 px-6 text-gray-500">
-                <BarChart3 className="size-8 mx-auto mb-3 text-gray-600" />
-                <div className="text-sm font-medium">
-                  No neighborhood data yet
+          <>
+            <div className="px-4 sm:px-6 pt-3 pb-1 flex gap-2">
+              <input
+                type="text"
+                placeholder="Search neighborhoods..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="flex-1 px-3 py-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-foreground)] placeholder-[var(--color-foreground-muted)] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-2.5 py-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded-lg text-sm text-[var(--color-foreground)] focus:outline-none focus:border-blue-500"
+              >
+                <option value="score-desc">Score: High &rarr; Low</option>
+                <option value="score-asc">Score: Low &rarr; High</option>
+                <option value="name-asc">Name: A &rarr; Z</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-2 px-4 sm:px-6 py-4">
+              {summaries.length === 0 ? (
+                <div className="text-center py-12 px-6 text-[var(--color-foreground-muted)]">
+                  <BarChart3 className="size-8 mx-auto mb-3 text-[var(--color-foreground-muted)]" />
+                  <div className="text-sm font-medium">
+                    No neighborhood data yet
+                  </div>
+                  <div className="text-xs mt-1">
+                    Run the data scrapers to populate quality-of-life scores
+                  </div>
                 </div>
-                <div className="text-xs mt-1">
-                  Run the data scrapers to populate quality-of-life scores
-                </div>
-              </div>
-            ) : (
-              summaries.map((s) => (
-                <NeighborhoodCard
-                  key={s.slug}
-                  summary={s}
-                  onSelect={() => handleSelect(s.slug)}
-                  isSelected={selectedSlug === s.slug}
-                  onCompareToggle={() => handleCompareToggle(s.slug)}
-                  isComparing={compareSet.has(s.slug)}
-                />
-              ))
-            )}
-          </div>
+              ) : (
+                <>
+                  {filteredSummaries.map((s) => (
+                    <NeighborhoodCard
+                      key={s.slug}
+                      summary={s}
+                      onSelect={() => handleSelect(s.slug)}
+                      isSelected={selectedSlug === s.slug}
+                      onCompareToggle={() => handleCompareToggle(s.slug)}
+                      isComparing={compareSet.has(s.slug)}
+                    />
+                  ))}
+                  {compareSet.size === 0 && filteredSummaries.length > 0 && (
+                    <div className="text-center text-[11px] text-[var(--color-foreground-muted)] py-2">
+                      Tick the checkboxes on the right to compare neighborhoods side-by-side
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
         )}
 
         {!loading && !error && view.type === "detail" && scorecard && (
