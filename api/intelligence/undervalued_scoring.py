@@ -9,6 +9,7 @@ Threshold: >25% discount flags as undervalued.
 """
 
 import logging
+from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
@@ -115,6 +116,85 @@ async def compute_comp_averages(
     return averages
 
 
+async def generate_undervalued_alerts(
+    db_pool: asyncpg.Pool,
+    scored_parcels: list,
+) -> int:
+    """
+    Evaluate scored parcels against user watchlist rules and generate alerts.
+
+    Args:
+        db_pool: Database connection pool
+        scored_parcels: List of dicts from scoring run with keys:
+            pid, discount_pct, lot_area_sqft, tod_tier, is_undervalued, neighborhood
+
+    Returns:
+        Count of alerts generated.
+    """
+    from api.intelligence.alerts import AlertEngine, WatchlistRule, RuleType
+
+    alerts_created = 0
+
+    try:
+        async with db_pool.acquire() as conn:
+            # Get active watchlists with undervalued-related rules
+            watchlists = await conn.fetch("""
+                SELECT w.id, w.user_id, wr.rule_type, wr.rule_value
+                FROM watchlists w
+                JOIN watchlist_rules wr ON wr.watchlist_id = w.id
+                WHERE w.is_active = true
+                  AND wr.rule_type IN ('undervalued_discount', 'undervalued_lot_area', 'undervalued_tod_tier')
+            """)
+
+            if not watchlists:
+                return 0
+
+            # Group rules by watchlist_id
+            wl_rules: dict = defaultdict(list)
+            for row in watchlists:
+                wl_rules[row["id"]].append(row)
+
+            for parcel in scored_parcels:
+                if not parcel.get("is_undervalued"):
+                    continue
+
+                signal = {
+                    "discount_pct": parcel.get("discount_pct", 0),
+                    "lot_area_sqft": parcel.get("lot_area_sqft", 0),
+                    "tod_tier": parcel.get("tod_tier"),
+                }
+
+                for wl_id, rules in wl_rules.items():
+                    rule_objs = [
+                        WatchlistRule(
+                            rule_type=RuleType(r["rule_type"]),
+                            rule_value=r["rule_value"],
+                        )
+                        for r in rules
+                    ]
+                    if AlertEngine.match_rules(signal, rule_objs):
+                        try:
+                            await conn.execute("""
+                                INSERT INTO alerts (
+                                    watchlist_id, signal_id, alert_type,
+                                    headline, summary, severity, created_at
+                                ) VALUES ($1, 0, 'undervalued_match', $2, $3, 'medium', NOW())
+                                ON CONFLICT DO NOTHING
+                            """,
+                                wl_id,
+                                f"Undervalued: {parcel.get('pid', '?')} ({parcel.get('discount_pct', 0):.0f}% below market)",
+                                f"Parcel {parcel.get('pid')} in {parcel.get('neighborhood', 'N/A')} flagged as undervalued.",
+                            )
+                            alerts_created += 1
+                        except Exception as e:
+                            logger.warning("Error creating undervalued alert: %s", e)
+
+    except Exception as e:
+        logger.warning("Error in undervalued alert generation: %s", e)
+
+    return alerts_created
+
+
 async def score_parcels(
     db_pool: asyncpg.Pool,
     limit: int = 1000,
@@ -125,6 +205,7 @@ async def score_parcels(
     Returns stats: parcels_scored, undervalued_count, errors.
     """
     stats = {"parcels_scored": 0, "undervalued_count": 0, "errors": 0}
+    scored_list = []  # Collect scored parcels for alert generation
 
     # Get comp averages per neighborhood
     comp_avgs = await compute_comp_averages(db_pool)
@@ -229,12 +310,30 @@ async def score_parcels(
                     if flagged and not has_active:
                         stats["undervalued_count"] += 1
 
+                    # Collect scored parcel for alert generation
+                    lot_area_sqft = float(parcel["lot_area_sqm"] or 0) * 10.7639
+                    scored_list.append({
+                        "pid": parcel["pid"],
+                        "discount_pct": discount or 0,
+                        "lot_area_sqft": round(lot_area_sqft, 1),
+                        "tod_tier": None,  # TOD tier not available in current schema
+                        "is_undervalued": flagged,
+                        "neighborhood": neighborhood,
+                    })
+
                 except Exception as e:
                     logger.debug("Error scoring parcel %s: %s", parcel["pid"], str(e)[:100])
                     stats["errors"] += 1
 
     except Exception as e:
         logger.error("Scoring batch failed: %s", str(e)[:200])
+
+    # Generate alerts for matched watchlist rules
+    try:
+        alerts = await generate_undervalued_alerts(db_pool, scored_list)
+        stats["alerts_generated"] = alerts
+    except Exception as e:
+        logger.warning("Error generating undervalued alerts: %s", e)
 
     logger.info("Undervalued scoring complete: %s", stats)
     return stats

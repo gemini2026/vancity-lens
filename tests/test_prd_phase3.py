@@ -158,3 +158,22 @@ class TestRiskChoropleth:
         # Should define risk score color thresholds
         assert ("RISK_COLORS" in content or "riskColor" in content or
                 ("green" in content.lower() and "risk" in content.lower()))
+
+
+class TestUndervaluedAlertGeneration:
+    """F06-B: Alert generation after scoring run."""
+
+    def test_generate_undervalued_alerts_exists(self):
+        from api.intelligence import undervalued_scoring
+        assert hasattr(undervalued_scoring, "generate_undervalued_alerts")
+
+    def test_generate_undervalued_alerts_is_async(self):
+        import asyncio
+        from api.intelligence.undervalued_scoring import generate_undervalued_alerts
+        assert asyncio.iscoroutinefunction(generate_undervalued_alerts)
+
+    def test_score_parcels_references_alerts(self):
+        import inspect
+        from api.intelligence.undervalued_scoring import score_parcels
+        source = inspect.getsource(score_parcels)
+        assert "generate_undervalued_alerts" in source or "alert" in source.lower()
