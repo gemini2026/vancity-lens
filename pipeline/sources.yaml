@@ -93,6 +93,123 @@ sources:
         page_source_type: "syc_plan_page"
         document_source_type: "syc_plan_document"
 
+  - id: syc_marpole_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Marpole Community Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/marpole-community-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_west_end_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — West End Community Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/west-end-community-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_mount_pleasant_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Mount Pleasant Community Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/mount-pleasant-community-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_norquay_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Norquay Village Neighbourhood Centre Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/norquay-village-neighbourhood-centre-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_cambie_corridor_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Cambie Corridor Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/cambie-corridor-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  - id: syc_grandview_woodland_plan_documents
+    enabled: true
+    priority: p1
+    cadence: weekly
+    name: "Shape Your City Vancouver — Grandview-Woodland Community Plan (Documents)"
+    discover:
+      type: syc_document_library_page
+      page_url: "https://www.shapeyourcity.ca/grandview-woodland-community-plan/documents"
+      ingest_page: true
+      store:
+        page_source_type: "syc_plan_page"
+        document_source_type: "syc_plan_document"
+
+  # ──────────────────────────────────────────────────────────────
+  # P0/P1: Zoning, Heritage & View Protection (Municipal)
+  # ──────────────────────────────────────────────────────────────
+  - id: vancouver_zoning_bylaw
+    enabled: true
+    priority: p0
+    cadence: monthly
+    name: "City of Vancouver — Zoning and Development By-law 3575"
+    discover:
+      type: static_urls
+      store:
+        source_type: "municipal_bylaw"
+      urls:
+        - "https://bylaws.vancouver.ca/zoning/zoning-and-development-by-law-3575.pdf"
+
+  - id: vancouver_heritage_register
+    enabled: true
+    priority: p1
+    cadence: monthly
+    name: "City of Vancouver — Heritage Register (Open Data)"
+    discover:
+      type: static_urls
+      store:
+        source_type: "heritage_register"
+      urls:
+        - "https://opendata.vancouver.ca/explore/dataset/heritage-register/information/"
+
+  - id: vancouver_view_cones
+    enabled: true
+    priority: p1
+    cadence: monthly
+    name: "City of Vancouver — View Protection Guidelines (Open Data)"
+    discover:
+      type: static_urls
+      store:
+        source_type: "view_protection"
+      urls:
+        - "https://opendata.vancouver.ca/explore/dataset/view-protection-guidelines/information/"
+
   # ──────────────────────────────────────────────────────────────
   # P1: Provincial Legislation / Regulations (HTML)
   # ──────────────────────────────────────────────────────────────
