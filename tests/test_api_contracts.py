@@ -552,6 +552,132 @@ class TestTopOpportunitiesEndpoint:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Map Prospecting Layer (ILR + Signal Count) Tests
+# ────────────────────────────────────────────────────────────────────────────
+
+
+class TestOpportunitiesMapProspecting:
+    """Tests for ILR and signal_count fields in opportunities map endpoint."""
+
+    def test_opportunities_sql_includes_ilr_and_signal_count(self):
+        """Verify the SQL query in the source code includes ILR and signal_count."""
+        import inspect
+        from api.main import top_opportunities
+        source = inspect.getsource(top_opportunities)
+        assert "ilr" in source.lower(), "SQL query must compute ILR"
+        assert "signal_count" in source.lower(), "SQL query must compute signal_count"
+        assert "NULLIF" in source, "ILR must use NULLIF for safe division"
+        assert "intelligence_signals" in source, "signal_count must query intelligence_signals"
+
+    def test_streaming_sql_includes_ilr_and_signal_count(self):
+        """Verify the streaming endpoint SQL also includes ILR and signal_count."""
+        import inspect
+        from api.main import top_opportunities_stream
+        source = inspect.getsource(top_opportunities_stream)
+        assert "ilr" in source.lower(), "Streaming SQL must compute ILR"
+        assert "signal_count" in source.lower(), "Streaming SQL must compute signal_count"
+        assert "NULLIF" in source, "Streaming ILR must use NULLIF for safe division"
+
+    @pytest.mark.asyncio
+    async def test_opportunities_response_includes_ilr_field(self):
+        """Opportunities response items include the ilr field via direct function call."""
+        from api.main import top_opportunities
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value={"total": 1})
+        mock_conn.fetch = AsyncMock(return_value=[
+            {
+                "pid": "001-234-567", "civic_address": "100 Main St",
+                "current_zoning": "RS-1", "asking_price": 2500000,
+                "assessed_value": 2000000, "lot_area_sqm": 600,
+                "lng": -123.12, "lat": 49.28,
+                "station_name": "Broadway-City Hall", "tier": 1,
+                "max_storeys": 20, "max_fsr": 5.0,
+                "current_height": 2, "current_fsr_val": 0.6,
+                "effective_storeys": 20, "effective_fsr": 5.0,
+                "storey_uplift": 18, "dist_m": 150, "est_value": 32000000,
+                "already_exceeds": False,
+                "ilr": 0.4500, "signal_count": 3,
+            }
+        ])
+        mock_acm = AsyncMock()
+        mock_acm.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_acm.__aexit__ = AsyncMock(return_value=False)
+        with patch("api.main.db") as mock_db:
+            mock_db.acquire.return_value = mock_acm
+            result = await top_opportunities(page=1, page_size=10, limit=None)
+            items = result.items
+            assert len(items) == 1
+            assert "ilr" in items[0], "Response must include ilr field"
+            assert items[0]["ilr"] == 0.45
+            assert "signal_count" in items[0], "Response must include signal_count field"
+            assert items[0]["signal_count"] == 3
+
+    @pytest.mark.asyncio
+    async def test_opportunities_ilr_null_when_no_values(self):
+        """ILR is null when land_value + improvement_value is zero (NULLIF)."""
+        from api.main import top_opportunities
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value={"total": 1})
+        mock_conn.fetch = AsyncMock(return_value=[
+            {
+                "pid": "003-456-789", "civic_address": "300 Elm St",
+                "current_zoning": "RS-1", "asking_price": None,
+                "assessed_value": 800000, "lot_area_sqm": 500,
+                "lng": -123.08, "lat": 49.25,
+                "station_name": "Joyce", "tier": 3,
+                "max_storeys": 8, "max_fsr": 2.5,
+                "current_height": 2, "current_fsr_val": 0.5,
+                "effective_storeys": 8, "effective_fsr": 2.5,
+                "storey_uplift": 6, "dist_m": 500, "est_value": 13400000,
+                "already_exceeds": False,
+                "ilr": None, "signal_count": 0,
+            }
+        ])
+        mock_acm = AsyncMock()
+        mock_acm.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_acm.__aexit__ = AsyncMock(return_value=False)
+        with patch("api.main.db") as mock_db:
+            mock_db.acquire.return_value = mock_acm
+            result = await top_opportunities(page=1, page_size=10, limit=None)
+            items = result.items
+            assert len(items) == 1
+            assert items[0]["ilr"] is None
+            assert items[0]["signal_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_opportunities_signal_count_nonzero(self):
+        """Signal count correctly passes through from DB query."""
+        from api.main import top_opportunities
+        mock_conn = AsyncMock()
+        mock_conn.fetchrow = AsyncMock(return_value={"total": 1})
+        mock_conn.fetch = AsyncMock(return_value=[
+            {
+                "pid": "002-345-678", "civic_address": "200 Oak St",
+                "current_zoning": "C-2", "asking_price": None,
+                "assessed_value": 1500000, "lot_area_sqm": 450,
+                "lng": -123.10, "lat": 49.26,
+                "station_name": "Oakridge", "tier": 2,
+                "max_storeys": 12, "max_fsr": 3.5,
+                "current_height": 3, "current_fsr_val": 1.2,
+                "effective_storeys": 12, "effective_fsr": 3.5,
+                "storey_uplift": 9, "dist_m": 300, "est_value": 16800000,
+                "already_exceeds": False,
+                "ilr": 0.3200, "signal_count": 7,
+            }
+        ])
+        mock_acm = AsyncMock()
+        mock_acm.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_acm.__aexit__ = AsyncMock(return_value=False)
+        with patch("api.main.db") as mock_db:
+            mock_db.acquire.return_value = mock_acm
+            result = await top_opportunities(page=1, page_size=10, limit=None)
+            items = result.items
+            assert len(items) == 1
+            assert items[0]["signal_count"] == 7
+            assert items[0]["ilr"] == 0.32
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # TOA GeoJSON Endpoint Tests
 # ────────────────────────────────────────────────────────────────────────────
 

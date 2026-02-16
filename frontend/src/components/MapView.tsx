@@ -107,6 +107,7 @@ export default function MapView() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const hoverPopupRef = useRef<mapboxgl.Popup | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const signalMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const clusterMarkersRef = useRef<mapboxgl.Marker[]>([]);
@@ -125,6 +126,7 @@ export default function MapView() {
   const [showRiskChoropleth, setShowRiskChoropleth] = useState(false);
   const [riskScores, setRiskScores] = useState<NeighborhoodRisk[]>([]);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const { resolvedTheme } = useTheme();
   const mapStyle = resolvedTheme === "dark" ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
 
@@ -598,11 +600,49 @@ export default function MapView() {
           const dotColor = hasPrice ? "#22c55e" : alreadyExceeds ? "#3b82f6" : isHighAlpha ? "#dc2626" : isMod ? "#ea580c" : "#ca8a04";
           const dotSize = hasPrice ? 15 : isHighAlpha ? 14 : isMod ? 12 : 10;
           el.style.cssText = `width:${dotSize}px;height:${dotSize}px;border-radius:50%;background:${dotColor};border:2px solid rgba(255,255,255,0.85);cursor:pointer;box-shadow:0 0 ${hasPrice ? 12 : isHighAlpha ? 10 : 6}px ${dotColor}50`;
-          el.title = `${opp.civic_address || opp.pid} — ${hasPrice ? `$${(opp.asking_price/1e6).toFixed(1)}M · ` : ""}${alreadyExceeds ? "already zoned" : `+${uplift}st uplift`}`;
           const marker = new mapboxgl.Marker({ element: el }).setLngLat([opp.lng, opp.lat]).addTo(m);
           markersRef.current.push(marker);
+
+          // Hover popup with rich info
+          const tierLabel = opp.tier ? `T${opp.tier}` : "—";
+          const tierBadgeColor = opp.tier === 1 ? "#dc2626" : opp.tier === 2 ? "#ea580c" : "#ca8a04";
+          const ilrPct = opp.ilr != null ? `${(opp.ilr * 100).toFixed(0)}%` : "N/A";
+          const sigCount = opp.signal_count ?? 0;
+          el.addEventListener("mouseenter", () => {
+            hoverPopupRef.current?.remove();
+            hoverPopupRef.current = new mapboxgl.Popup({
+              offset: 15,
+              closeButton: false,
+              closeOnClick: false,
+              maxWidth: "260px",
+            })
+              .setLngLat([opp.lng, opp.lat])
+              .setHTML(`
+                <div style="font-family:system-ui,sans-serif;padding:8px 10px;background:#111827;color:#f3f4f6;border-radius:6px;min-width:180px">
+                  <div style="font-size:12px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(opp.civic_address || opp.pid)}</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+                    <span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:${tierBadgeColor};color:#fff">${escapeHtml(tierLabel)}</span>
+                    ${!alreadyExceeds ? `<span style="font-size:10px;color:#86efac;font-weight:600">+${uplift}st uplift</span>` : '<span style="font-size:10px;color:#93c5fd">Already zoned</span>'}
+                    ${hasPrice ? `<span style="font-size:10px;color:#fbbf24;font-weight:600">$${(opp.asking_price / 1e6).toFixed(1)}M</span>` : ""}
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:10px;color:#9ca3af">
+                    <span>FSR</span><span style="color:#f3f4f6;font-weight:500">${opp.effective_fsr?.toFixed(1) ?? "—"}</span>
+                    <span>ILR</span><span style="color:#f3f4f6;font-weight:500">${escapeHtml(ilrPct)}</span>
+                    <span>Signals</span><span style="color:${sigCount > 0 ? "#fbbf24" : "#6b7280"};font-weight:500">${sigCount}</span>
+                    <span>Est. Value</span><span style="color:#f3f4f6;font-weight:500">${opp.est_value ? fmt(opp.est_value) : "—"}</span>
+                  </div>
+                </div>
+              `)
+              .addTo(m);
+          });
+          el.addEventListener("mouseleave", () => {
+            hoverPopupRef.current?.remove();
+            hoverPopupRef.current = null;
+          });
+
           el.addEventListener("click", async (ev) => {
             ev.stopPropagation();
+            hoverPopupRef.current?.remove();
             setLoading(true);
             try {
               const [data, signals] = await Promise.all([
@@ -657,6 +697,40 @@ export default function MapView() {
               .addTo(m);
             signalMarkersRef.current.push(marker);
           });
+
+          // Also add GeoJSON source for heatmap layer
+          const severityWeight: Record<string, number> = { critical: 1.0, high: 0.75, medium: 0.5, low: 0.25, info: 0.1 };
+          const heatmapFeatures = geojson.features.map((f: any) => ({
+            ...f,
+            properties: { ...f.properties, weight: severityWeight[f.properties.severity] ?? 0.25 },
+          }));
+          if (!m.getSource("signals-heatmap")) {
+            m.addSource("signals-heatmap", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: heatmapFeatures },
+            });
+            m.addLayer({
+              id: "signals-heatmap-layer",
+              type: "heatmap",
+              source: "signals-heatmap",
+              layout: { visibility: "none" },
+              paint: {
+                "heatmap-weight": ["get", "weight"],
+                "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 1, 15, 3],
+                "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 15, 15, 30],
+                "heatmap-color": [
+                  "interpolate", ["linear"], ["heatmap-density"],
+                  0, "rgba(0,0,0,0)",
+                  0.2, "rgba(103,169,207,0.4)",
+                  0.4, "rgba(209,229,143,0.5)",
+                  0.6, "rgba(253,219,77,0.6)",
+                  0.8, "rgba(239,138,58,0.7)",
+                  1, "rgba(220,38,38,0.8)",
+                ],
+                "heatmap-opacity": 0.7,
+              },
+            });
+          }
         }
       } catch (err) { console.error("Failed to load signal markers:", err); }
 
@@ -740,6 +814,14 @@ export default function MapView() {
       if (el) el.style.display = showClusters ? "flex" : "none";
     });
   }, [showClusters]);
+
+  // Toggle heatmap layer visibility
+  useEffect(() => {
+    const m = map.current;
+    if (m && m.getLayer("signals-heatmap-layer")) {
+      m.setLayoutProperty("signals-heatmap-layer", "visibility", showHeatmap ? "visible" : "none");
+    }
+  }, [showHeatmap]);
 
   // Fetch risk scores when choropleth is enabled
   useEffect(() => {
@@ -856,6 +938,19 @@ export default function MapView() {
           <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
           Risk Map
         </button>
+        <button
+          onClick={() => setShowHeatmap(prev => !prev)}
+          className={cn(
+            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            showHeatmap
+              ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+              : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+          )}
+          title="Toggle signal density heatmap"
+        >
+          <span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />
+          Heatmap
+        </button>
         {!showCaseStudies && (
           <button
             onClick={() => setShowCaseStudies(true)}
@@ -912,6 +1007,19 @@ export default function MapView() {
             >
               <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
               Risk Map
+            </button>
+            <button
+              onClick={() => setShowHeatmap(prev => !prev)}
+              className={cn(
+                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                showHeatmap
+                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
+                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
+              )}
+              title="Toggle signal density heatmap"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />
+              Heatmap
             </button>
             {!showCaseStudies && (
               <button
