@@ -1,0 +1,113 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vancity-lens-political-risk
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+spec:
+  # Schedule: Monthly on 1st at 2 AM UTC
+  schedule: "0 2 1 * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+
+  # Keep last 3 successful and 1 failed job for debugging
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  # Suspend the job if needed
+  suspend: false
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: vancity-lens-political-risk
+        spec:
+          serviceAccountName: vancity-lens-api
+          terminationGracePeriodSeconds: 30
+          restartPolicy: OnFailure
+
+          containers:
+          - name: political-risk-materializer
+            image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api:latest
+            imagePullPolicy: Always
+
+            command:
+            - python
+            - -c
+            - |
+              import asyncio
+              import asyncpg
+              import os
+              from api.intelligence.political_risk import materialize_all_scores
+              async def run():
+                  pool = await asyncpg.create_pool(os.environ['DATABASE_URL'])
+                  try:
+                      await materialize_all_scores(pool)
+                  finally:
+                      await pool.close()
+              asyncio.run(run())
+
+            # Resource requests and limits
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+            # Environment variables from ConfigMap and Secrets
+            env:
+            - name: RAG_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: vancity-lens-config
+                  key: rag-backend
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: database-url
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: anthropic-api-key
+            - name: COHERE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: cohere-api-key
+            - name: BRAVE_SEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: brave-search-api-key
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: vancity-lens-config
+                  key: cors-origins
+          - name: cloud-sql-proxy
+            image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+            args:
+              - "openclaw-antonmishel-03460:us-west1:vancity-lens-db"
+              - "--private-ip"
+              - "--auto-iam-authn"
+              - "--port=5432"
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 65534
