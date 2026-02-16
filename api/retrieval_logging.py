@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+_first_log_failure_reported = False
+
 
 class RetrievalTracker:
     """Tracks a single external data retrieval for audit logging."""
@@ -78,7 +80,15 @@ async def log_retrieval(db_pool, source_id: str, query_params: Optional[dict] = 
                         tracker.source_id,
                     )
         except Exception as log_err:
-            logger.warning(
-                "Failed to log retrieval for %s: %s",
-                source_id, log_err,
-            )
+            global _first_log_failure_reported
+            if not _first_log_failure_reported:
+                logger.error(
+                    "Failed to log retrieval for %s: %s",
+                    source_id, log_err, exc_info=True,
+                )
+                _first_log_failure_reported = True
+            else:
+                logger.warning(
+                    "Failed to log retrieval for %s: %s",
+                    source_id, log_err,
+                )

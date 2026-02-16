@@ -417,7 +417,7 @@ async def compute_entitlement(
                     field="market_data",
                     message=f"Cost data may be outdated -- last updated {market_data_date}",
                 ))
-        except (ValueError, TypeError):
+        except ValueError:
             pass  # Non-ISO date format (e.g. "2025-Q4") — skip staleness check
 
     return ParcelEntitlementResponse(

@@ -4,6 +4,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import date
+from enum import Enum
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -11,11 +12,18 @@ logger = logging.getLogger(__name__)
 COUNCIL_URL = "https://vancouver.ca/your-government/council-meetings.aspx"
 
 
+class AgendaItemType(str, Enum):
+    """Classification of council agenda items."""
+    public_hearing = "public_hearing"
+    bylaw = "bylaw"
+    regular = "regular"
+
+
 @dataclass
 class AgendaItem:
     """A single council meeting agenda item."""
     title: str
-    item_type: str  # "public_hearing", "bylaw", "regular"
+    item_type: AgendaItemType
     pdf_urls: list[str]
     meeting_date: Optional[date]
     description: str
@@ -52,11 +60,11 @@ def parse_agenda_items(html: str) -> list[AgendaItem]:
         # Classify item type based on title content
         title_lower = title.lower()
         if "public hearing" in title_lower or "rezone" in title_lower or "rezoning" in title_lower:
-            item_type = "public_hearing"
+            item_type = AgendaItemType.public_hearing
         elif "bylaw" in title_lower:
-            item_type = "bylaw"
+            item_type = AgendaItemType.bylaw
         else:
-            item_type = "regular"
+            item_type = AgendaItemType.regular
 
         # Extract PDF links
         pdf_urls = []
@@ -134,12 +142,10 @@ async def scrape_council_agendas(max_pages: int = 3) -> list[AgendaItem]:
                 # Success - break retry loop
                 break
 
-        except Exception as e:
+        except (TimeoutError, ConnectionError) as e:
             logger.error(f"Attempt {attempt + 1}/{retries} failed: {e}")
             if attempt == retries - 1:
-                # Last attempt failed
                 raise
-            # Wait before retry
-            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            await asyncio.sleep(2 ** attempt)
 
     return all_items

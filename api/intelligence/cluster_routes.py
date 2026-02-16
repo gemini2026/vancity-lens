@@ -4,9 +4,14 @@ Endpoint:
 - GET /clusters -- Detect and return active development clusters
 """
 
-from fastapi import APIRouter, Query, Request
+import logging
+
+import asyncpg
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from .clustering import detect_clusters
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["clustering"])
 
@@ -28,12 +33,24 @@ async def get_clusters(
 ):
     """Detect development application clusters."""
     pool = _get_pool(request)
-    clusters = await detect_clusters(
-        pool,
-        radius_m=radius_m,
-        window_days=window_days,
-        min_apps=min_apps,
-    )
+    try:
+        clusters = await detect_clusters(
+            pool,
+            radius_m=radius_m,
+            window_days=window_days,
+            min_apps=min_apps,
+        )
+    except asyncpg.UndefinedTableError:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipeline data not yet available. Run the pipeline ingestion first.",
+        )
+    except asyncpg.PostgresError as e:
+        logger.error("Failed to detect clusters: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to detect development clusters.",
+        )
     return {
         "count": len(clusters),
         "clusters": [c.model_dump() for c in clusters],

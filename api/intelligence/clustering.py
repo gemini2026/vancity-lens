@@ -12,6 +12,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from .supply_pipeline import PipelineStage
+
 logger = logging.getLogger(__name__)
 
 # ── Configuration ───────────────────────────────────────────────
@@ -28,18 +30,18 @@ class ClusterMember(BaseModel):
     pipeline_id: int
     parcel_pid: str
     address: str
-    pipeline_stage: str
+    pipeline_stage: PipelineStage
     proposed_storeys: Optional[int] = None
     proposed_units: Optional[int] = None
-    distance_m: float
+    distance_m: float = Field(ge=0)
 
 
 class DevelopmentCluster(BaseModel):
     """A detected cluster of development activity."""
     center_pid: str
     center_address: str
-    center_lat: float
-    center_lng: float
+    center_lat: float = Field(ge=-90, le=90)
+    center_lng: float = Field(ge=-180, le=180)
     member_count: int
     members: list[ClusterMember]
     radius_m: int = CLUSTER_RADIUS_M
