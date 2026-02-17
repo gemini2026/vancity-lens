@@ -13,6 +13,7 @@ resources:
   - managedcertificate.yaml
   - ../../cronjob.yaml
   - ../../cronjob-k2-ingest.yaml
+  - ../../cronjob-tavily-search.yaml
   - secretstore.yaml
   - externalsecret.yaml
   - hpa.yaml
