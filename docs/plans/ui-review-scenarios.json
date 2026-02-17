@@ -2,15 +2,23 @@
   "settings": {
     "base_url": "http://localhost:3000",
     "output_dir": "docs/designs/screenshots/original",
-    "viewport": {"width": 1440, "height": 900},
+    "viewport": {"width": 1280, "height": 800},
     "color_scheme": "dark",
     "full_page": false,
     "settle_ms": 3000,
     "nav_timeout_ms": 30000,
-    "loading_selectors": [".animate-spin", ".animate-pulse", "[role='progressbar']"]
+    "loading_selectors": [".animate-spin", "[data-loading='true']", "text=/Loading/i"]
   },
-  "seed_commands": [],
-  "variables": {},
+  "seed_commands": [
+    {
+      "command": "python3 data/load_seed.py",
+      "cwd": "/Users/antonmishel/bill47"
+    }
+  ],
+  "variables": {
+    "BASE_URL": "http://localhost:3000",
+    "API_BASE": "http://localhost:8080"
+  },
   "scenarios": [
     {
       "name": "01_map_default",
