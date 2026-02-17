@@ -111,6 +111,46 @@ def _parse_date(value: Any) -> Optional[date]:
     return None
 
 
+def _extract_title_from_text(chunk_text: str) -> str:
+    """Extract a document title from chunk text when K2 metadata is empty.
+
+    Many ingested documents have the title in ALL-CAPS near the start
+    (e.g., "BROADWAY PLAN PHASE 2 ENGAGEMENT REPORT"). This finds the
+    longest all-caps run and returns it as the title.
+    """
+    import re
+
+    if not chunk_text:
+        return ""
+    # Insert a word boundary at uppercase→lowercase transitions so
+    # "REPORTAppendix" becomes "REPORT Appendix"
+    text = re.sub(r"([A-Z])([a-z])", r" \1\2", chunk_text.strip())
+    # Also split on newlines
+    text = text.replace("\n", " ").replace("\r", " ")
+    words = text.split()
+    # Find the longest consecutive run of all-caps words
+    best_start, best_len = 0, 0
+    cur_start, cur_len = 0, 0
+    for i, w in enumerate(words):
+        alpha = re.sub(r"[^A-Za-z]", "", w)
+        is_caps = alpha and alpha == alpha.upper() and len(alpha) >= 2
+        is_number = bool(re.fullmatch(r"\d+", w))
+        if is_caps or (is_number and cur_len > 0):
+            if cur_len == 0:
+                cur_start = i
+            cur_len += 1
+            if cur_len > best_len:
+                best_start, best_len = cur_start, cur_len
+        else:
+            cur_len = 0
+    if best_len >= 3:
+        title = " ".join(words[best_start : best_start + best_len])
+        title = title.strip(" ,-–—:")
+        if len(title) >= 10:
+            return title
+    return ""
+
+
 def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, Any]]:
     """Search K2 and normalize results to the chunk dict shape expected by chat.py."""
 
@@ -180,6 +220,7 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
             meta.get("title")
             or meta.get("document_title")
             or meta.get("source_title")
+            or _extract_title_from_text(chunk_text)
             or "Unknown"
         )
         source_url = (
