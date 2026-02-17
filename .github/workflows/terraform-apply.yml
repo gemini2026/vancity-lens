@@ -34,7 +34,7 @@ jobs:
     outputs:
       environments: ${{ steps.envs.outputs.environments }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -79,7 +79,7 @@ jobs:
         environment: ${{ fromJson(needs.detect-changes.outputs.environments) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

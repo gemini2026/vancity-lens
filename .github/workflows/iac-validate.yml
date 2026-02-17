@@ -23,7 +23,7 @@ jobs:
     name: Terraform Fmt + Validate
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -43,7 +43,7 @@ jobs:
     name: Kustomize Build
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v2
@@ -64,7 +64,7 @@ jobs:
     if: ${{ vars.ENABLE_TERRAFORM_PLAN == 'true' && vars.TF_STATE_BUCKET != '' }}
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
