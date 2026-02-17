@@ -353,3 +353,28 @@ async def search_and_store(
         "documents_new": stats["new_documents"],
         "documents_skipped": stats["duplicates_skipped"],
     }
+
+
+# ── CLI entrypoint for K8s CronJob ─────────────────────────────────
+if __name__ == "__main__":
+    import asyncio
+    import asyncpg
+    import json
+    import sys
+
+    async def main():
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            logger.error("DATABASE_URL not set")
+            sys.exit(1)
+
+        pool = await asyncpg.create_pool(database_url, min_size=1, max_size=3)
+        try:
+            result = await search_and_store(pool)
+            print(json.dumps(result, indent=2, default=str))
+            if result.get("new_documents", 0) > 0:
+                logger.info("Tavily CronJob success: %d new documents", result["new_documents"])
+        finally:
+            await pool.close()
+
+    asyncio.run(main())

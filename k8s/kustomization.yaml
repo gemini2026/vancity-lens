@@ -16,6 +16,7 @@ resources:
 - ingress.yaml
 - cronjob.yaml
 - cronjob-k2-ingest.yaml
+- cronjob-tavily-search.yaml
 
 # Common labels applied to all resources
 labels:

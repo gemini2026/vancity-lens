@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vancity-lens-tavily-search
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+    component: tavily-search
+spec:
+  # Schedule: every 8 hours (0:00, 8:00, 16:00 UTC)
+  schedule: "0 */8 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+
+  # Keep last 3 successful and 1 failed job for debugging
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  suspend: false
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600  # 10 min max (Tavily calls are fast)
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: vancity-lens-tavily-search
+        spec:
+          serviceAccountName: vancity-lens-api
+          terminationGracePeriodSeconds: 30
+          restartPolicy: OnFailure
+
+          containers:
+          - name: tavily-search
+            image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api:latest
+            imagePullPolicy: Always
+
+            command:
+            - python
+            - -m
+            - api.intelligence.tavily_search
+
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "250m"
+
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: database-url
+            - name: TAVILY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: tavily-api-key
+          - name: cloud-sql-proxy
+            image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+            args:
+              - "openclaw-antonmishel-03460:us-west1:vancity-lens-db"
+              - "--private-ip"
+              - "--auto-iam-authn"
+              - "--port=5432"
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 65534
