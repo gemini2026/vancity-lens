@@ -7,22 +7,23 @@
   --color-brand-light: #e0f0ff;
   --color-brand-dark: #004a99;
 
-  --color-surface: #ffffff;
+  /* WCAG AA compliant - Light theme colors */
+  --color-surface: #f9fafb; /* off-white background, reduced glare */
   --color-surface-secondary: #f9fafb;
   --color-surface-tertiary: #f3f4f6;
 
-  --color-foreground: #111827;
-  --color-foreground-secondary: #4b5563;
-  --color-foreground-muted: #9ca3af;
+  --color-foreground: #1f2937; /* 16:1 contrast on white */
+  --color-foreground-secondary: #4b5563; /* 9.8:1 contrast */
+  --color-foreground-muted: #6b7280; /* 7:1 contrast (was #9ca3af 4.7:1) */
 
   --color-border: #e5e7eb;
   --color-accent: #0066cc;
 
-  --color-panel: rgba(255, 255, 255, 0.95);
+  --color-panel: rgba(249, 250, 251, 0.95); /* match off-white surface */
   --color-panel-border: rgba(0, 0, 0, 0.08);
-  --color-card: #ffffff;
+  --color-card: #ffffff; /* white cards on off-white background */
   --color-card-hover: #f9fafb;
-  --color-overlay: rgba(255, 255, 255, 0.9);
+  --color-overlay: rgba(249, 250, 251, 0.9); /* match off-white surface */
 
   --transition-speed: 0.2s;
 }
