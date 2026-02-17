@@ -145,8 +145,9 @@ def _extract_title_from_text(chunk_text: str) -> str:
             cur_len = 0
     if best_len >= 3:
         title = " ".join(words[best_start : best_start + best_len])
-        title = title.strip(" ,-–—:")
-        if len(title) >= 10:
+        # Strip trailing page numbers and punctuation
+        title = re.sub(r"[\s\d,\-–—:]+$", "", title).strip()
+        if len(title) >= 10 and len(title.split()) >= 3:
             return title
     return ""
 
