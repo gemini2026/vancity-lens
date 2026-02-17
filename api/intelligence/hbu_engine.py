@@ -254,19 +254,20 @@ def _parse_llm_response(answer_text: str) -> dict[str, Any]:
     - feasibility_verdict: str
     - recommended_use: str
     """
+    import re
+
     text = answer_text.strip()
 
-    # Strip markdown code fences
-    if text.startswith("```"):
-        lines = text.split("\n")
-        lines = [line for line in lines if not line.strip().startswith("```")]
-        text = "\n".join(lines).strip()
+    # Strategy 1: Extract JSON from markdown code fences (```json ... ```)
+    fence_match = re.search(r"```(?:json)?\s*\n([\s\S]*?)```", text)
+    if fence_match:
+        text = fence_match.group(1).strip()
 
     parsed = None
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
-        # Try to find a JSON object embedded in the text
+        # Strategy 2: Find the outermost JSON object in the text
         start = text.find("{")
         end = text.rfind("}") + 1
         if start >= 0 and end > start:
