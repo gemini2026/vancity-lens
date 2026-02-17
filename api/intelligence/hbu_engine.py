@@ -189,7 +189,7 @@ async def analyze_hbu(
             max_tokens=3000,
         )
     except Exception as e:
-        logger.error("LLM synthesis failed for HBU %s: %s", pid, e)
+        logger.error("LLM synthesis failed for HBU %s: %s: %s", pid, type(e).__name__, e)
         return _build_fallback_response(pid, ent_data, pro_forma_data)
 
     # 5. Parse LLM response

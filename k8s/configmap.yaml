@@ -24,7 +24,7 @@ data:
 
   # K2 (Knowledge2) runtime config (non-secret)
   k2-api-host: "https://api-dev.knowledge2.ai"
-  k2-corpus-id: "vancity"
+  k2-corpus-id: "bb158585-b616-4aed-ab63-55604093a3b8"
   k2-top-k: "10"
   k2-timeout-seconds: "20"
   k2-fallback-to-local: "true"

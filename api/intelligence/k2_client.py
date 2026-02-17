@@ -139,7 +139,7 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
         )
     except Knowledge2Error as exc:
         msg = str(exc)
-        if "Corpus not found" in msg and cfg.corpus_id not in _CORPUS_ID_CACHE:
+        if ("Corpus not found" in msg or "Invalid corpus identifier" in msg) and cfg.corpus_id not in _CORPUS_ID_CACHE:
             try:
                 corpora = (client.list_corpora(limit=100, offset=0) or {}).get("corpora") or []
                 matches = [c for c in corpora if c.get("name") == cfg.corpus_id and c.get("id")]
