@@ -12,9 +12,11 @@ import type { ParcelEntitlement, EntitlementSignal } from "@/lib/types";
 import type { IntelSignal } from "@/lib/intel-types";
 import ParcelDetailPanel from "./ParcelDetailPanel";
 import AddressSearchBar from "./AddressSearchBar";
+import AddressAutocomplete from "./AddressAutocomplete";
 import FinancingCalculator from "./FinancingCalculator";
 import CaseStudyCarousel from "./CaseStudyCarousel";
 import type { GeocodingResult } from "@/lib/geocoding";
+import type { AddressSearchResult } from "@/hooks/useAddressSearch";
 import { getApiBase } from "@/lib/api-base";
 import { useTheme } from "@/lib/theme-context";
 import { Layers } from "lucide-react";
@@ -167,6 +169,26 @@ export default function MapView() {
         openDetailPanel(data, signals);
       } catch (err) {
         console.error("Address lookup failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    }, 1600);
+  }, [openDetailPanel]);
+
+  const handleParcelSelect = useCallback((result: AddressSearchResult) => {
+    if (!map.current) return;
+    map.current.flyTo({ center: [result.lng, result.lat], zoom: 16, duration: 1500 });
+    // Trigger parcel analysis using the selected PID
+    setTimeout(async () => {
+      setLoading(true);
+      try {
+        const [data, signals] = await Promise.all([
+          fetchEntitlement(result.pid),
+          getSignalsForParcel(result.pid, 500).catch(() => [] as IntelSignal[]),
+        ]);
+        openDetailPanel(data, signals);
+      } catch (err) {
+        console.error("Parcel lookup failed:", err);
       } finally {
         setLoading(false);
       }
@@ -878,7 +900,7 @@ export default function MapView() {
           <div className="text-[var(--color-foreground-muted)] text-[11px] mt-0.5">Bill 47 Entitlement Engine · 92K parcels</div>
         </div>
         <div className="w-[280px] md:w-[320px]">
-          <AddressSearchBar onSelect={handleAddressSelect} placeholder="Search address in Vancouver" />
+          <AddressAutocomplete onSelect={handleParcelSelect} placeholder="Search address in Vancouver" />
         </div>
       </div>
 
