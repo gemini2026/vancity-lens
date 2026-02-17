@@ -42,7 +42,7 @@ async def resolve_neighborhood_name(conn, slug: str) -> Optional[str]:
         if row:
             return row["name"]
     except Exception as e:
-        logger.debug(f"Could not resolve neighborhood name from DB: {e}")
+        logger.debug("Could not resolve neighborhood name from DB: %s", e)
     return slug_to_neighborhood_name(slug)
 
 
@@ -72,7 +72,7 @@ async def get_supply_pipeline_count(conn, neighborhood_name: str) -> dict:
             "proposed_units": int(row["proposed_units"]) if row else 0,
         }
     except Exception as e:
-        logger.warning(f"Error fetching supply pipeline count: {e}")
+        logger.warning("Error fetching supply pipeline count: %s", e)
         return {"active_projects": 0, "proposed_units": 0}
 
 
@@ -113,7 +113,7 @@ async def get_avg_approval_timeline(conn, neighborhood_name: str) -> Optional[fl
             return round(float(row["avg_months"]), 1)
         return None
     except Exception as e:
-        logger.warning(f"Error fetching approval timeline: {e}")
+        logger.warning("Error fetching approval timeline: %s", e)
         return None
 
 
@@ -143,7 +143,7 @@ async def get_supply_pressure(conn, neighborhood_name: str) -> Optional[float]:
         proposed_units = int(row["proposed_units"])
         return round(proposed_units / parcel_count, 3)
     except Exception as e:
-        logger.warning(f"Error fetching supply pressure: {e}")
+        logger.warning("Error fetching supply pressure: %s", e)
         return None
 
 
@@ -186,7 +186,7 @@ async def get_development_momentum(conn, neighborhood_name: str) -> Optional[flo
 
         return round(last_90 / prior_90, 2)
     except Exception as e:
-        logger.warning(f"Error fetching development momentum: {e}")
+        logger.warning("Error fetching development momentum: %s", e)
         return None
 
 

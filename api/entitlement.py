@@ -421,6 +421,9 @@ async def compute_entitlement(
             pass  # Non-ISO date format (e.g. "2025-Q4") — skip staleness check
 
     # 10. Parcel Click Enrichment: ILR computation
+    # Note: 0 values treated as missing — a $0 land or improvement value is
+    # invalid assessment data, not a real zero (e.g., leasehold would have
+    # land_value=NULL, not 0).
     land_val = parcel.get("land_value") or None
     improvement_val = parcel.get("improvement_value") or None
     yr_built = parcel.get("year_built") or None

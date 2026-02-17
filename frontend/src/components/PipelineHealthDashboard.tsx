@@ -48,6 +48,7 @@ export default function PipelineHealthDashboard({
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [runningScrapers, setRunningScrapers] = useState<Set<string>>(
     new Set()
   );
@@ -83,6 +84,7 @@ export default function PipelineHealthDashboard({
   }, [fetchHealth]);
 
   const handleRunScraper = async (name: string) => {
+    setActionError(null);
     setRunningScrapers((prev) => new Set(prev).add(name));
     try {
       const res = await fetch(
@@ -91,12 +93,12 @@ export default function PipelineHealthDashboard({
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        alert(`Failed to run ${name}: ${body.detail || res.statusText}`);
+        setActionError(`Failed to run ${name}: ${body.detail || res.statusText}`);
       }
       // Refresh health data after run
       await fetchHealth();
     } catch {
-      alert(`Failed to trigger ${name}`);
+      setActionError(`Failed to trigger ${name}`);
     } finally {
       setRunningScrapers((prev) => {
         const next = new Set(prev);
@@ -118,6 +120,12 @@ export default function PipelineHealthDashboard({
 
   return (
     <div className="space-y-4">
+      {actionError && (
+        <div className="flex items-center justify-between px-3 py-2 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} className="ml-2 text-red-300 hover:text-white">&times;</button>
+        </div>
+      )}
       {/* Header with totals */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-white">Pipeline Health</h3>

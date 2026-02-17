@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from .auth import require_admin
 from .db import db
@@ -2464,7 +2464,7 @@ async def scraper_health(request: Request):
 
 
 @router.post("/scraper/{name}/run")
-async def scraper_run(name: str, request: Request):
+async def scraper_run(name: str = Path(..., pattern=r"^[a-z_]{1,50}$"), request: Request = None):
     """
     Manually trigger a scraper by name via the scheduler's run_scraper()
     method.  Returns the ScraperResult dict on success.
