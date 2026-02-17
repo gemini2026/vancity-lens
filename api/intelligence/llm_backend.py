@@ -127,23 +127,29 @@ async def _generate_gemini(
     client = _get_gemini_client()
     t0 = time.perf_counter()
 
+    # Gemini 2.5 Flash uses a "thinking" phase that consumes output tokens.
+    # Reserve most tokens for the actual response by capping the thinking budget.
+    config_kwargs: dict = {
+        "system_instruction": system_prompt,
+        "max_output_tokens": max(max_tokens, 8192),
+        "temperature": 0.3,
+    }
+    if "2.5" in GEMINI_MODEL:
+        config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=2048)
+
     async with LLM_SEMAPHORE:
         response = await asyncio.wait_for(
             client.aio.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=user_message,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    max_output_tokens=max_tokens,
-                    temperature=0.3,
-                ),
+                config=types.GenerateContentConfig(**config_kwargs),
             ),
             timeout=timeout_seconds,
         )
 
     latency = time.perf_counter() - t0
     text = response.text or ""
-    logger.info("Gemini response in %.1fs (model=%s, tokens=%d)", latency, GEMINI_MODEL, len(text))
+    logger.info("Gemini response in %.1fs (model=%s, chars=%d)", latency, GEMINI_MODEL, len(text))
     return text, GEMINI_MODEL, latency
 
 
