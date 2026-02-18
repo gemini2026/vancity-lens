@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 interface LayerControl {
   id: string;
   label: string;
@@ -15,6 +17,16 @@ interface LayerControlSheetProps {
 }
 
 export default function LayerControlSheet({ isOpen, onClose, controls }: LayerControlSheetProps) {
+  // Handle Escape key to close the sheet
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -27,7 +39,12 @@ export default function LayerControlSheet({ isOpen, onClose, controls }: LayerCo
       />
 
       {/* Bottom Sheet */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-panel)] backdrop-blur-md rounded-t-2xl max-h-[70vh] overflow-y-auto border-t border-[var(--color-panel-border)] shadow-2xl">
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-panel)] backdrop-blur-md rounded-t-2xl max-h-[70vh] overflow-y-auto border-t border-[var(--color-panel-border)] shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="layer-sheet-title"
+      >
         {/* Swipe handle */}
         <div className="flex justify-center py-3">
           <div className="w-3 h-1 rounded-full bg-[var(--color-foreground-muted)]/30" />
@@ -35,7 +52,7 @@ export default function LayerControlSheet({ isOpen, onClose, controls }: LayerCo
 
         {/* Header */}
         <div className="px-6 pb-4 border-b border-[var(--color-panel-border)]">
-          <h2 className="text-lg font-bold text-[var(--color-foreground)]">Map Layers</h2>
+          <h2 id="layer-sheet-title" className="text-lg font-bold text-[var(--color-foreground)]">Map Layers</h2>
         </div>
 
         {/* Controls list */}

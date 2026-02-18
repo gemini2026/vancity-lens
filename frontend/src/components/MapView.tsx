@@ -19,7 +19,6 @@ import type { GeocodingResult } from "@/lib/geocoding";
 import type { AddressSearchResult } from "@/hooks/useAddressSearch";
 import { getApiBase } from "@/lib/api-base";
 import { useTheme } from "@/lib/theme-context";
-import { Layers } from "lucide-react";
 import LayerControlFAB from "./LayerControlFAB";
 import LayerControlSheet from "./LayerControlSheet";
 
@@ -130,7 +129,6 @@ export default function MapView() {
   const [visibleTiers, setVisibleTiers] = useState<Record<number, boolean>>({ 1: true, 2: true, 3: true });
   const [showRiskChoropleth, setShowRiskChoropleth] = useState(false);
   const [riskScores, setRiskScores] = useState<NeighborhoodRisk[]>([]);
-  const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showTopDeals, setShowTopDeals] = useState(false);
   const [showLayerSheet, setShowLayerSheet] = useState(false);
