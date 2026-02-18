@@ -1,350 +1,338 @@
-# VanCity Lens — UI Review Plan
+# UI Review Plan — VanCity Lens
 
-**Date:** 2026-02-17
-**Version:** 2.0
-**Review Type:** Comprehensive E2E UI/UX validation with data integrity checks
+**Generated:** 2026-02-17  
+**Application:** VanCity Lens (Vancouver Development Intelligence Platform)  
+**Frontend Stack:** Next.js 15, React 19, Tailwind CSS 4, Radix UI, Mapbox GL 3.9
 
 ---
 
 ## Application Overview
 
-**VanCity Lens** is a single-page application (SPA) for real estate intelligence in Vancouver, BC. It combines:
-- Interactive map visualization (Mapbox GL) of parcels, TOA zones, and development signals
-- RAG-powered intelligence chat interface using K2 + Gemini/Anthropic LLM backend
-- Neighborhood scorecard rankings and comparisons
-- Parcel entitlement analysis (Bill 47 TOD density, HBU analysis, pro forma modeling)
+**VanCity Lens** is a Vancouver city planning intelligence platform that combines:
+- **Interactive map** with Transit-Oriented Area (TOA) zones, development opportunities, and intelligence signals
+- **RAG-powered chat** for asking questions about Vancouver development, backed by city council minutes, rezoning applications, and news
+- **Neighborhood scorecards** for comparing quality-of-life metrics across 22 Vancouver neighborhoods
 
-**Target Users:**
-- Real estate investors (primary)
-- Property developers
-- Real estate brokers
-- Urban planners
+**Target User:** Colin — a single POC user (Vancouver resident, developer, or city planning enthusiast) who wants to:
+- Find development opportunities near transit
+- Understand zoning changes and political sentiment
+- Track signals (rezoning applications, council decisions, permits) on a map
+- Compare neighborhoods for investment/living decisions
 
-**Tech Stack:**
-- Frontend: Next.js 15 (React 19), Tailwind CSS 4, Mapbox GL 3.9, Radix UI
-- Backend: FastAPI 0.115.6 (Python 3.12), PostgreSQL 16 + PostGIS + pgvector
-- LLM: Gemini 2.5 Flash (Vertex AI) + Anthropic Claude fallback
-- Auth: JWT bearer tokens (localStorage)
-- E2E: Playwright 1.x (TypeScript)
+**Key Characteristics:**
+- Single-page app with hash-based routing (`#map`, `#intel`, `#hoods`)
+- Mobile-responsive (bottom tab bar on mobile, top nav on desktop)
+- Optional JWT authentication (POC is open-access)
+- Real-time data from FastAPI backend + PostgreSQL with PostGIS and pgvector
 
 ---
 
 ## Authentication Strategy
 
-**Mechanism:** JWT bearer tokens stored in browser localStorage
-**Storage Keys:**
-- `vcl_access_token` (30 min expiry)
-- `vcl_refresh_token` (7 days expiry)
+**Authentication Type:** JWT Bearer tokens (optional for POC)
 
-**Test Credentials:**
-| Role | Email | Password |
-|------|-------|----------|
-| User | `e2e-user@test.com` | `E2eTestPass123!` |
-| Admin | `e2e-admin@test.com` | `E2eAdminPass123!` |
+**Access Levels:**
+- **Anonymous:** All three main tabs work without auth (Map, Intelligence, Neighborhoods)
+- **Authenticated User:** Unlocks saved parcels, watchlists, custom alerts, share links
+- **Admin:** Access to pipeline health dashboards (not in scope for UX review)
 
-**Screenshot Capture Auth:**
-- Use Playwright storage state injection (`.auth/user.json`)
-- Pre-authenticate via `global-setup.ts` (calls `POST /api/v1/auth/login`)
-- All authenticated page captures reuse storage state
+**E2E Test Credentials:**
+- User: `e2e-user@test.com` / `E2eTestPass123!`
+- Admin: `e2e-admin@test.com` / `E2eAdminPass123!`
 
-**Public vs. Protected Views:**
-- **Public:** Map view, Intelligence feed, Neighborhoods list (read-only)
-- **Protected:** Save parcel, watchlists, alerts, financing calculator, HBU analysis
+**Auth Flow for Screenshots:**
+1. Register test user via `POST /api/v1/auth/register` (if not exists)
+2. Login via `POST /api/v1/auth/login` → get `access_token` and `refresh_token`
+3. Store tokens in localStorage: `vcl_access_token`, `vcl_refresh_token`
+4. Frontend `AuthProvider` context manages session restoration
+
+**Strategy for Capture:**
+- **Scenario 1-10:** Anonymous (no auth) — cover all public features
+- **Scenario 11-15:** Authenticated user — cover saved parcels, watchlists, share links
 
 ---
 
 ## Data Seeding Strategy
 
-**Pre-Seeded Entities (13 JSON files):**
-```bash
-# Load seed data before screenshot capture
-python3 data/load_seed.py
-```
+**Seed Script:** `scripts/seed_e2e.sh` → runs `db/008_e2e_seed.sql`
 
-Loads:
-- 250+ parcels (Vancouver property fabric)
-- 500+ intelligence signals (rezoning, permits, policy changes)
-- 45 transit stations (SkyTrain + bus)
-- 22 neighborhoods with scorecards
-- 300+ comparable sales
-- 80+ supply pipeline projects
-- 25 heritage sites
-- 10 case studies
+**Seeded Entities:**
+- **Documents:** 5 test documents (IDs 10001-10005)
+- **Document Chunks:** 6 chunks (IDs 10001-10006)
+- **Intelligence Signals:** 5 signals (IDs 10001-10005) with types:
+  - `rezoning_decision` (2)
+  - `council_vote` (1)
+  - `development_permit` (1)
+  - `news_article` (1)
+- **Parcels:** 1 canonical test parcel (PID `100-001-009`, address `2220 Cambie Street`)
 
-**Key Data Relationships:**
-- Parcels → Neighborhoods (via `geo_local_area` FK)
-- Transit Stations → Bill 47 Tiers (TOA zone generation)
-- Signals → Neighborhoods (geographic attribution)
-- Comparables → Parcels (proximity-based)
+**Production Seed (for realistic screenshots):**
+- Script: `python scripts/seed_data.py --status` → check if production data loaded
+- If needed: `python scripts/seed_data.py` → scrape + process real documents (~15-30 min)
 
 **ID Extraction:**
-- Parcel IDs: Click map marker → extract from ParcelDetailPanel state
-- Neighborhood slugs: Hardcoded from seed data (`mount-pleasant`, `west-end`, etc.)
-- Signal IDs: Visible in IntelPage feed cards
+- Signal IDs: `10001-10005` (known from SQL)
+- Parcel PID: `100-001-009` (known from SQL)
+- Neighborhood slugs: Extract from API response `GET /api/v1/intel/neighborhoods`
+- Chat session ID: Extract from API response after first chat message
+
+**Cleanup:**
+- E2E seed is idempotent (uses `ON CONFLICT DO NOTHING`)
+- Production seed is persistent (no cleanup needed)
 
 ---
 
 ## Route Inventory
 
-VanCity Lens uses **hash-based routing** with no traditional Next.js dynamic routes. All navigation happens through URL hash fragments.
+| # | Route Pattern | Page Component | Dynamic Segments | Requires Data | Description |
+|---|---------------|----------------|------------------|---------------|-------------|
+| 1 | `/` (default: `#map`) | `MapView` | None | Yes | Map tab with TOA zones, opportunities, signals |
+| 2 | `/#map` | `MapView` | None | Yes | Map tab (explicit) |
+| 3 | `/#intel` | `IntelPage` | None | Yes | Intelligence tab (chat + signal feed) |
+| 4 | `/#hoods` | `NeighborhoodPage` | None | Yes | Neighborhoods tab (scorecards) |
 
-| # | Route Pattern | Page Component | Dynamic Segments | Requires Data |
-|---|--------------|----------------|------------------|---------------|
-| 1 | `/` or `/#map` | MapView | None | Yes (parcels, signals, TOA zones) |
-| 2 | `/#intel` | IntelPage | None | Yes (signals, neighborhoods) |
-| 3 | `/#hoods` | NeighborhoodPage | None | Yes (scorecards) |
-
-**Navigation Mechanism:**
-- Top bar tabs (desktop): Map / Intelligence / Neighborhoods
-- Bottom bar tabs (mobile): Same 3 tabs, fixed at bottom
-- All 3 pages are **always mounted** (visibility toggled via `display: hidden` to preserve WebGL state)
-
-**Deep-Linking:** Not currently supported — parcel/neighborhood selection happens via component state, not URL query params
+**Note:** Single-page app with hash-based routing. No dynamic route segments like `/items/:id`.
 
 ---
 
 ## Scenario Design
 
-Scenarios are organized by **user journey** rather than by route, since each route has multiple in-page state variations.
+### Scenario 1: Anonymous — Map Exploration (Desktop Dark Theme)
+**Goal:** Capture the default map view with all major in-page states
 
-### Scenario 1: Onboarding & Map Exploration (Unauthenticated)
-1. Navigate to `/` (default: `/#map`)
-2. Verify case study carousel appears
-3. Click a case study → map flies to parcel, detail panel opens
-4. Close case study carousel
-5. Capture: Map with TOA zones visible
+**Steps:**
+1. Navigate to `#map`
+2. Wait for map tiles to load
+3. Screenshot: Map default view (case study carousel visible)
+4. Click tier 1 checkbox → Screenshot: Tier 1 layer visible
+5. Click tier 2 checkbox → Screenshot: Tier 2 layer visible
+6. Click tier 3 checkbox → Screenshot: Tier 3 layer visible
+7. Click opportunity marker → Screenshot: Parcel detail panel open
+8. Click "Deal Model" button → Screenshot: Financing calculator modal open
+9. Close modal → Click "Top Deals" button → Screenshot: Top opportunities panel open
+10. Toggle "Show Signals" → Screenshot: Signal markers visible
+11. Toggle "Heatmap" → Screenshot: Signal density heatmap visible
 
-### Scenario 2: Map Interaction & Parcel Detail
-1. Navigate to `/#map`
-2. Wait for map load (loading selectors: `.mapboxgl-canvas`)
-3. Enable Tier 2 toggle
-4. Click a Tier 2 parcel marker
-5. Wait for ParcelDetailPanel to open
-6. Capture: Parcel detail panel with entitlement data
-7. Scroll down → capture all collapsible sections (Value Estimate, HBU, Risk Flags, Comparables)
-8. Click Financing Calculator button → capture modal
+### Scenario 2: Anonymous — Map Search & Parcel Analysis (Desktop Dark Theme)
+**Goal:** Capture address search and parcel detail panel states
 
-### Scenario 3: Intelligence Tab — Chat & Signal Feed
-1. Navigate to `/#intel`
-2. Capture: Default chat + feed side-by-side layout (desktop)
-3. Filter by neighborhood: "Mount Pleasant"
-4. Capture: Filtered signal feed
-5. Click a signal card → expand document viewer
-6. Capture: Expanded signal with document content
-7. Type chat query: "What's happening in Mount Pleasant?"
-8. Wait for LLM response
-9. Capture: Chat conversation with citations
+**Steps:**
+1. Navigate to `#map`
+2. Focus address search input → Screenshot: Search dropdown open
+3. Type "Cambie" → Screenshot: Search results dropdown
+4. Select "2220 Cambie Street" → Screenshot: Map flies to location, parcel detail panel open
+5. Expand "Comparable Sales" section → Screenshot: Section expanded
+6. Expand "Due Diligence" section → Screenshot: Section expanded
 
-### Scenario 4: Neighborhoods — Scorecards & Comparison
-1. Navigate to `/#hoods`
-2. Capture: Neighborhood list with search bar
-3. Search for "West End"
-4. Click "West End" → view scorecard detail
-5. Capture: Scorecard with 8 category metrics
-6. Click "Compare" button
-7. Select 2 additional neighborhoods
-8. Capture: Side-by-side comparison view
+### Scenario 3: Anonymous — Intelligence Discovery (Desktop Dark Theme)
+**Goal:** Capture chat + signal feed states
 
-### Scenario 5: Mobile Responsive Views
-1. Set viewport to 390×844 (Pixel 5)
-2. Navigate to `/#map`
-3. Capture: Mobile map with bottom tab bar
-4. Click FAB (floating action button) → open layer menu drawer
-5. Capture: Layer menu drawer
-6. Click a parcel → ParcelDetailPanel opens full-screen
-7. Capture: Mobile parcel detail panel
-8. Navigate to `/#intel`
-9. Capture: Mobile chat tab
-10. Switch to feed tab
-11. Capture: Mobile feed tab
-12. Navigate to `/#hoods`
-13. Capture: Mobile neighborhoods list
+**Steps:**
+1. Navigate to `#intel`
+2. Screenshot: Chat empty + Signal feed with filters
+3. Type question "What rezoning applications were approved last month?" → Send → Screenshot: Chat conversation with LLM response
+4. Click filter by neighborhood → Select "Mount Pleasant" → Screenshot: Feed filtered by neighborhood
+5. Click signal card → Screenshot: Signal expanded with document details
+6. Click "Load more" → Screenshot: Additional signals loaded
 
-### Scenario 6: Theme Switching
-1. Navigate to `/#map` (default dark theme)
-2. Capture: Dark theme map
-3. Click theme toggle → switch to light
-4. Capture: Light theme map
-5. Navigate to `/#intel`
-6. Capture: Light theme intelligence tab
-7. Navigate to `/#hoods`
-8. Capture: Light theme neighborhoods
+### Scenario 4: Anonymous — Neighborhoods Comparison (Desktop Dark Theme)
+**Goal:** Capture neighborhood list, detail, and comparison views
 
-### Scenario 7: Authenticated Features
-1. Authenticate via storage state (user role)
-2. Navigate to `/#map`
-3. Click a parcel → open detail panel
-4. Click "Save" star icon
-5. Verify saved state (star filled)
-6. Capture: Saved parcel indicator
-7. Navigate to alerts dropdown (bell icon)
-8. Capture: Alerts feed with unread count
-9. Click watchlist menu
-10. Capture: Watchlist panel with saved parcels
+**Steps:**
+1. Navigate to `#hoods`
+2. Screenshot: List view with all neighborhoods
+3. Type "Mount" in search → Screenshot: Filtered list by name
+4. Click "Mount Pleasant" card → Screenshot: Detail scorecard view
+5. Click "Back" → Check compare boxes (Mount Pleasant, Kitsilano) → Screenshot: "Compare Selected" button visible
+6. Click "Compare Selected" → Screenshot: Comparison view open
 
-### Scenario 8: Error States & Edge Cases
-1. Navigate to `/#map` (disconnect network after load)
-2. Click a parcel → trigger entitlement fetch failure
-3. Capture: API error state in detail panel
-4. Restore network
-5. Navigate to `/#intel`
-6. Submit chat query with no signals available
-7. Capture: Empty state message
-8. Navigate to `/#hoods`
-9. Search for non-existent neighborhood
-10. Capture: No results state
+### Scenario 5: Mobile — Bottom Tab Navigation (Mobile 375x812 Dark Theme)
+**Goal:** Capture mobile responsive layout and navigation
+
+**Steps:**
+1. Navigate to `#map` (mobile viewport 375x812)
+2. Screenshot: Map with bottom tab bar and layers FAB
+3. Click layers FAB → Screenshot: Layer menu drawer open
+4. Close drawer → Tap "Intel" tab → Screenshot: Intelligence tab (mobile layout)
+5. Tap "Hoods" tab → Screenshot: Neighborhoods tab (mobile layout)
+
+### Scenario 6: Anonymous — Light Theme (Desktop Light Theme)
+**Goal:** Capture light theme variants of key screens
+
+**Steps:**
+1. Click theme toggle → cycle to light theme
+2. Navigate to `#map` → Screenshot: Map in light theme
+3. Navigate to `#intel` → Screenshot: Intelligence in light theme
+4. Navigate to `#hoods` → Screenshot: Neighborhoods in light theme
+
+### Scenario 7: Anonymous — Empty States (Desktop Dark Theme)
+**Goal:** Capture empty states when no data is present
+
+**Steps:**
+1. Navigate to `#intel` → Filter by neighborhood "Test Neighborhood" (no matches) → Screenshot: "No signals found" message
+2. Navigate to `#hoods` → Search "ZZZZZ" (no matches) → Screenshot: "No neighborhood data yet" message
+
+### Scenario 8: Authenticated — Saved Parcels & Watchlists (Desktop Dark Theme)
+**Goal:** Capture authenticated user features
+
+**Pre-requisites:** Auth tokens in localStorage
+
+**Steps:**
+1. Navigate to `#map` → Click opportunity marker → Screenshot: Parcel detail panel with star icon (unsaved)
+2. Click star icon → Screenshot: Parcel saved (star filled)
+3. Click notifications bell → Screenshot: Alerts dropdown open
+4. Navigate to watchlist panel → Screenshot: Watchlist panel with saved parcels
+
+### Scenario 9: Mobile — Parcel Detail (Mobile 375x812 Dark Theme)
+**Goal:** Capture mobile parcel detail full-screen view
+
+**Steps:**
+1. Navigate to `#map` (mobile viewport 375x812)
+2. Tap opportunity marker → Screenshot: Full-screen parcel detail panel
+3. Scroll down → Screenshot: All parcel detail sections visible
+
+### Scenario 10: Desktop — Disclaimer Banner (Desktop Dark Theme)
+**Goal:** Capture disclaimer banner (first visit)
+
+**Pre-requisites:** Clear localStorage `vcl_disclaimer_dismissed`
+
+**Steps:**
+1. Navigate to `#map` → Screenshot: Disclaimer banner visible at top
+2. Click "Dismiss" → Screenshot: Disclaimer banner hidden
 
 ---
 
 ## Variables
 
-Variables needed for dynamic URL/selector interpolation:
-
 | Variable | Source | Usage | Example Value |
 |----------|--------|-------|---------------|
-| `BASE_URL` | Manifest setting | All navigation | `http://localhost:3000` |
-| `API_BASE` | Manifest setting | Health checks | `http://localhost:8080` |
-| `USER_TOKEN` | Storage state | Authenticated requests | (JWT from login) |
-| `PARCEL_PID` | Map click extraction | Parcel detail URL | `015-287-329` |
-| `NEIGHBORHOOD_SLUG` | Hardcoded from seed | Scorecard detail | `mount-pleasant` |
-| `SIGNAL_ID` | Signal feed extraction | Signal expand | `12345` |
-
-**Extraction Patterns:**
-- Parcel PID: After map click, read from `ParcelDetailPanel` state or URL hash (future)
-- Neighborhood slug: Pre-defined list from seed data
-- Signal ID: Extract from `.signal-card` data attribute or API response
+| `base_url` | Config | Base URL for navigation | `http://localhost:3000` |
+| `access_token` | Seed command output | Auth header for API calls | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `refresh_token` | Seed command output | Token refresh | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `parcel_pid` | SQL seed | Known test parcel PID | `100-001-009` |
+| `signal_id` | SQL seed | Known test signal ID | `10001` |
+| `neighborhood_slug` | API response | Neighborhood slug for filters | `mount-pleasant` |
 
 ---
 
 ## Capture Checklist
 
-### Desktop (1280×800)
-- [x] Map: default view with case study carousel
-- [x] Map: TOA zones layer visible
-- [x] Map: Tier 2 parcels visible
-- [x] Map: Parcel detail panel (all sections expanded)
-- [x] Map: Financing calculator modal
-- [x] Map: Top opportunities panel (FAB)
-- [x] Map: Risk choropleth layer active
-- [x] Map: Signal heatmap layer active
-- [x] Intelligence: default chat + feed layout
-- [x] Intelligence: filtered signal feed (by neighborhood)
-- [x] Intelligence: signal expanded with document
-- [x] Intelligence: chat conversation with LLM response
-- [x] Neighborhoods: list view with search
-- [x] Neighborhoods: scorecard detail
-- [x] Neighborhoods: comparison view (3 neighborhoods)
-- [x] Alerts dropdown (authenticated)
-- [x] Watchlist panel (authenticated)
-- [x] Light theme: map
-- [x] Light theme: intelligence
-- [x] Light theme: neighborhoods
+### Top-Level Pages
+- [x] Map tab (`#map`) — desktop dark
+- [x] Intelligence tab (`#intel`) — desktop dark
+- [x] Neighborhoods tab (`#hoods`) — desktop dark
+- [x] Map tab — desktop light
+- [x] Intelligence tab — desktop light
+- [x] Neighborhoods tab — desktop light
+- [x] Map tab — mobile (375x812)
+- [x] Intelligence tab — mobile (375x812)
+- [x] Neighborhoods tab — mobile (375x812)
 
-### Mobile (390×844)
-- [x] Map: full-screen with bottom tabs
-- [x] Map: layer menu drawer (FAB)
-- [x] Map: parcel detail full-screen
-- [x] Intelligence: chat tab
-- [x] Intelligence: feed tab
-- [x] Intelligence: signal expanded
-- [x] Neighborhoods: list view
-- [x] Neighborhoods: scorecard detail
-- [x] Neighborhoods: comparison view
+### In-Page State Variations — Map Tab
+- [x] Map default view with case study carousel
+- [x] Tier 1 layer visible
+- [x] Tier 2 layer visible
+- [x] Tier 3 layer visible
+- [x] Parcel detail panel open (desktop)
+- [x] Parcel detail panel open (mobile full-screen)
+- [x] Financing calculator modal open
+- [x] Top opportunities panel open
+- [x] Signal markers visible
+- [x] Heatmap overlay visible
+- [x] Address search dropdown open
+- [x] Search results dropdown
+- [x] Layers menu drawer open (mobile)
+- [x] Comparable Sales section expanded
+- [x] Due Diligence section expanded
 
-### Edge Cases
-- [x] Empty state: no signals for filter
-- [x] Error state: API failure in detail panel
-- [x] Loading state: spinner during HBU analysis
-- [x] No results: neighborhood search
+### In-Page State Variations — Intelligence Tab
+- [x] Chat empty + Signal feed (default)
+- [x] Chat conversation with LLM response
+- [x] Feed filtered by neighborhood
+- [x] Signal card expanded
+- [x] Additional signals loaded (after "Load more")
+- [x] Empty state: "No signals found"
 
-**Total Expected Screenshots:** 32 (19 desktop + 9 mobile + 4 edge cases)
+### In-Page State Variations — Neighborhoods Tab
+- [x] List view with all neighborhoods
+- [x] Filtered list by search
+- [x] Detail scorecard view
+- [x] "Compare Selected" button visible (2+ checked)
+- [x] Comparison view open
+- [x] Empty state: "No neighborhood data yet"
+
+### Global States
+- [x] Disclaimer banner visible (first visit)
+- [x] Light theme (all tabs)
+- [x] Alerts dropdown open (authenticated)
+- [x] Bottom tab bar (mobile)
+- [x] Top nav (desktop)
+
+### Authenticated States
+- [x] Parcel saved (star filled)
+- [x] Alerts dropdown open
+- [x] Watchlist panel with saved parcels
+
+### Empty States
+- [x] Intelligence: "No signals found"
+- [x] Neighborhoods: "No neighborhood data yet"
 
 ---
 
 ## In-Page States Inventory
 
-Every row here MUST have a screenshot scenario.
-
 | Route | Trigger | State Name | Screenshot Scenario |
 |-------|---------|------------|---------------------|
-| `/#map` | Default load | Map with case study carousel | Scenario 1, step 5 |
-| `/#map` | Click tier toggle | Tier 2 layer visible | Scenario 2, step 3 |
-| `/#map` | Click parcel marker | Parcel detail panel open | Scenario 2, step 6 |
-| `/#map` | Click "Financing" in panel | Financing calculator modal | Scenario 2, step 8 |
-| `/#map` | Click FAB | Top opportunities panel | Scenario 2 (added) |
-| `/#map` | Toggle risk layer | Risk choropleth active | Scenario 2 (added) |
-| `/#map` | Toggle heatmap | Signal heatmap active | Scenario 2 (added) |
-| `/#map` | Click theme toggle | Light theme | Scenario 6, step 4 |
-| `/#intel` | Default load | Chat + feed layout | Scenario 3, step 2 |
-| `/#intel` | Filter by neighborhood | Filtered feed | Scenario 3, step 4 |
-| `/#intel` | Click signal card | Signal expanded | Scenario 3, step 6 |
-| `/#intel` | Submit chat query | LLM conversation | Scenario 3, step 9 |
-| `/#intel` | Mobile: chat tab | Chat panel visible | Scenario 5, step 9 |
-| `/#intel` | Mobile: feed tab | Feed panel visible | Scenario 5, step 11 |
-| `/#hoods` | Default load | Neighborhoods list | Scenario 4, step 2 |
-| `/#hoods` | Click neighborhood | Scorecard detail | Scenario 4, step 5 |
-| `/#hoods` | Click "Compare" | Comparison view | Scenario 4, step 8 |
-| `/#map` | Mobile: click FAB | Layer menu drawer | Scenario 5, step 5 |
-| `/#map` | Mobile: click parcel | Full-screen detail | Scenario 5, step 7 |
-| `/#map` | Click bell icon (auth) | Alerts dropdown | Scenario 7, step 8 |
-| `/#map` | Click watchlist menu (auth) | Watchlist panel | Scenario 7, step 10 |
-| `/#map` | API failure | Error state in panel | Scenario 8, step 3 |
-| `/#intel` | No signals for filter | Empty state message | Scenario 8, step 7 |
-| `/#hoods` | Search non-existent | No results state | Scenario 8, step 10 |
+| `#map` | Default load | Map with case study carousel | Scenario 1, Step 3 |
+| `#map` | Click tier 1 checkbox | Tier 1 layer visible | Scenario 1, Step 4 |
+| `#map` | Click tier 2 checkbox | Tier 2 layer visible | Scenario 1, Step 5 |
+| `#map` | Click tier 3 checkbox | Tier 3 layer visible | Scenario 1, Step 6 |
+| `#map` | Click opportunity marker | Parcel detail panel open (desktop) | Scenario 1, Step 7; Scenario 2, Step 4 |
+| `#map` | Click "Deal Model" button | Financing calculator modal open | Scenario 1, Step 8 |
+| `#map` | Click "Top Deals" button | Top opportunities panel open | Scenario 1, Step 9 |
+| `#map` | Toggle "Show Signals" | Signal markers visible | Scenario 1, Step 10 |
+| `#map` | Toggle "Heatmap" | Heatmap overlay visible | Scenario 1, Step 11 |
+| `#map` | Focus address search input | Search dropdown open | Scenario 2, Step 2 |
+| `#map` | Type in address search | Search results dropdown | Scenario 2, Step 3 |
+| `#map` | Expand "Comparable Sales" | Section expanded | Scenario 2, Step 5 |
+| `#map` | Expand "Due Diligence" | Section expanded | Scenario 2, Step 6 |
+| `#map` | Click layers FAB (mobile) | Layer menu drawer open | Scenario 5, Step 3 |
+| `#map` | Tap marker (mobile) | Parcel detail full-screen (mobile) | Scenario 9, Step 2 |
+| `#intel` | Default load | Chat empty + Signal feed | Scenario 3, Step 2 |
+| `#intel` | Type question + send | Chat conversation with LLM response | Scenario 3, Step 3 |
+| `#intel` | Filter by neighborhood | Feed filtered | Scenario 3, Step 4 |
+| `#intel` | Click signal card | Signal expanded | Scenario 3, Step 5 |
+| `#intel` | Click "Load more" | Additional signals loaded | Scenario 3, Step 6 |
+| `#intel` | Filter with no matches | "No signals found" | Scenario 7, Step 1 |
+| `#hoods` | Default load | List view with all neighborhoods | Scenario 4, Step 2 |
+| `#hoods` | Type in search | Filtered list by name | Scenario 4, Step 3 |
+| `#hoods` | Click neighborhood card | Detail scorecard view | Scenario 4, Step 4 |
+| `#hoods` | Check 2+ compare boxes | "Compare Selected" button visible | Scenario 4, Step 5 |
+| `#hoods` | Click "Compare Selected" | Comparison view open | Scenario 4, Step 6 |
+| `#hoods` | Search with no matches | "No neighborhood data yet" | Scenario 7, Step 2 |
+| Global | First visit | Disclaimer banner visible | Scenario 10, Step 1 |
+| Global | Click theme toggle | Light theme active | Scenario 6, Step 1 |
+| Global | Click alerts bell (auth) | Alerts dropdown open | Scenario 8, Step 3 |
+| Global | Mobile | Bottom tab bar visible | Scenario 5, Step 2 |
+| `#map` | Click star icon (auth) | Parcel saved (star filled) | Scenario 8, Step 2 |
 
 ---
 
-## Technical Constraints
+## Notes
 
-### Loading Indicators
-VanCity Lens uses custom loading spinners. The capture script must wait for these to disappear:
-
-**Selectors to monitor:**
-```json
-{
-  "loading_selectors": [
-    ".animate-spin",
-    "[data-loading='true']",
-    ".mapboxgl-ctrl-attrib.mapboxgl-compact:not(.mapboxgl-ctrl-attrib-button)",
-    "text=/Loading/i"
-  ]
-}
-```
-
-### Mapbox GL State Management
-- Map tiles load asynchronously — wait for `map.loaded()` event
-- Map state persists between tab switches (WebGL canvas never unmounts)
-- First screenshot of map may take 3-5s for tile loading
-
-### Hash Routing Delays
-- Hash changes trigger React state updates, not full page reloads
-- Add 500ms wait after hash navigation for component mount
-
-### Authentication
-- Storage state injection happens before page navigation
-- Tokens must be valid (refresh if expired > 30 min)
+- **Total Distinct States:** ~40+ across all tabs
+- **Scenarios:** 10 scenarios covering anonymous + authenticated flows
+- **Viewports:** Desktop (1280x800), Mobile (375x812)
+- **Themes:** Dark (default), Light
+- **Auth:** Anonymous (Scenarios 1-7, 10), Authenticated (Scenario 8-9)
+- **Data Dependency:** All scenarios require E2E seed (`scripts/seed_e2e.sh`) OR production seed (`python scripts/seed_data.py`)
 
 ---
 
 ## Next Steps
 
-1. **Generate scenarios JSON** — Translate this plan into executable scenarios for `capture_screens.py`
-2. **Validate scenarios** — Run `validate_scenarios.py` to check structure
-3. **Execute capture** — Run capture script with seeded data
-4. **Compress images** — Run `compress_images.py` to keep under 1MB
-5. **Phase 3: UX Analysis** — Analyze captured screenshots against heuristics
-6. **Phase 4: Wireframes** — Generate improved designs via GenerateImage
-7. **Phase 5: Report** — Write comprehensive UX review report
-
----
-
-**Plan Quality Gates:**
-- ✅ All routes identified
-- ✅ All in-page states cataloged
-- ✅ Auth strategy documented
-- ✅ Data seeding command provided
-- ✅ Variable extraction patterns defined
-- ✅ Loading selectors specified
-- ✅ Mobile + desktop coverage
-- ✅ Edge case scenarios included
-- ✅ 32 expected screenshots mapped
+1. **Validate Scenarios File:** Run `python3 .cursor/skills/review-ux/scripts/validate_scenarios.py docs/plans/ui-review-scenarios.json`
+2. **Run Capture Script:** `python3 .cursor/skills/review-ux/scripts/capture_screens.py --scenario docs/plans/ui-review-scenarios.json`
+3. **Verify Screenshots:** Check `docs/designs/screenshots/original/` for completeness
+4. **Compress Images:** `python3 .cursor/skills/review-ux/scripts/compress_images.py --input-dir docs/designs/screenshots/original`
+5. **Proceed to Phase 3:** UX Analysis

@@ -37,8 +37,7 @@ import asyncpg
 from sdk import Knowledge2
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -48,8 +47,8 @@ BATCH_SIZE = 100
 # Chunking strategy for K2
 DEFAULT_CHUNKING = {
     "strategy": "semantic",  # semantic, fixed_size, or sentence
-    "chunk_size": 512,       # tokens per chunk
-    "overlap": 50,           # token overlap between chunks
+    "chunk_size": 512,  # tokens per chunk
+    "overlap": 50,  # token overlap between chunks
 }
 
 
@@ -63,21 +62,22 @@ def _get_env_required(name: str) -> str:
 
 def get_k2_client() -> Knowledge2:
     """Build K2 client from environment variables."""
-    api_host = os.environ.get("K2_API_HOST", "https://api-dev.knowledge2.ai").strip().rstrip("/")
+    api_host = (
+        os.environ.get("K2_API_HOST", "https://api-dev.knowledge2.ai")
+        .strip()
+        .rstrip("/")
+    )
     api_key = _get_env_required("K2_API_KEY")
 
     return Knowledge2(
         api_host=api_host,
         api_key=api_key,
-        timeout=60.0  # Longer timeout for batch uploads
+        timeout=60.0,  # Longer timeout for batch uploads
     )
 
 
 async def get_documents_to_sync(
-    pool: asyncpg.Pool,
-    *,
-    force: bool = False,
-    limit: Optional[int] = None
+    pool: asyncpg.Pool, *, force: bool = False, limit: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Fetch documents from PostgreSQL that need to be synced to K2.
@@ -95,7 +95,9 @@ async def get_documents_to_sync(
         where_clause = "TRUE"
     else:
         # Only sync docs that haven't been synced yet
-        where_clause = "(metadata->>'k2_synced' IS NULL OR metadata->>'k2_synced' = 'false')"
+        where_clause = (
+            "(metadata->>'k2_synced' IS NULL OR metadata->>'k2_synced' = 'false')"
+        )
 
     limit_clause = f"LIMIT {limit}" if limit else ""
 
@@ -126,16 +128,18 @@ async def get_documents_to_sync(
         elif metadata is None:
             metadata = {}
 
-        documents.append({
-            "id": row["id"],
-            "source_type": row["source_type"],
-            "source_url": row["source_url"],
-            "title": row["title"],
-            "published_date": row["published_date"],
-            "raw_text": row["raw_text"],
-            "metadata": metadata,
-            "scraped_at": row["scraped_at"],
-        })
+        documents.append(
+            {
+                "id": row["id"],
+                "source_type": row["source_type"],
+                "source_url": row["source_url"],
+                "title": row["title"],
+                "published_date": row["published_date"],
+                "raw_text": row["raw_text"],
+                "metadata": metadata,
+                "scraped_at": row["scraped_at"],
+            }
+        )
 
     return documents
 
@@ -154,14 +158,18 @@ def format_for_k2(doc: Dict[str, Any]) -> Dict[str, Any]:
     k2_metadata = {
         "source_type": doc["source_type"],
         "title": doc["title"],
-        "published_date": doc["published_date"].isoformat() if doc["published_date"] else None,
+        "published_date": doc["published_date"].isoformat()
+        if doc["published_date"]
+        else None,
         "scraped_at": doc["scraped_at"].isoformat() if doc["scraped_at"] else None,
         "postgres_id": doc["id"],
     }
 
     # Merge with original metadata (but don't override postgres_id)
     if doc["metadata"]:
-        k2_metadata.update({k: v for k, v in doc["metadata"].items() if k != "postgres_id"})
+        k2_metadata.update(
+            {k: v for k, v in doc["metadata"].items() if k != "postgres_id"}
+        )
 
     return {
         "raw_text": doc["raw_text"] or "",
@@ -170,10 +178,7 @@ def format_for_k2(doc: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def mark_as_synced(
-    pool: asyncpg.Pool,
-    document_ids: List[int]
-) -> None:
+async def mark_as_synced(pool: asyncpg.Pool, document_ids: List[int]) -> None:
     """
     Mark documents as synced to K2 in PostgreSQL.
 
@@ -196,7 +201,7 @@ async def mark_as_synced(
         WHERE id = ANY($2)
         """,
         synced_at,
-        document_ids
+        document_ids,
     )
 
 
@@ -205,7 +210,7 @@ async def sync_to_k2(
     *,
     force: bool = False,
     dry_run: bool = False,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Main sync orchestrator - fetch documents from PostgreSQL and upload to K2.
@@ -221,7 +226,9 @@ async def sync_to_k2(
     """
     corpus_id = _get_env_required("K2_CORPUS_ID")
 
-    logger.info("Starting K2 sync (force=%s, dry_run=%s, limit=%s)", force, dry_run, limit)
+    logger.info(
+        "Starting K2 sync (force=%s, dry_run=%s, limit=%s)", force, dry_run, limit
+    )
 
     # Fetch documents to sync
     documents = await get_documents_to_sync(pool, force=force, limit=limit)
@@ -239,7 +246,9 @@ async def sync_to_k2(
     if dry_run:
         logger.info("DRY RUN - would sync %d documents:", len(documents))
         for doc in documents[:10]:
-            logger.info("  [%d] %s (%s)", doc["id"], doc["title"][:60], doc["source_type"])
+            logger.info(
+                "  [%d] %s (%s)", doc["id"], doc["title"][:60], doc["source_type"]
+            )
         if len(documents) > 10:
             logger.info("  ... and %d more", len(documents) - 10)
         return {
@@ -257,13 +266,15 @@ async def sync_to_k2(
     batch_count = 0
 
     for i in range(0, len(documents), BATCH_SIZE):
-        batch = documents[i:i + BATCH_SIZE]
+        batch = documents[i : i + BATCH_SIZE]
         batch_num = (i // BATCH_SIZE) + 1
 
-        logger.info("Uploading batch %d/%d (%d documents)...",
-                   batch_num,
-                   (len(documents) + BATCH_SIZE - 1) // BATCH_SIZE,
-                   len(batch))
+        logger.info(
+            "Uploading batch %d/%d (%d documents)...",
+            batch_num,
+            (len(documents) + BATCH_SIZE - 1) // BATCH_SIZE,
+            len(batch),
+        )
 
         # Format for K2
         k2_batch = [format_for_k2(doc) for doc in batch]
@@ -275,14 +286,16 @@ async def sync_to_k2(
                 documents=k2_batch,
                 chunking=DEFAULT_CHUNKING,
                 auto_index=True,  # Auto-index for immediate RAG availability
-                wait=True,        # Wait for indexing to complete
-                poll_s=5,         # Poll every 5 seconds
+                wait=True,  # Wait for indexing to complete
+                poll_s=5,  # Poll every 5 seconds
             )
 
-            logger.info("Batch %d uploaded successfully (document_id=%s, status=%s)",
-                       batch_num,
-                       response.get("document_id"),
-                       response.get("status"))
+            logger.info(
+                "Batch %d uploaded successfully (document_id=%s, status=%s)",
+                batch_num,
+                response.get("document_id"),
+                response.get("status"),
+            )
 
             # Mark as synced in PostgreSQL
             doc_ids = [doc["id"] for doc in batch]
@@ -296,7 +309,11 @@ async def sync_to_k2(
             # Continue with next batch rather than failing entirely
             continue
 
-    logger.info("Sync complete: %d documents uploaded in %d batches", total_uploaded, batch_count)
+    logger.info(
+        "Sync complete: %d documents uploaded in %d batches",
+        total_uploaded,
+        batch_count,
+    )
 
     return {
         "documents_fetched": len(documents),
@@ -310,13 +327,22 @@ async def sync_to_k2(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Sync PostgreSQL documents to K2 corpus")
-    parser.add_argument("--force", action="store_true",
-                       help="Re-sync all documents (ignore sync status)")
-    parser.add_argument("--dry-run", action="store_true",
-                       help="Show what would be synced without actually uploading")
-    parser.add_argument("--limit", type=int,
-                       help="Limit number of documents to process")
+    parser = argparse.ArgumentParser(
+        description="Sync PostgreSQL documents to K2 corpus"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-sync all documents (ignore sync status)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be synced without actually uploading",
+    )
+    parser.add_argument(
+        "--limit", type=int, help="Limit number of documents to process"
+    )
 
     args = parser.parse_args()
 
@@ -329,10 +355,7 @@ if __name__ == "__main__":
         pool = await asyncpg.create_pool(database_url, min_size=1, max_size=3)
         try:
             stats = await sync_to_k2(
-                pool,
-                force=args.force,
-                dry_run=args.dry_run,
-                limit=args.limit
+                pool, force=args.force, dry_run=args.dry_run, limit=args.limit
             )
 
             # Print results as JSON for easy parsing
