@@ -338,6 +338,21 @@ async def sync_to_k2(
                     hex_dump = ' '.join(f'{ord(c):02x}' for c in snippet)
                     logger.info("source_uri[40:60] = %r (hex: %s)", snippet, hex_dump)
 
+            # Try uploading just the first document to isolate the issue
+            logger.info("Attempting single-document upload for debugging...")
+            try:
+                single_doc_response = k2_client.upload_documents_batch(
+                    corpus_id=corpus_id,
+                    documents=[k2_batch[0]] if k2_batch else [],
+                    chunking=DEFAULT_CHUNKING,
+                    auto_index=True,
+                    wait=True,
+                    poll_s=5,
+                )
+                logger.info("Single-document upload succeeded! Response: %s", single_doc_response)
+            except Exception as single_err:
+                logger.error("Single-document upload also failed: %s", single_err)
+
             response = k2_client.upload_documents_batch(
                 corpus_id=corpus_id,
                 documents=k2_batch,
