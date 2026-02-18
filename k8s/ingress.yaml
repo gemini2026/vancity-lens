@@ -13,8 +13,7 @@ metadata:
     # cloud.google.com/backendConfig: "{{.Values.backendConfig}}"
 spec:
   rules:
-  - host: "vancity-lens.example.com"  # Replace with your actual domain
-    http:
+  - http:
       paths:
       - path: /
         pathType: Prefix
