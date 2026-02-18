@@ -7,7 +7,6 @@ Bill 47 opportunities through concrete examples.
 
 import json
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
