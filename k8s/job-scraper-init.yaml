@@ -1,0 +1,107 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scraper-init
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+    component: scraper-init
+  annotations:
+    description: "One-time scraper initialization to seed data on fresh deployments"
+spec:
+  # Allow manual re-run by deleting and recreating
+  ttlSecondsAfterFinished: 86400  # Keep for 24 hours after completion
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: vancity-lens-api
+        component: scraper-init
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: vancity-lens-sa
+      containers:
+      - name: scraper-init
+        image: gcr.io/openclaw-antonmishel-03460/vancity-lens-api:latest
+        command:
+        - python3
+        - -c
+        - |
+          import asyncio
+          import asyncpg
+          import os
+          import sys
+          from datetime import datetime
+
+          async def trigger_scrapers():
+              """Trigger initial scraper runs via admin API."""
+              pool = await asyncpg.create_pool(
+                  os.environ["DATABASE_URL"],
+                  min_size=1,
+                  max_size=5,
+                  command_timeout=300
+              )
+
+              # Import scraper functions
+              sys.path.insert(0, '/app')
+              from api.intelligence.scraper_council import scrape_and_store as scrape_council
+              from api.intelligence.scraper_dpb import download_and_store as scrape_dpb
+              from api.intelligence.scraper_rezoning import scrape_and_store as scrape_rezoning
+              from api.intelligence.scraper_news import scrape_news_feeds as scrape_news
+              from api.intelligence.scraper_bclaws import scrape_and_store as scrape_bclaws
+
+              # Priority scrapers for immediate data availability
+              scrapers = [
+                  ("council", scrape_council),
+                  ("dpb", scrape_dpb),
+                  ("rezoning", scrape_rezoning),
+                  ("news", scrape_news),
+                  ("bclaws", scrape_bclaws),
+              ]
+
+              results = {}
+              for name, func in scrapers:
+                  print(f"[{datetime.now()}] Running {name} scraper...")
+                  try:
+                      start_date = datetime.now()
+                      end_date = datetime.now()
+                      result = await func(pool, start_date, end_date)
+                      results[name] = {
+                          "status": "success",
+                          "found": result.get("documents_found", 0),
+                          "new": result.get("documents_new", 0),
+                      }
+                      print(f"[{datetime.now()}] {name}: {results[name]}")
+                  except Exception as e:
+                      results[name] = {"status": "error", "error": str(e)}
+                      print(f"[{datetime.now()}] {name} FAILED: {e}")
+
+              await pool.close()
+
+              # Summary
+              total_docs = sum(r.get("new", 0) for r in results.values())
+              print(f"\n{'='*60}")
+              print(f"Scraper initialization complete")
+              print(f"Total new documents: {total_docs}")
+              print(f"{'='*60}\n")
+
+              if total_docs == 0:
+                  print("WARNING: No documents scraped. Check scraper logs above.")
+                  sys.exit(1)
+
+          asyncio.run(trigger_scrapers())
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: vancity-lens-secrets
+              key: database-url
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
