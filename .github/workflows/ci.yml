@@ -93,18 +93,32 @@ jobs:
       - name: Wait for PostgreSQL
         run: |
           python -c "
-          import socket
+          import sys
           import time
-          for i in range(30):
+          import subprocess
+
+          # Install psycopg2 for reliable connection testing
+          subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'psycopg2-binary'], check=True)
+
+          import psycopg2
+
+          conn_string = 'postgresql://postgres:postgres@localhost:5432/vancity_lens'
+
+          for i in range(60):
               try:
-                  socket.create_connection(('localhost', 5432), timeout=1)
-                  print('PostgreSQL is ready')
-                  exit(0)
-              except:
-                  print(f'Attempt {i+1}/30: PostgreSQL not ready yet...')
-                  time.sleep(1)
+                  conn = psycopg2.connect(conn_string)
+                  conn.close()
+                  print(f'PostgreSQL is ready (attempt {i+1})')
+                  sys.exit(0)
+              except psycopg2.OperationalError as e:
+                  print(f'Attempt {i+1}/60: {e}')
+                  time.sleep(2)
+              except Exception as e:
+                  print(f'Unexpected error on attempt {i+1}/60: {type(e).__name__}: {e}')
+                  time.sleep(2)
+
           print('PostgreSQL did not become ready in time')
-          exit(1)
+          sys.exit(1)
           "
 
       - name: Run pytest
