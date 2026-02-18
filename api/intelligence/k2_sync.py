@@ -331,6 +331,13 @@ async def sync_to_k2(
                 import json as json_lib
                 logger.info("First document in batch:\n%s", json_lib.dumps(k2_batch[0], indent=2, default=str)[:1000])
 
+                # Check for invisible characters in source_uri around position 48
+                source_uri = k2_batch[0].get("source_uri", "")
+                if len(source_uri) > 40:
+                    snippet = source_uri[40:60]
+                    hex_dump = ' '.join(f'{ord(c):02x}' for c in snippet)
+                    logger.info("source_uri[40:60] = %r (hex: %s)", snippet, hex_dump)
+
             response = k2_client.upload_documents_batch(
                 corpus_id=corpus_id,
                 documents=k2_batch,
