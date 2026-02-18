@@ -60,7 +60,8 @@ class DocumentListItem(TypedDict, total=False):
     id: str
     corpus_id: str
     source_uri: str
-    metadata: dict
+    custom_metadata: dict
+    system_metadata: dict
     created_at: str | None
     status: str | None
     size_bytes: int | None

@@ -49,3 +49,7 @@ class TuningRunListResponse(TypedDict):
 
 class PromoteResponse(TypedDict):
     model_id: str
+
+
+class CancelTuningRunResponse(TypedDict):
+    status: str

@@ -15,6 +15,7 @@ class CorpusResponse(TypedDict, total=False):
     org_name: str | None
     project_name: str | None
     chunking_config: dict[str, Any] | None
+    graph_rag_policy: dict[str, Any] | None
 
 
 class CorpusListResponse(TypedDict):
@@ -28,9 +29,12 @@ class CorpusDeleteResponse(TypedDict, total=False):
 
 class CorpusStatusResponse(TypedDict, total=False):
     status: str
+    search_status: str
+    retrieval_ready: bool
     ingesting: bool
     indexing: bool
     document_count: int
     documents_processing: int
     dense_status: str | None
     sparse_status: str | None
+    graph_status: str | None

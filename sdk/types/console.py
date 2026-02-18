@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, TypedDict
+from typing import Any, TypedDict
 
 from .jobs import JobListItem
 
@@ -35,6 +35,7 @@ class ConsoleProjectItem(TypedDict, total=False):
     name: str
     org_id: str
     role: str
+    graph_rag_policy: dict[str, Any] | None
 
 
 class ConsoleProjectListResponse(TypedDict):

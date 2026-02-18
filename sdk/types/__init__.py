@@ -1,5 +1,19 @@
 from __future__ import annotations
 
+from .a2a import (
+    A2AAgentAuthentication,
+    A2AAgentCapabilities,
+    A2AAgentCardResponse,
+    A2AAgentProvider,
+    A2AAgentSkill,
+    A2AArtifact,
+    A2ADataPart,
+    A2AJsonRpcError,
+    A2AJsonRpcResponse,
+    A2ATaskResponse,
+    A2ATaskStatus,
+    A2ATextPart,
+)
 from .audit import AuditLogItem, AuditLogListResponse
 from .auth import (
     ApiKeyCreateResponse,
@@ -15,6 +29,7 @@ from .console import (
     ConsoleBootstrapResponse,
     ConsoleMeResponse,
     ConsoleOrgResponse,
+    ConsoleProjectItem,
     ConsoleProjectListResponse,
     ConsoleSummaryResponse,
     InviteAcceptResponse,
@@ -50,7 +65,13 @@ from .embeddings import EmbeddingItem, EmbeddingsResponse
 from .evaluation import EvalRunDetailResponse, EvalRunResponse
 from .feedback import FeedbackResponse
 from .indexes import IndexBuildResponse, IndexCompactResponse, IndexStatusResponse
-from .jobs import JobListItem, JobListResponse, JobResponse, JobStatusResponse
+from .jobs import (
+    JobListItem,
+    JobListResponse,
+    JobResponse,
+    JobStatusResponse,
+    ReconcileJobsResponse,
+)
 from .models import ModelDeleteResponse, ModelListResponse, ModelResponse
 from .onboarding import (
     DatasetAnalysisDetails,
@@ -91,10 +112,14 @@ from .projects import ProjectListResponse, ProjectResponse
 from .search import (
     SearchBatchOptions,
     SearchBatchResponse,
+    SearchColdStartMeta,
     SearchGenerateOptions,
     SearchGenerateResponse,
     SearchGenerationConfig,
+    SearchGraphRagConfig,
+    SearchGraphRagMeta,
     SearchHybridConfig,
+    SearchMeta,
     SearchOptions,
     SearchRerankConfig,
     SearchResponse,
@@ -102,6 +127,7 @@ from .search import (
     SearchReturnConfig,
 )
 from .training import (
+    CancelTuningRunResponse,
     PromoteResponse,
     TrainingDataBuildResponse,
     TrainingDatasetListResponse,
@@ -122,6 +148,18 @@ from .usage import (
 )
 
 __all__ = [
+    "A2AAgentAuthentication",
+    "A2AAgentCapabilities",
+    "A2AAgentCardResponse",
+    "A2AAgentProvider",
+    "A2AAgentSkill",
+    "A2AArtifact",
+    "A2ADataPart",
+    "A2AJsonRpcError",
+    "A2AJsonRpcResponse",
+    "A2ATaskResponse",
+    "A2ATaskStatus",
+    "A2ATextPart",
     "ApiErrorDetail",
     "ApiKeyCreateResponse",
     "ApiKeyListItem",
@@ -130,12 +168,14 @@ __all__ = [
     "ApiKeyRotateResponse",
     "AuditLogItem",
     "AuditLogListResponse",
+    "CancelTuningRunResponse",
     "ChunkListItem",
     "ChunkListResponse",
     "ChunkingConfig",
     "ConsoleBootstrapResponse",
     "ConsoleMeResponse",
     "ConsoleOrgResponse",
+    "ConsoleProjectItem",
     "ConsoleProjectListResponse",
     "ConsoleSummaryResponse",
     "CorpusDeleteResponse",
@@ -199,13 +239,18 @@ __all__ = [
     "ProjectListResponse",
     "ProjectResponse",
     "PromoteResponse",
+    "ReconcileJobsResponse",
     "ResolvedLabelInfo",
     "SearchBatchOptions",
     "SearchBatchResponse",
+    "SearchColdStartMeta",
     "SearchGenerateOptions",
     "SearchGenerateResponse",
     "SearchGenerationConfig",
+    "SearchGraphRagConfig",
+    "SearchGraphRagMeta",
     "SearchHybridConfig",
+    "SearchMeta",
     "SearchOptions",
     "SearchRerankConfig",
     "SearchResponse",

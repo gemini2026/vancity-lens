@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Iterator, cast
 
 from sdk.resources._mixin_base import RequesterMixin
 from sdk.types import (
@@ -333,9 +333,62 @@ class DocumentsMixin(RequesterMixin):
         data = self._request("GET", f"/v1/corpora/{corpus_id}/documents", params=params)
         return cast("DocumentListResponse", data)
 
+    def iter_documents(
+        self,
+        corpus_id: str,
+        *,
+        limit: int = 100,
+        q: str | None = None,
+        status: str | None = None,
+        source: str | None = None,
+        tag: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Lazily paginate documents, yielding individual document items."""
+        params: dict[str, Any] = {}
+        if q is not None:
+            params["q"] = q
+        if status is not None:
+            params["status"] = status
+        if source is not None:
+            params["source"] = source
+        if tag is not None:
+            params["tag"] = tag
+        yield from self._paginate(
+            "GET",
+            f"/v1/corpora/{corpus_id}/documents",
+            items_key="documents",
+            params=params if params else None,
+            limit=limit,
+        )
+
     def get_document(self, doc_id: str) -> DocumentDetailResponse:
         data = self._request("GET", f"/v1/documents/{doc_id}")
         return cast("DocumentDetailResponse", data)
+
+    def update_document_metadata(
+        self,
+        doc_id: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update customer metadata on a document using merge semantics.
+
+        Keys with non-empty values are added or updated.
+        Keys with empty string or None values are removed.
+        Keys not in the request are left unchanged.
+
+        Args:
+            doc_id: Document ID to update
+            metadata: Dict of metadata updates to apply
+
+        Returns:
+            Updated metadata dict with custom_metadata and system_metadata
+        """
+        response = self._request(
+            "PATCH",
+            f"/v1/documents/{doc_id}/metadata",
+            json=metadata,
+        )
+        return response
 
     def delete_document(
         self, corpus_id: str, doc_id: str, reindex: bool = False
@@ -354,3 +407,12 @@ class DocumentsMixin(RequesterMixin):
             params={"limit": limit, "offset": offset},
         )
         return cast("ChunkListResponse", data)
+
+    def iter_chunks(self, corpus_id: str, *, limit: int = 100) -> Iterator[dict[str, Any]]:
+        """Lazily paginate chunks, yielding individual chunk items."""
+        yield from self._paginate(
+            "GET",
+            f"/v1/corpora/{corpus_id}/chunks",
+            items_key="chunks",
+            limit=limit,
+        )

@@ -6,7 +6,8 @@ from typing import List, Optional, TypedDict
 class ChunkListItem(TypedDict, total=False):
     id: str
     text: str
-    metadata: dict
+    custom_metadata: dict
+    system_metadata: dict
     offset_start: int | None
     offset_end: int | None
     page_start: int | None

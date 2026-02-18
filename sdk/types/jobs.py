@@ -37,3 +37,7 @@ class JobListResponse(TypedDict):
 
 class JobStatusResponse(TypedDict):
     status: str
+
+
+class ReconcileJobsResponse(TypedDict):
+    reconciled: int

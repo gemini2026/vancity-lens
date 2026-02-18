@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Iterator, cast
 
 from sdk.resources._mixin_base import RequesterMixin
 from sdk.types import (
@@ -172,6 +172,15 @@ class OnboardingMixin(RequesterMixin):
             params={"limit": limit, "offset": offset},
         )
         return cast("GoldLabelsListResponse", data)
+
+    def iter_gold_labels(self, corpus_id: str, *, limit: int = 100) -> Iterator[dict[str, Any]]:
+        """Iterate over gold labels, automatically paginating."""
+        return self._paginate(
+            "GET",
+            f"/v1/corpora/{corpus_id}/gold-labels",
+            items_key="labels",
+            limit=limit,
+        )
 
     # =========================================================================
     # Synthetic Query Generation
