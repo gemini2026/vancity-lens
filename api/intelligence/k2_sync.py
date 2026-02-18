@@ -205,8 +205,8 @@ async def mark_as_synced(pool: asyncpg.Pool, document_ids: List[int]) -> None:
         """
         UPDATE documents
         SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-            jsonb_build_object('k2_synced', 'true', 'k2_synced_at', $1)
-        WHERE id = ANY($2)
+            jsonb_build_object('k2_synced', 'true', 'k2_synced_at', $1::text)
+        WHERE id = ANY($2::int[])
         """,
         synced_at,
         document_ids,
