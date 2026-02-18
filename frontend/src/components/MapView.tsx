@@ -20,6 +20,8 @@ import type { AddressSearchResult } from "@/hooks/useAddressSearch";
 import { getApiBase } from "@/lib/api-base";
 import { useTheme } from "@/lib/theme-context";
 import { Layers } from "lucide-react";
+import LayerControlFAB from "./LayerControlFAB";
+import LayerControlSheet from "./LayerControlSheet";
 
 const API_BASE = getApiBase();
 
@@ -131,6 +133,7 @@ export default function MapView() {
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showTopDeals, setShowTopDeals] = useState(false);
+  const [showLayerSheet, setShowLayerSheet] = useState(false);
   const { resolvedTheme } = useTheme();
   const mapStyle = resolvedTheme === "dark" ? "mapbox://styles/mapbox/dark-v11" : "mapbox://styles/mapbox/light-v11";
 
@@ -1016,90 +1019,52 @@ export default function MapView() {
         )}
       </div>
 
-      {/* Mobile: Layers FAB */}
-      <div className="md:hidden absolute bottom-20 right-4 z-10">
-        <button
-          onClick={() => setShowLayerMenu(!showLayerMenu)}
-          className="touch-target-large w-12 h-12 rounded-full bg-[var(--color-panel)] border border-[var(--color-panel-border)] backdrop-blur-md flex items-center justify-center text-[var(--color-foreground-muted)] shadow-lg"
-        >
-          <Layers className="w-5 h-5" />
-        </button>
-        {showLayerMenu && (
-          <div className="absolute bottom-14 right-0 bg-[var(--color-panel)] border border-[var(--color-panel-border)] backdrop-blur-md rounded-xl p-3 flex flex-col gap-2 min-w-[160px] shadow-xl">
-            <button
-              onClick={() => setShowSignals(!showSignals)}
-              className={cn(
-                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
-                showSignals
-                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
-                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
-              )}
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />
-              {showSignals ? "Hide" : "Show"} Signals
-            </button>
-            <button
-              onClick={() => setShowClusters(!showClusters)}
-              className={cn(
-                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
-                showClusters
-                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
-                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
-              )}
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1.5" />
-              {showClusters ? "Hide" : "Show"} Clusters{clusters.length > 0 ? ` (${clusters.length})` : ""}
-            </button>
-            <button
-              onClick={() => setShowRiskChoropleth(prev => !prev)}
-              className={cn(
-                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
-                showRiskChoropleth
-                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
-                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
-              )}
-              title="Toggle neighborhood risk overlay"
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
-              Risk Map
-            </button>
-            <button
-              onClick={() => setShowHeatmap(prev => !prev)}
-              className={cn(
-                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
-                showHeatmap
-                  ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
-                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
-              )}
-              title="Toggle signal density heatmap"
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />
-              Heatmap
-            </button>
-            <button
-              onClick={() => setShowTopDeals(prev => !prev)}
-              className={cn(
-                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
-                showTopDeals
-                  ? "bg-emerald-600/20 border border-emerald-500/30 text-emerald-400"
-                  : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
-              )}
-              title="Toggle top opportunities panel"
-            >
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
-              Top Deals
-            </button>
-            {!showCaseStudies && (
-              <button
-                onClick={() => setShowCaseStudies(true)}
-                className="touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
-              >
-                Examples
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Mobile: Layer Control FAB + Bottom Sheet */}
+      <LayerControlFAB
+        onClick={() => setShowLayerSheet(!showLayerSheet)}
+        isOpen={showLayerSheet}
+      />
+      <LayerControlSheet
+        isOpen={showLayerSheet}
+        onClose={() => setShowLayerSheet(false)}
+        controls={[
+          {
+            id: "signals",
+            label: "Intelligence Signals",
+            enabled: showSignals,
+            onChange: (enabled) => setShowSignals(enabled),
+            color: "#3b82f6",
+          },
+          {
+            id: "clusters",
+            label: `Development Clusters${clusters.length > 0 ? ` (${clusters.length})` : ""}`,
+            enabled: showClusters,
+            onChange: (enabled) => setShowClusters(enabled),
+            color: "#a855f7",
+          },
+          {
+            id: "risk",
+            label: "Risk Map",
+            enabled: showRiskChoropleth,
+            onChange: (enabled) => setShowRiskChoropleth(enabled),
+            color: "#ef4444",
+          },
+          {
+            id: "heatmap",
+            label: "Heatmap",
+            enabled: showHeatmap,
+            onChange: (enabled) => setShowHeatmap(enabled),
+            color: "#f97316",
+          },
+          {
+            id: "topdeals",
+            label: "Top Deals",
+            enabled: showTopDeals,
+            onChange: (enabled) => setShowTopDeals(enabled),
+            color: "#10b981",
+          },
+        ]}
+      />
 
       {/* Top Opportunities Panel */}
       {showTopDeals && (
