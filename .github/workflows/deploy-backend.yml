@@ -40,7 +40,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens/${{ env.IMAGE_NAME }}"
+          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens-docker/${{ env.IMAGE_NAME }}"
           docker build -t ${IMAGE_URL}:${{ github.sha }} -t ${IMAGE_URL}:latest .
           docker push ${IMAGE_URL}:${{ github.sha }}
           docker push ${IMAGE_URL}:latest
@@ -54,7 +54,7 @@ jobs:
 
       - name: Update deployment image tag
         run: |
-          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens/${{ env.IMAGE_NAME }}"
+          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens-docker/${{ env.IMAGE_NAME }}"
           sed -i "s|IMAGE_PLACEHOLDER|${IMAGE_URL}:${{ github.sha }}|g" k8s/deployment.yaml
 
       - name: Deploy to GKE
