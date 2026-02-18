@@ -19,7 +19,7 @@ from typing import List, Dict, Optional
 logger = logging.getLogger(__name__)
 
 # -- Configuration -------------------------------------------------------------
-CHUNK_SIZE = 800       # tokens per chunk (sweet spot for retrieval)
+CHUNK_SIZE = 800  # tokens per chunk (sweet spot for retrieval)
 TOKENIZER_MODEL = "gpt-4"  # tiktoken encoding name
 
 # -- Lazy-loaded chunker singleton ---------------------------------------------
@@ -36,9 +36,12 @@ def _get_chunker():
 
     try:
         import semchunk
+
         _chunker = semchunk.chunkerify(TOKENIZER_MODEL, chunk_size=CHUNK_SIZE)
         _use_semchunk = True
-        logger.info(f"semchunk initialized: model={TOKENIZER_MODEL}, chunk_size={CHUNK_SIZE}")
+        logger.info(
+            f"semchunk initialized: model={TOKENIZER_MODEL}, chunk_size={CHUNK_SIZE}"
+        )
     except ImportError:
         logger.warning("semchunk not installed -- falling back to simple splitter")
         _use_semchunk = False
@@ -75,6 +78,7 @@ def _count_tokens(text: str) -> int:
 
 # -- Fallback simple chunker ---------------------------------------------------
 
+
 def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
     """
     Simple paragraph-based chunker as fallback when semchunk is unavailable.
@@ -82,7 +86,7 @@ def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
     Splits on double newlines (paragraphs), then merges small paragraphs
     until the chunk reaches ~chunk_size tokens.
     """
-    paragraphs = re.split(r'\n\s*\n', text)
+    paragraphs = re.split(r"\n\s*\n", text)
     chunks = []
     current_parts = []
     current_tokens = 0
@@ -95,7 +99,7 @@ def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
         para_tokens = _count_tokens(para)
 
         if current_tokens + para_tokens > chunk_size and current_parts:
-            chunks.append('\n\n'.join(current_parts))
+            chunks.append("\n\n".join(current_parts))
             current_parts = []
             current_tokens = 0
 
@@ -103,7 +107,7 @@ def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
         current_tokens += para_tokens
 
     if current_parts:
-        chunks.append('\n\n'.join(current_parts))
+        chunks.append("\n\n".join(current_parts))
 
     return chunks
 
@@ -112,11 +116,13 @@ def _simple_chunker(text: str, *, chunk_size: int = CHUNK_SIZE) -> List[str]:
 
 # Patterns for government document section headers
 _HEADER_PATTERNS = [
-    re.compile(r'^(?:ITEM|SECTION|ARTICLE|PART|CHAPTER)\s+\d+[:.]*\s*(.+)$', re.IGNORECASE),
-    re.compile(r'^(\d+\.)\s+(.+)$'),
-    re.compile(r'^[A-Z]\.\s+(.+)$'),
-    re.compile(r'^([A-Z][A-Z\s]{3,})$'),          # ALL CAPS HEADER (min 4 chars)
-    re.compile(r'^(.{5,80}):\s*$'),                 # Short line ending with colon
+    re.compile(
+        r"^(?:ITEM|SECTION|ARTICLE|PART|CHAPTER)\s+\d+[:.]*\s*(.+)$", re.IGNORECASE
+    ),
+    re.compile(r"^(\d+\.)\s+(.+)$"),
+    re.compile(r"^[A-Z]\.\s+(.+)$"),
+    re.compile(r"^([A-Z][A-Z\s]{3,})$"),  # ALL CAPS HEADER (min 4 chars)
+    re.compile(r"^(.{5,80}):\s*$"),  # Short line ending with colon
 ]
 
 
@@ -133,7 +139,7 @@ def detect_section_header(text: str) -> Optional[str]:
     Returns:
         Detected section header string, or None
     """
-    lines = text.split('\n')
+    lines = text.split("\n")
 
     # Check first 5 lines for a header
     for line in lines[:5]:
@@ -147,7 +153,7 @@ def detect_section_header(text: str) -> Optional[str]:
                 # Extract the meaningful part
                 groups = match.groups()
                 header = groups[-1] if groups else line
-                header = header.strip().rstrip(':').strip()
+                header = header.strip().rstrip(":").strip()
                 if header and len(header) > 2:
                     return header
 
@@ -155,6 +161,7 @@ def detect_section_header(text: str) -> Optional[str]:
 
 
 # -- Main chunking pipeline ----------------------------------------------------
+
 
 def chunk_document(
     text: str,
@@ -182,7 +189,7 @@ def chunk_document(
         return []
 
     # Normalize whitespace but preserve paragraph structure
-    text = '\n'.join(line.rstrip() for line in text.split('\n'))
+    text = "\n".join(line.rstrip() for line in text.split("\n"))
     text = text.strip()
 
     if not text:
@@ -196,6 +203,7 @@ def chunk_document(
         # If custom chunk_size requested, create a one-off chunker
         try:
             import semchunk
+
             custom_chunker = semchunk.chunkerify(TOKENIZER_MODEL, chunk_size=chunk_size)
             raw_chunks = custom_chunker(text)
         except Exception:
@@ -220,12 +228,14 @@ def chunk_document(
         section_header = detect_section_header(chunk_text)
         token_count = _count_tokens(chunk_text)
 
-        result.append({
-            'chunk_text': chunk_text,
-            'chunk_index': idx,
-            'section_header': section_header,
-            'approx_token_count': token_count,
-        })
+        result.append(
+            {
+                "chunk_text": chunk_text,
+                "chunk_index": idx,
+                "section_header": section_header,
+                "approx_token_count": token_count,
+            }
+        )
 
     logger.info(
         f"Chunked document into {len(result)} chunks "

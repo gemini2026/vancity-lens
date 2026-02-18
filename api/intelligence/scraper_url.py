@@ -46,7 +46,9 @@ async def scrape_url(
     # Validate URL
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"Invalid URL scheme: {parsed.scheme}. Only http/https supported.")
+        raise ValueError(
+            f"Invalid URL scheme: {parsed.scheme}. Only http/https supported."
+        )
     if not parsed.netloc:
         raise ValueError("Invalid URL: missing hostname")
 
@@ -76,10 +78,7 @@ async def scrape_url(
         raise ValueError(f"Download failed: {e}")
 
     # Detect content type and parse
-    is_pdf = (
-        "application/pdf" in content_type
-        or url.lower().endswith(".pdf")
-    )
+    is_pdf = "application/pdf" in content_type or url.lower().endswith(".pdf")
 
     if is_pdf:
         result = parse_pdf(data)
@@ -178,32 +177,56 @@ def _extract_html_metadata(html: str) -> dict:
     metadata: dict = {}
 
     # og:title
-    m = re.search(r'<meta\s+(?:property|name)=["\']og:title["\']\s+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta\s+(?:property|name)=["\']og:title["\']\s+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         metadata["og_title"] = m.group(1).strip()
 
     # og:description
-    m = re.search(r'<meta\s+(?:property|name)=["\']og:description["\']\s+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta\s+(?:property|name)=["\']og:description["\']\s+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         metadata["og_description"] = m.group(1).strip()
 
     # og:site_name
-    m = re.search(r'<meta\s+(?:property|name)=["\']og:site_name["\']\s+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta\s+(?:property|name)=["\']og:site_name["\']\s+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         metadata["og_site_name"] = m.group(1).strip()
 
     # article:published_time
-    m = re.search(r'<meta\s+(?:property|name)=["\']article:published_time["\']\s+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta\s+(?:property|name)=["\']article:published_time["\']\s+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         metadata["article_published_time"] = m.group(1).strip()
 
     # meta description
-    m = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         metadata["meta_description"] = m.group(1).strip()
 
     # meta author
-    m = re.search(r'<meta\s+name=["\']author["\']\s+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta\s+name=["\']author["\']\s+content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         metadata["meta_author"] = m.group(1).strip()
 

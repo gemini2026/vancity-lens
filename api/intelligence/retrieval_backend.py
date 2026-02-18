@@ -61,13 +61,20 @@ async def _retrieve_local(
                 use_rerank=True,
             )
         return await hybrid_search(
-            db_pool, query, cohere_api_key, limit=10, use_rerank=True,
+            db_pool,
+            query,
+            cohere_api_key,
+            limit=10,
+            use_rerank=True,
         )
 
     return await sparse_search(
-        db_pool, query, limit=10,
+        db_pool,
+        query,
+        limit=10,
         neighborhood=neighborhood_filter,
-        date_from=date_from, date_to=date_to,
+        date_from=date_from,
+        date_to=date_to,
     )
 
 
@@ -82,9 +89,12 @@ async def _fallback_sparse(
     from .local_rag.embeddings import sparse_search
 
     return await sparse_search(
-        db_pool, query, limit=10,
+        db_pool,
+        query,
+        limit=10,
         neighborhood=neighborhood_filter,
-        date_from=date_from, date_to=date_to,
+        date_from=date_from,
+        date_to=date_to,
     )
 
 
@@ -120,9 +130,11 @@ async def retrieve_document_chunks(
         if k2_fallback_to_local_enabled():
             logger.warning("K2 retrieval failed; falling back to BM25. error=%s", exc)
             return await _fallback_sparse(
-                db_pool, query,
+                db_pool,
+                query,
                 neighborhood_filter=neighborhood_filter,
-                date_from=date_from, date_to=date_to,
+                date_from=date_from,
+                date_to=date_to,
             )
         raise
 

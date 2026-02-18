@@ -25,7 +25,9 @@ def _env_int(name: str, default: int) -> int:
         logger.warning("Invalid %s=%r; using default %s", name, raw, default)
         return default
     if value <= 0:
-        logger.warning("Invalid %s=%r (must be > 0); using default %s", name, raw, default)
+        logger.warning(
+            "Invalid %s=%r (must be > 0); using default %s", name, raw, default
+        )
         return default
     return value
 
@@ -40,7 +42,9 @@ def _env_float(name: str, default: float) -> float:
         logger.warning("Invalid %s=%r; using default %s", name, raw, default)
         return default
     if value <= 0:
-        logger.warning("Invalid %s=%r (must be > 0); using default %s", name, raw, default)
+        logger.warning(
+            "Invalid %s=%r (must be > 0); using default %s", name, raw, default
+        )
         return default
     return value
 
@@ -63,6 +67,10 @@ LLM_SEMAPHORE = asyncio.Semaphore(LLM_MAX_CONCURRENT_REQUESTS)
 
 # Timeouts (seconds)
 ANTHROPIC_CHAT_TIMEOUT_SECONDS = _env_float("ANTHROPIC_CHAT_TIMEOUT_SECONDS", 30.0)
-ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS = _env_float("ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS", 45.0)
+ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS = _env_float(
+    "ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS", 45.0
+)
 GEMINI_CHAT_TIMEOUT_SECONDS = _env_float("GEMINI_CHAT_TIMEOUT_SECONDS", 45.0)
-GEMINI_EXTRACTION_TIMEOUT_SECONDS = _env_float("GEMINI_EXTRACTION_TIMEOUT_SECONDS", 45.0)
+GEMINI_EXTRACTION_TIMEOUT_SECONDS = _env_float(
+    "GEMINI_EXTRACTION_TIMEOUT_SECONDS", 45.0
+)

@@ -34,7 +34,8 @@ async def get_pending_reviews(
     params.extend([limit, offset])
 
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch(f"""
+        rows = await conn.fetch(
+            f"""
             SELECT id, document_id, signal_type, summary, headline,
                    neighborhood, severity, confidence, event_date,
                    review_status, created_at
@@ -42,11 +43,16 @@ async def get_pending_reviews(
             WHERE {where}
             ORDER BY confidence ASC, created_at DESC
             LIMIT ${idx} OFFSET ${idx + 1}
-        """, *params)
+        """,
+            *params,
+        )
 
-        count_row = await conn.fetchrow(f"""
+        count_row = await conn.fetchrow(
+            f"""
             SELECT count(*) as total FROM intelligence_signals WHERE {where}
-        """, *(params[:-2] if signal_type else []))
+        """,
+            *(params[:-2] if signal_type else []),
+        )
 
         return {
             "items": [dict(r) for r in rows],
@@ -69,7 +75,8 @@ async def review_signal(
     review_status = "approved" if action == "approve" else "rejected"
 
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("""
+        row = await conn.fetchrow(
+            """
             UPDATE intelligence_signals
             SET review_status = $1,
                 reviewed_by = $2,
@@ -104,7 +111,8 @@ async def bulk_review(
     review_status = "approved" if action == "approve" else "rejected"
 
     async with db_pool.acquire() as conn:
-        result = await conn.execute("""
+        result = await conn.execute(
+            """
             UPDATE intelligence_signals
             SET review_status = $1,
                 reviewed_by = $2,

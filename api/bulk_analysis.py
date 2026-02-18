@@ -33,6 +33,7 @@ GRADE_THRESHOLDS = {"A": 80, "B": 60, "C": 40, "D": 20}
 
 class JobStatus(str, Enum):
     """Lifecycle states for a bulk-analysis job."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -59,9 +60,7 @@ class BulkAnalysisRequest(BaseModel):
         """Ensure total items do not exceed MAX_ITEMS."""
         total = len(self.pids) + len(self.addresses)
         if total > MAX_ITEMS:
-            raise ValueError(
-                f"Total items ({total}) exceeds maximum of {MAX_ITEMS}"
-            )
+            raise ValueError(f"Total items ({total}) exceeds maximum of {MAX_ITEMS}")
         return self
 
     @model_validator(mode="after")

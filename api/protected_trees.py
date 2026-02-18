@@ -22,14 +22,16 @@ from pydantic import BaseModel, Field
 
 class ProtectionStatus(str, Enum):
     """Tree protection levels under Vancouver bylaw."""
-    HERITAGE = "heritage"          # Extra protection, heritage designation
-    SIGNIFICANT = "significant"    # 10-20cm DBH
-    PROTECTED = "protected"        # 20cm+ DBH (permit required)
-    UNPROTECTED = "unprotected"    # <10cm DBH
+
+    HERITAGE = "heritage"  # Extra protection, heritage designation
+    SIGNIFICANT = "significant"  # 10-20cm DBH
+    PROTECTED = "protected"  # 20cm+ DBH (permit required)
+    UNPROTECTED = "unprotected"  # <10cm DBH
 
 
 class ProtectedTree(BaseModel):
     """A single protected or heritage tree on a parcel."""
+
     id: int = Field(..., description="Unique tree identifier")
     species: str = Field(..., description="Tree species (e.g., Western Red Cedar)")
     dbh_cm: float = Field(..., ge=0, description="Diameter at breast height in cm")
@@ -40,16 +42,24 @@ class ProtectedTree(BaseModel):
         ..., description="Protection level under bylaw"
     )
     heritage_designation: Optional[str] = Field(
-        None, description="Heritage name/date if applicable (e.g., BC Heritage Register)"
+        None,
+        description="Heritage name/date if applicable (e.g., BC Heritage Register)",
     )
 
 
 class TreeCountResult(BaseModel):
     """Results of protected tree analysis for a parcel."""
+
     total_trees: int = Field(..., ge=0, description="Total protected trees found")
-    heritage_trees: int = Field(..., ge=0, description="Trees with heritage designation")
-    significant_trees: int = Field(..., ge=0, description="Trees 10-20cm DBH (significant)")
-    protected_trees: int = Field(..., ge=0, description="Trees 20cm+ DBH (permit required)")
+    heritage_trees: int = Field(
+        ..., ge=0, description="Trees with heritage designation"
+    )
+    significant_trees: int = Field(
+        ..., ge=0, description="Trees 10-20cm DBH (significant)"
+    )
+    protected_trees: int = Field(
+        ..., ge=0, description="Trees 20cm+ DBH (permit required)"
+    )
     estimated_removal_cost: float = Field(
         ..., ge=0, description="Total estimated removal cost (dollars)"
     )
@@ -96,9 +106,15 @@ class ProtectedTreeAnalyzer:
                 impact_score=0.0,
             )
 
-        heritage_count = sum(1 for t in trees if t.protection_status == ProtectionStatus.HERITAGE)
-        significant_count = sum(1 for t in trees if t.protection_status == ProtectionStatus.SIGNIFICANT)
-        protected_count = sum(1 for t in trees if t.protection_status == ProtectionStatus.PROTECTED)
+        heritage_count = sum(
+            1 for t in trees if t.protection_status == ProtectionStatus.HERITAGE
+        )
+        significant_count = sum(
+            1 for t in trees if t.protection_status == ProtectionStatus.SIGNIFICANT
+        )
+        protected_count = sum(
+            1 for t in trees if t.protection_status == ProtectionStatus.PROTECTED
+        )
 
         # Compute removal cost
         removal_cost = self._estimate_total_removal_cost(trees)
@@ -226,7 +242,9 @@ class ProtectedTreeAnalyzer:
             if distance <= radius_m:
                 nearby.append(tree)
 
-        return sorted(nearby, key=lambda t: self._haversine_distance(lat, lng, t.lat, t.lng))
+        return sorted(
+            nearby, key=lambda t: self._haversine_distance(lat, lng, t.lat, t.lng)
+        )
 
     def _estimate_total_removal_cost(self, trees: list[ProtectedTree]) -> float:
         """Sum removal costs across all trees by protection status."""
@@ -273,7 +291,9 @@ class ProtectedTreeAnalyzer:
         return self.STANDARD_REMOVAL_LOW + (scale * (2_000 - self.STANDARD_REMOVAL_LOW))
 
     @staticmethod
-    def _haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    def _haversine_distance(
+        lat1: float, lng1: float, lat2: float, lng2: float
+    ) -> float:
         """
         Compute approximate distance between two lat/lng points in meters.
 
@@ -297,7 +317,9 @@ class ProtectedTreeAnalyzer:
 
         return R_EARTH_M * c
 
-    def classify_tree_status(self, dbh_cm: float, is_heritage: bool = False) -> ProtectionStatus:
+    def classify_tree_status(
+        self, dbh_cm: float, is_heritage: bool = False
+    ) -> ProtectionStatus:
         """
         Classify a tree based on DBH and heritage status.
 

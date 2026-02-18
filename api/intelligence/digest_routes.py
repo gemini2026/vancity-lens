@@ -46,6 +46,7 @@ admin_router = APIRouter(
 # Subscription Endpoints
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/subscribe", response_model=DigestSubscription, status_code=201)
 async def create_subscription(
     neighborhoods: Optional[List[str]] = Query(None),
@@ -330,6 +331,7 @@ async def delete_subscription(
 # Digest Preview & History
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/preview", response_model=DigestContent)
 async def preview_digest(
     neighborhoods: Optional[List[str]] = Query(None),
@@ -362,7 +364,9 @@ async def preview_digest(
             date_to=date_to,
         )
 
-        logger.info(f"Generated preview with {len(digest_content.highlights)} highlights")
+        logger.info(
+            f"Generated preview with {len(digest_content.highlights)} highlights"
+        )
         return digest_content
 
     except Exception as e:
@@ -409,7 +413,9 @@ async def get_digest_history(
         else:
             param_idx = 2
 
-        query += f" ORDER BY d.digest_date DESC LIMIT ${param_idx} OFFSET ${param_idx + 1}"
+        query += (
+            f" ORDER BY d.digest_date DESC LIMIT ${param_idx} OFFSET ${param_idx + 1}"
+        )
         params.extend([limit, offset])
 
         async with db.pool.acquire() as conn:
@@ -443,6 +449,7 @@ async def get_digest_history(
 # ────────────────────────────────────────────────────────────────────────────
 # Admin Endpoints
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @admin_router.post("/trigger", status_code=202)
 async def trigger_digest_generation(

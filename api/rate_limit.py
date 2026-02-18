@@ -135,6 +135,7 @@ class RateLimiter:
 
 # ── Global rate limiters for different endpoint tiers ────────────────────
 
+
 def _get_general_limit() -> int:
     """Get general API rate limit from environment or default."""
     return int(os.getenv("RATE_LIMIT_GENERAL", "30"))

@@ -38,19 +38,10 @@ class PaginatedOpportunityResponse(BaseModel):
     """Paginated opportunities response with cursor info."""
 
     items: List[OpportunityResponse] = Field(..., description="Opportunities")
-    next_cursor: Optional[str] = Field(
-        None,
-        description="Cursor for next page"
-    )
-    previous_cursor: Optional[str] = Field(
-        None,
-        description="Cursor for previous page"
-    )
+    next_cursor: Optional[str] = Field(None, description="Cursor for next page")
+    previous_cursor: Optional[str] = Field(None, description="Cursor for previous page")
     has_more: bool = Field(..., description="Whether more items exist")
-    total_count: Optional[int] = Field(
-        None,
-        description="Total count (if requested)"
-    )
+    total_count: Optional[int] = Field(None, description="Total count (if requested)")
 
 
 async def get_pool():
@@ -62,25 +53,16 @@ async def get_pool():
     "",
     response_model=PaginatedOpportunityResponse,
     summary="List opportunities with cursor pagination",
-    description="Fetch opportunities using cursor-based pagination for efficiency"
+    description="Fetch opportunities using cursor-based pagination for efficiency",
 )
 async def list_opportunities(
     cursor: Optional[str] = Query(None, description="Cursor from previous response"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     sort_by: str = Query("created_at", description="Column to sort by"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="asc or desc"),
-    neighborhood: Optional[str] = Query(
-        None,
-        description="Filter by neighborhood"
-    ),
-    min_score: Optional[float] = Query(
-        None,
-        description="Filter by minimum score"
-    ),
-    compute_total: bool = Query(
-        False,
-        description="Compute total count (slower)"
-    ),
+    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
+    min_score: Optional[float] = Query(None, description="Filter by minimum score"),
+    compute_total: bool = Query(False, description="Compute total count (slower)"),
     pool: Any = Depends(get_pool),
 ) -> PaginatedOpportunityResponse:
     """
@@ -119,7 +101,14 @@ async def list_opportunities(
             table="opportunities",
             cursor_params=cursor_params,
             filters=filters if filters else None,
-            select_columns=["id", "name", "neighborhood", "score", "created_at", "updated_at"],
+            select_columns=[
+                "id",
+                "name",
+                "neighborhood",
+                "score",
+                "created_at",
+                "updated_at",
+            ],
             compute_total=compute_total,
         )
 
@@ -137,7 +126,7 @@ async def list_opportunities(
 @router.get(
     "/{opportunity_id}",
     response_model=OpportunityResponse,
-    summary="Get single opportunity"
+    summary="Get single opportunity",
 )
 async def get_opportunity(
     opportunity_id: str,
@@ -163,7 +152,7 @@ async def get_opportunity(
         row = await conn.fetchrow(
             "SELECT id, name, neighborhood, score, created_at, updated_at "
             "FROM opportunities WHERE id = $1",
-            opportunity_id
+            opportunity_id,
         )
 
     if not row:
@@ -176,7 +165,7 @@ async def get_opportunity(
     "/nearby",
     response_model=PaginatedOpportunityResponse,
     summary="Find nearby opportunities with cursor pagination",
-    description="Spatial query for opportunities near coordinates"
+    description="Spatial query for opportunities near coordinates",
 )
 async def nearby_opportunities(
     latitude: float = Query(..., description="Latitude"),
@@ -216,8 +205,12 @@ async def nearby_opportunities(
             table="opportunities",
             cursor_params=cursor_params,
             select_columns=[
-                "id", "name", "neighborhood", "score",
-                "created_at", "updated_at"
+                "id",
+                "name",
+                "neighborhood",
+                "score",
+                "created_at",
+                "updated_at",
             ],
             compute_total=False,
         )

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class WebhookEventType(str, Enum):
     """Supported webhook event types for CRM integration."""
+
     PARCEL_ANALYZED = "parcel.analyzed"
     ALERT_TRIGGERED = "alert.triggered"
     REPORT_READY = "report.ready"
@@ -34,6 +35,7 @@ class WebhookEventType(str, Enum):
 
 class WebhookConfig(BaseModel):
     """Configuration for a registered webhook endpoint."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -47,6 +49,7 @@ class WebhookConfig(BaseModel):
 
 class WebhookDelivery(BaseModel):
     """Tracks the delivery status of a webhook event."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     webhook_id: str
     event_type: str
@@ -97,7 +100,8 @@ class WebhookManager:
 
         # Check max webhooks per user
         user_webhooks = [
-            w for w in self._webhooks.values()
+            w
+            for w in self._webhooks.values()
             if w.user_id == config.user_id and w.is_active
         ]
         if len(user_webhooks) >= self.MAX_WEBHOOKS_PER_USER:
@@ -116,7 +120,9 @@ class WebhookManager:
         self._webhooks[config.id] = config
         logger.info(
             "Webhook registered: id=%s user=%s url=%s events=%s",
-            config.id, config.user_id, config.url,
+            config.id,
+            config.user_id,
+            config.url,
             [e.value for e in config.events],
         )
         return config
@@ -150,10 +156,7 @@ class WebhookManager:
         Returns:
             List of WebhookConfig objects belonging to the user.
         """
-        return [
-            w for w in self._webhooks.values()
-            if w.user_id == user_id
-        ]
+        return [w for w in self._webhooks.values() if w.user_id == user_id]
 
     def get_webhook(self, webhook_id: str, user_id: str) -> Optional[WebhookConfig]:
         """
@@ -202,7 +205,9 @@ class WebhookManager:
                 delivery_ids.append(delivery.id)
                 logger.info(
                     "Webhook delivery queued: delivery_id=%s webhook_id=%s event=%s",
-                    delivery.id, webhook.id, event_type.value,
+                    delivery.id,
+                    webhook.id,
+                    event_type.value,
                 )
 
         return delivery_ids

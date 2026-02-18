@@ -1,4 +1,5 @@
 """Prompts and patterns for LLM-based regulatory change extraction."""
+
 import re
 
 CHANGE_EXTRACTION_PROMPT = """You are a regulatory change analyst for Vancouver real estate development.

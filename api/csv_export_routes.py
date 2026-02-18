@@ -79,8 +79,12 @@ async def export_signals(
     request: Request,
     neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
     category: Optional[str] = Query(None, description="Filter by signal category/type"),
-    signal_type: Optional[str] = Query(None, description="Alias for category (matches UI filter param)"),
-    date_from: Optional[date] = Query(None, description="Export signals from this date onwards"),
+    signal_type: Optional[str] = Query(
+        None, description="Alias for category (matches UI filter param)"
+    ),
+    date_from: Optional[date] = Query(
+        None, description="Export signals from this date onwards"
+    ),
     date_to: Optional[date] = Query(None, description="Export signals up to this date"),
     date_range: Optional[str] = Query(
         None,
@@ -131,7 +135,9 @@ async def export_signals(
                     effective_date_from = date.today() - timedelta(days=days)
                     effective_date_to = date.today()
                 except ValueError:
-                    raise HTTPException(status_code=400, detail=f"Invalid date_range: {date_range}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid date_range: {date_range}"
+                    )
 
         # Build filters
         filters = SignalExportFilters(
@@ -210,7 +216,9 @@ async def export_neighborhood_comparison(
 
         neighborhood_list: list[str] = []
         if neighborhoods:
-            neighborhood_list = [n.strip() for n in neighborhoods.split(",") if n.strip()]
+            neighborhood_list = [
+                n.strip() for n in neighborhoods.split(",") if n.strip()
+            ]
 
         if neighborhood_list:
             if len(neighborhood_list) > 10:
@@ -237,7 +245,9 @@ async def export_neighborhood_comparison(
             media_type="text/csv",
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
-                "X-Export-Neighborhoods": str(len(neighborhood_list) if neighborhood_list else "all"),
+                "X-Export-Neighborhoods": str(
+                    len(neighborhood_list) if neighborhood_list else "all"
+                ),
             },
         )
     except HTTPException:
@@ -260,8 +270,12 @@ async def export_parcels(
     request: Request,
     neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
     zoning: Optional[str] = Query(None, description="Filter by zoning code"),
-    min_lot_sqft: Optional[float] = Query(None, ge=0, description="Minimum lot size in sqft"),
-    max_lot_sqft: Optional[float] = Query(None, ge=0, description="Maximum lot size in sqft"),
+    min_lot_sqft: Optional[float] = Query(
+        None, ge=0, description="Minimum lot size in sqft"
+    ),
+    max_lot_sqft: Optional[float] = Query(
+        None, ge=0, description="Maximum lot size in sqft"
+    ),
     limit: int = Query(1000, ge=1, le=5000, description="Max rows to export"),
     user: Optional[dict] = Depends(get_optional_user_from_request),
     pool: asyncpg.Pool = Depends(get_db_pool),

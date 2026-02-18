@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Data Classes
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class PoolStats:
     """Statistics for a single database pool in PgBouncer."""
@@ -76,6 +77,7 @@ class PgBouncerMetrics:
 # ────────────────────────────────────────────────────────────────────────────
 # PgBouncer Monitor Class
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class PgBouncerMonitor:
     """Monitor and manage PgBouncer connection pooling proxy.
@@ -273,9 +275,7 @@ class PgBouncerMonitor:
                 (total_server_active / 25 * 100) if total_server_active > 0 else 0.0
             )
 
-            response_time_ms = (
-                (datetime.utcnow() - start_time).total_seconds() * 1000
-            )
+            response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
 
             return {
                 "total_client_conn": total_client_conn,

@@ -48,10 +48,14 @@ class QueryBuilder:
             # For IN/NOT IN, convert list to comma-separated placeholders
             if isinstance(value, (list, tuple)):
                 placeholders = [f"${i + param_num}" for i in range(len(value))]
-                self.conditions.append(f"{column} {operator} ({', '.join(placeholders)})")
+                self.conditions.append(
+                    f"{column} {operator} ({', '.join(placeholders)})"
+                )
                 self.params.extend(value)
             else:
-                raise ValueError(f"IN operator requires list/tuple value, got {type(value)}")
+                raise ValueError(
+                    f"IN operator requires list/tuple value, got {type(value)}"
+                )
         else:
             self.conditions.append(f"{column} {operator} {placeholder}")
             self.params.append(value)
@@ -62,7 +66,7 @@ class QueryBuilder:
         self,
         column: str,
         from_date: Optional[date] = None,
-        to_date: Optional[date] = None
+        to_date: Optional[date] = None,
     ) -> "QueryBuilder":
         """
         Add date range filter conditions.
@@ -99,13 +103,7 @@ class QueryBuilder:
         Returns:
             Self for method chaining
         """
-        severity_levels = {
-            "info": 0,
-            "low": 1,
-            "medium": 2,
-            "high": 3,
-            "critical": 4
-        }
+        severity_levels = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
         severity_val = severity_levels.get(severity_min.lower(), 0)
         severity_col = (
@@ -163,7 +161,9 @@ class QueryBuilder:
         # Pagination params are added last
         total_params = len(self.params)
         if total_params < 2:
-            raise ValueError("add_pagination() must be called before getting placeholders")
+            raise ValueError(
+                "add_pagination() must be called before getting placeholders"
+            )
 
         limit_placeholder = f"${total_params - 1}"
         offset_placeholder = f"${total_params}"
@@ -225,7 +225,9 @@ class PreparedStatementCache:
             # Evict oldest if over limit
             if len(self.cache) > self.max_statements:
                 oldest_key, _ = self.cache.popitem(last=False)
-                logger.debug(f"Evicted prepared statement from cache: {oldest_key[:50]}...")
+                logger.debug(
+                    f"Evicted prepared statement from cache: {oldest_key[:50]}..."
+                )
 
     def clear(self) -> None:
         """Clear all cached prepared statements."""
@@ -238,14 +240,11 @@ class PreparedStatementCache:
         Returns:
             Dictionary with cache_size and max_statements
         """
-        return {
-            "cache_size": len(self.cache),
-            "max_statements": self.max_statements
-        }
+        return {"cache_size": len(self.cache), "max_statements": self.max_statements}
 
 
 def build_signal_feed_query(
-    filters: Optional[Dict[str, Any]] = None
+    filters: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, List[Any], str, str]:
     """
     Build a parameterized query for the signal feed endpoint.
@@ -280,9 +279,7 @@ def build_signal_feed_query(
 
     if "date_from" in filters or "date_to" in filters:
         builder.add_date_range(
-            "isig.event_date",
-            filters.get("date_from"),
-            filters.get("date_to")
+            "isig.event_date", filters.get("date_from"), filters.get("date_to")
         )
 
     # Add pagination
@@ -324,7 +321,7 @@ def build_signal_feed_query(
 
 
 def build_signal_count_query(
-    filters: Optional[Dict[str, Any]] = None
+    filters: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, List[Any]]:
     """
     Build a parameterized query for counting signals with filters.
@@ -357,9 +354,7 @@ def build_signal_count_query(
 
     if "date_from" in filters or "date_to" in filters:
         builder.add_date_range(
-            "isig.event_date",
-            filters.get("date_from"),
-            filters.get("date_to")
+            "isig.event_date", filters.get("date_from"), filters.get("date_to")
         )
 
     where_clause, params = builder.build()

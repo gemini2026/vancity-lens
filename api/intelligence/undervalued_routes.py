@@ -26,8 +26,12 @@ router = APIRouter(prefix="/api/v1/opportunities", tags=["opportunities"])
 @router.get("")
 async def list_opportunities(
     top: int = 20,
-    tod_tier: Optional[str] = Query(None, description="Filter by TOD tier (e.g., 'Tier 1')"),
-    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood name"),
+    tod_tier: Optional[str] = Query(
+        None, description="Filter by TOD tier (e.g., 'Tier 1')"
+    ),
+    neighborhood: Optional[str] = Query(
+        None, description="Filter by neighborhood name"
+    ),
 ):
     """Get top undervalued parcel opportunities."""
     try:
@@ -115,7 +119,9 @@ async def send_weekly_undervalued_digest(db_pool: asyncpg.Pool) -> dict:
             # Use alert_email if set, otherwise fall back to account email
             to_addr = sub["alert_email"] or sub["email"]
             if not to_addr:
-                logger.warning("Subscriber id=%s has no usable email address.", sub["id"])
+                logger.warning(
+                    "Subscriber id=%s has no usable email address.", sub["id"]
+                )
                 stats["emails_failed"] += 1
                 continue
 

@@ -25,8 +25,10 @@ CLUSTER_MIN_APPS = 3
 
 # ── Models ──────────────────────────────────────────────────────
 
+
 class ClusterMember(BaseModel):
     """A pipeline entry that's part of a cluster."""
+
     pipeline_id: int
     parcel_pid: str
     address: str
@@ -38,6 +40,7 @@ class ClusterMember(BaseModel):
 
 class DevelopmentCluster(BaseModel):
     """A detected cluster of development activity."""
+
     center_pid: str
     center_address: str
     center_lat: float = Field(ge=-90, le=90)
@@ -117,6 +120,7 @@ SQL_FIND_CLUSTERS = """
 
 # ── Engine ──────────────────────────────────────────────────────
 
+
 async def detect_clusters(
     db_pool,
     radius_m: int = CLUSTER_RADIUS_M,
@@ -144,6 +148,7 @@ async def detect_clusters(
         seen_pids.add(center_pid)
 
         import json
+
         members_raw = row["members"]
         if isinstance(members_raw, str):
             members_raw = json.loads(members_raw)
@@ -158,15 +163,17 @@ async def detect_clusters(
             seen_pids.add(m["parcel_pid"])
             raw_stage = m["pipeline_stage"]
             stage = STAGE_MIGRATION_MAP.get(raw_stage, raw_stage)
-            members.append(ClusterMember(
-                pipeline_id=m["pipeline_id"],
-                parcel_pid=m["parcel_pid"],
-                address=m["address"],
-                pipeline_stage=stage,
-                proposed_storeys=m.get("proposed_storeys"),
-                proposed_units=m.get("proposed_units"),
-                distance_m=float(m["distance_m"]),
-            ))
+            members.append(
+                ClusterMember(
+                    pipeline_id=m["pipeline_id"],
+                    parcel_pid=m["parcel_pid"],
+                    address=m["address"],
+                    pipeline_stage=stage,
+                    proposed_storeys=m.get("proposed_storeys"),
+                    proposed_units=m.get("proposed_units"),
+                    distance_m=float(m["distance_m"]),
+                )
+            )
             if m.get("proposed_units"):
                 total_units += m["proposed_units"]
 

@@ -79,13 +79,23 @@ async def calculate_financing(request: FinancingRequest) -> FinancingResult:
 )
 async def quick_calc(
     acquisition_cost: float = Query(..., gt=0, description="Purchase price in CAD"),
-    equity_pct: float = Query(..., ge=0.0, le=1.0, description="Equity % as decimal (0.25 = 25%)"),
-    interest_rate: float = Query(..., ge=0.0, le=1.0, description="Annual rate as decimal (0.065 = 6.5%)"),
+    equity_pct: float = Query(
+        ..., ge=0.0, le=1.0, description="Equity % as decimal (0.25 = 25%)"
+    ),
+    interest_rate: float = Query(
+        ..., ge=0.0, le=1.0, description="Annual rate as decimal (0.065 = 6.5%)"
+    ),
     hold_period_months: int = Query(..., ge=1, description="Hold period in months"),
     construction_cost: float = Query(..., ge=0, description="Construction cost in CAD"),
-    gross_revenue: float = Query(..., ge=0, description="Expected total revenue in CAD"),
-    soft_cost_pct: float = Query(0.18, ge=0.0, le=1.0, description="Soft costs as % of hard costs"),
-    sellable_sqft: float = Query(0.0, ge=0.0, description="Sellable sqft for breakeven PSF"),
+    gross_revenue: float = Query(
+        ..., ge=0, description="Expected total revenue in CAD"
+    ),
+    soft_cost_pct: float = Query(
+        0.18, ge=0.0, le=1.0, description="Soft costs as % of hard costs"
+    ),
+    sellable_sqft: float = Query(
+        0.0, ge=0.0, description="Sellable sqft for breakeven PSF"
+    ),
 ) -> FinancingResult:
     """
     Quick financing estimate using query parameters.

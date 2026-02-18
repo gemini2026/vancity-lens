@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 # ── Refresh Functions ────────────────────────────────────────────
 
+
 async def refresh_neighborhood_scores(db_pool: asyncpg.Pool) -> dict:
     """
     Refresh the mv_neighborhood_scores materialized view.
@@ -137,26 +138,31 @@ async def refresh_all_views(db_pool: asyncpg.Pool) -> dict:
             # Refresh toa_buffers (spatial TOA zone buffers used by entitlement engine)
             try:
                 import time as _time
+
                 t0 = _time.monotonic()
                 await conn.execute("REFRESH MATERIALIZED VIEW toa_buffers")
                 dur_ms = int((_time.monotonic() - t0) * 1000)
                 row_count = await conn.fetchval("SELECT COUNT(*) FROM toa_buffers")
-                results.append({
-                    "view_name": "toa_buffers",
-                    "rows_refreshed": row_count,
-                    "duration_ms": dur_ms,
-                    "success": True,
-                })
+                results.append(
+                    {
+                        "view_name": "toa_buffers",
+                        "rows_refreshed": row_count,
+                        "duration_ms": dur_ms,
+                        "success": True,
+                    }
+                )
                 total_duration += dur_ms
                 logger.info(f"toa_buffers refreshed: {row_count} rows in {dur_ms}ms")
             except Exception as toa_err:
                 logger.warning(f"Could not refresh toa_buffers: {toa_err}")
-                results.append({
-                    "view_name": "toa_buffers",
-                    "rows_refreshed": 0,
-                    "duration_ms": 0,
-                    "success": False,
-                })
+                results.append(
+                    {
+                        "view_name": "toa_buffers",
+                        "rows_refreshed": 0,
+                        "duration_ms": 0,
+                        "success": False,
+                    }
+                )
 
             # Refresh neighborhood scores and signal activity views
             rows = await conn.fetch(
@@ -209,6 +215,7 @@ async def refresh_all_views(db_pool: asyncpg.Pool) -> dict:
 
 # ── Query Functions ─────────────────────────────────────────────
 
+
 async def get_neighborhood_rankings(
     db_pool: asyncpg.Pool, limit: int = 50
 ) -> list[NeighborhoodSummary]:
@@ -249,7 +256,9 @@ async def get_neighborhood_rankings(
                 bottom_cat = None
 
                 if cat_scores:
-                    sorted_cats = sorted(cat_scores.items(), key=lambda x: x[1], reverse=True)
+                    sorted_cats = sorted(
+                        cat_scores.items(), key=lambda x: x[1], reverse=True
+                    )
                     if sorted_cats:
                         top_cat = sorted_cats[0][0]
                         bottom_cat = sorted_cats[-1][0]
@@ -392,6 +401,7 @@ async def compare_neighborhoods(
 
 
 # ── Scheduled Refresh ────────────────────────────────────────────
+
 
 class ScheduledRefresh:
     """

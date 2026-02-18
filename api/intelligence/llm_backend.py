@@ -46,6 +46,7 @@ def _get_gemini_client():
 
 # ── Public API ───────────────────────────────────────────────────────
 
+
 async def generate_chat(
     *,
     system_prompt: str,
@@ -108,6 +109,7 @@ async def generate_extraction(
 
 # ── Gemini implementation ────────────────────────────────────────────
 
+
 async def _generate_gemini(
     *,
     system_prompt: str,
@@ -149,7 +151,12 @@ async def _generate_gemini(
 
     latency = time.perf_counter() - t0
     text = response.text or ""
-    logger.info("Gemini response in %.1fs (model=%s, chars=%d)", latency, GEMINI_MODEL, len(text))
+    logger.info(
+        "Gemini response in %.1fs (model=%s, chars=%d)",
+        latency,
+        GEMINI_MODEL,
+        len(text),
+    )
     return text, GEMINI_MODEL, latency
 
 
@@ -209,7 +216,10 @@ async def _generate_anthropic_extraction(
 ) -> tuple[str, str, float]:
     from anthropic import AsyncAnthropic
 
-    from .external_clients import ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
+    from .external_clients import (
+        ANTHROPIC_EXTRACTION_TIMEOUT_SECONDS,
+        ANTHROPIC_SEMAPHORE,
+    )
 
     client = AsyncAnthropic(api_key=api_key)
     t0 = time.perf_counter()
@@ -283,7 +293,9 @@ async def _anthropic_with_fallback(
             continue
         except Exception as e:
             msg = str(e)
-            if "Error code: 404" in msg and ("model:" in msg or "not_found_error" in msg):
+            if "Error code: 404" in msg and (
+                "model:" in msg or "not_found_error" in msg
+            ):
                 last_exc = e
                 logger.warning("Anthropic model not found: %s; trying fallback.", model)
                 continue

@@ -27,12 +27,28 @@ logger = logging.getLogger(__name__)
 
 # Vancouver's 22 official local areas (canonical names)
 VANCOUVER_NEIGHBORHOODS = [
-    "Arbutus Ridge", "Downtown", "Dunbar-Southlands", "Fairview",
-    "Grandview-Woodland", "Hastings-Sunrise", "Kensington-Cedar Cottage",
-    "Kerrisdale", "Killarney", "Kitsilano", "Marpole", "Mount Pleasant",
-    "Oakridge", "Renfrew-Collingwood", "Riley Park", "Shaughnessy",
-    "South Cambie", "Strathcona", "Sunset", "Victoria-Fraserview",
-    "West End", "West Point Grey",
+    "Arbutus Ridge",
+    "Downtown",
+    "Dunbar-Southlands",
+    "Fairview",
+    "Grandview-Woodland",
+    "Hastings-Sunrise",
+    "Kensington-Cedar Cottage",
+    "Kerrisdale",
+    "Killarney",
+    "Kitsilano",
+    "Marpole",
+    "Mount Pleasant",
+    "Oakridge",
+    "Renfrew-Collingwood",
+    "Riley Park",
+    "Shaughnessy",
+    "South Cambie",
+    "Strathcona",
+    "Sunset",
+    "Victoria-Fraserview",
+    "West End",
+    "West Point Grey",
 ]
 
 # Map VPD neighborhood names to official CoV names (some differ)
@@ -128,7 +144,9 @@ async def scrape_vpd_crime(session, url: str = COV_CRIME_URL) -> list[dict]:
     try:
         async with session.get(url) as response:
             if response.status != 200:
-                logger.warning("Crime data API returned %s, trying fallback", response.status)
+                logger.warning(
+                    "Crime data API returned %s, trying fallback", response.status
+                )
                 return []
 
             text = await response.text()
@@ -147,7 +165,9 @@ async def scrape_vpd_crime(session, url: str = COV_CRIME_URL) -> list[dict]:
             None,
         )
         if not hood_col:
-            logger.error("Crime CSV missing NEIGHBOURHOOD column. Found: %s", reader.fieldnames)
+            logger.error(
+                "Crime CSV missing NEIGHBOURHOOD column. Found: %s", reader.fieldnames
+            )
             return []
     else:
         hood_col = "NEIGHBOURHOOD"
@@ -158,7 +178,11 @@ async def scrape_vpd_crime(session, url: str = COV_CRIME_URL) -> list[dict]:
         if canonical in VANCOUVER_NEIGHBORHOODS:
             neighborhood_counts[canonical] += 1
 
-    logger.info("Scraped %d crime records across %d neighborhoods", sum(neighborhood_counts.values()), len(neighborhood_counts))
+    logger.info(
+        "Scraped %d crime records across %d neighborhoods",
+        sum(neighborhood_counts.values()),
+        len(neighborhood_counts),
+    )
     period_start, period_end = _current_period()
 
     return [
@@ -240,7 +264,9 @@ TRANSLINK_STOPS_URL = "https://gtfs.translink.ca/static/latest/stops.txt"
 COV_TRANSIT_URL = "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/rapid-transit-stations/exports/json"
 
 
-async def scrape_translink_transit(session, url: str = TRANSLINK_STOPS_URL) -> list[dict]:
+async def scrape_translink_transit(
+    session, url: str = TRANSLINK_STOPS_URL
+) -> list[dict]:
     """Scrape TransLink GTFS stops or fallback to CoV transit data.
 
     Returns transit stop count per neighborhood.
@@ -248,7 +274,9 @@ async def scrape_translink_transit(session, url: str = TRANSLINK_STOPS_URL) -> l
     try:
         async with session.get(url) as response:
             if response.status != 200:
-                logger.warning("TransLink GTFS returned %s, trying CoV fallback", response.status)
+                logger.warning(
+                    "TransLink GTFS returned %s, trying CoV fallback", response.status
+                )
                 return await _scrape_cov_transit_fallback(session)
 
             text = await response.text()
@@ -274,7 +302,11 @@ async def scrape_translink_transit(session, url: str = TRANSLINK_STOPS_URL) -> l
         if hood:
             neighborhood_stops[hood] += 1
 
-    logger.info("Scraped %d transit stops across %d neighborhoods", sum(neighborhood_stops.values()), len(neighborhood_stops))
+    logger.info(
+        "Scraped %d transit stops across %d neighborhoods",
+        sum(neighborhood_stops.values()),
+        len(neighborhood_stops),
+    )
     period_start, period_end = _current_period()
 
     return [
@@ -325,6 +357,7 @@ async def _scrape_cov_transit_fallback(session) -> list[dict]:
 
 
 # ── Development Metrics (from Intelligence Signals) ───────────
+
 
 async def compute_development_metrics(db_pool) -> list[dict]:
     """Compute development activity metrics from intelligence signals.
@@ -394,7 +427,11 @@ async def scrape_cov_permits(session, url: str = COV_PERMITS_URL) -> list[dict]:
         if hood in VANCOUVER_NEIGHBORHOODS:
             neighborhood_counts[hood] += 1
 
-    logger.info("Scraped %d permits across %d neighborhoods", sum(neighborhood_counts.values()), len(neighborhood_counts))
+    logger.info(
+        "Scraped %d permits across %d neighborhoods",
+        sum(neighborhood_counts.values()),
+        len(neighborhood_counts),
+    )
     period_start, period_end = _current_period()
 
     return [
@@ -416,7 +453,9 @@ async def scrape_cov_permits(session, url: str = COV_PERMITS_URL) -> list[dict]:
 COV_PROPERTY_TAX_URL = "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/property-tax-report/exports/json"
 
 
-async def scrape_cov_property_tax(session, url: str = COV_PROPERTY_TAX_URL) -> list[dict]:
+async def scrape_cov_property_tax(
+    session, url: str = COV_PROPERTY_TAX_URL
+) -> list[dict]:
     """Scrape City of Vancouver property tax data for affordability metrics.
 
     Returns average assessed value per neighborhood.
@@ -437,7 +476,9 @@ async def scrape_cov_property_tax(session, url: str = COV_PROPERTY_TAX_URL) -> l
 
     for item in data if isinstance(data, list) else []:
         hood = (item.get("geo_local_area") or "").strip()
-        raw_value = item.get("current_land_value") or item.get("current_improvement_value")
+        raw_value = item.get("current_land_value") or item.get(
+            "current_improvement_value"
+        )
         if hood in VANCOUVER_NEIGHBORHOODS and raw_value:
             try:
                 # Strip formatting ($, commas) before conversion
@@ -465,6 +506,7 @@ async def scrape_cov_property_tax(session, url: str = COV_PROPERTY_TAX_URL) -> l
 
 # ── Database Persistence ─────────────────────────────────────
 
+
 async def _persist_metrics(db_pool, metrics: list[dict]) -> int:
     """Insert scraped metrics into the neighborhood_metrics table.
 
@@ -482,11 +524,14 @@ async def _persist_metrics(db_pool, metrics: list[dict]) -> int:
         for m in metrics:
             hood_id = hood_map.get(m["neighborhood"])
             if not hood_id:
-                logger.debug("Skipping metric for unknown neighborhood: %s", m["neighborhood"])
+                logger.debug(
+                    "Skipping metric for unknown neighborhood: %s", m["neighborhood"]
+                )
                 continue
 
             try:
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO neighborhood_metrics
                         (neighborhood_id, category, metric_name, metric_value, source_name, period_start, period_end, ingested_at)
                     VALUES ($1, $2, $3, $4, $5, $6::date, $7::date, NOW())
@@ -494,13 +539,27 @@ async def _persist_metrics(db_pool, metrics: list[dict]) -> int:
                     DO UPDATE SET metric_value = EXCLUDED.metric_value,
                                   source_name = EXCLUDED.source_name,
                                   ingested_at = NOW()
-                """, hood_id, m["category"], m["metric_name"], m["value"],
-                     m["source"], m["period_start"], m["period_end"])
+                """,
+                    hood_id,
+                    m["category"],
+                    m["metric_name"],
+                    m["value"],
+                    m["source"],
+                    m["period_start"],
+                    m["period_end"],
+                )
                 inserted += 1
             except Exception as e:
-                logger.error("Failed to persist metric %s/%s: %s", m["neighborhood"], m["metric_name"], e)
+                logger.error(
+                    "Failed to persist metric %s/%s: %s",
+                    m["neighborhood"],
+                    m["metric_name"],
+                    e,
+                )
 
-    logger.info("Persisted %d/%d metrics to neighborhood_metrics", inserted, len(metrics))
+    logger.info(
+        "Persisted %d/%d metrics to neighborhood_metrics", inserted, len(metrics)
+    )
     return inserted
 
 
@@ -513,7 +572,10 @@ async def _compute_and_store_scores(db_pool) -> int:
     Returns count of score rows written.
     """
     from api.intelligence.neighborhoods import (
-        normalize_metric, compute_composite_score, DEFAULT_WEIGHTS, METRIC_DIRECTIONS,
+        normalize_metric,
+        compute_composite_score,
+        DEFAULT_WEIGHTS,
+        METRIC_DIRECTIONS,
     )
 
     async with db_pool.acquire() as conn:
@@ -534,7 +596,9 @@ async def _compute_and_store_scores(db_pool) -> int:
         # Organize by category → {hood_id: value}
         cat_values: dict[str, dict[int, float]] = defaultdict(dict)
         for row in rows:
-            cat_values[row["category"]][row["neighborhood_id"]] = float(row["metric_value"])
+            cat_values[row["category"]][row["neighborhood_id"]] = float(
+                row["metric_value"]
+            )
 
         # Normalize each category and write scores
         written = 0
@@ -547,23 +611,33 @@ async def _compute_and_store_scores(db_pool) -> int:
             values = list(hood_vals.values())
             min_val = min(values)
             max_val = max(values)
-            higher = METRIC_DIRECTIONS.get(category, "higher_is_better") == "higher_is_better"
+            higher = (
+                METRIC_DIRECTIONS.get(category, "higher_is_better")
+                == "higher_is_better"
+            )
 
             for hood_id, raw_value in hood_vals.items():
                 score = normalize_metric(raw_value, min_val, max_val, higher)
                 all_hood_scores[hood_id][category] = score
 
                 # Get previous score for trend detection
-                prev = await conn.fetchval("""
+                prev = await conn.fetchval(
+                    """
                     SELECT score FROM neighborhood_scores
                     WHERE neighborhood_id = $1 AND category = $2 AND period_start < $3::date
                     ORDER BY period_start DESC LIMIT 1
-                """, hood_id, category, period_start.isoformat())
+                """,
+                    hood_id,
+                    category,
+                    period_start.isoformat(),
+                )
 
                 from api.intelligence.neighborhoods import detect_trend
+
                 trend, trend_change = detect_trend(score, float(prev) if prev else None)
 
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO neighborhood_scores
                         (neighborhood_id, category, score, raw_value, trend, trend_change, period_start, period_end)
                     VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::date)
@@ -572,12 +646,22 @@ async def _compute_and_store_scores(db_pool) -> int:
                                   raw_value = EXCLUDED.raw_value,
                                   trend = EXCLUDED.trend,
                                   trend_change = EXCLUDED.trend_change
-                """, hood_id, category, score, raw_value, trend, trend_change,
-                     period_start.isoformat(), period_end.isoformat())
+                """,
+                    hood_id,
+                    category,
+                    score,
+                    raw_value,
+                    trend,
+                    trend_change,
+                    period_start.isoformat(),
+                    period_end.isoformat(),
+                )
                 written += 1
 
         # Compute and store composite scores
-        await conn.fetch("SELECT id, name FROM neighborhoods")  # verify neighborhoods exist
+        await conn.fetch(
+            "SELECT id, name FROM neighborhoods"
+        )  # verify neighborhoods exist
         ranked = []
         for hood_id, cat_scores in all_hood_scores.items():
             composite = compute_composite_score(cat_scores, DEFAULT_WEIGHTS)
@@ -587,7 +671,9 @@ async def _compute_and_store_scores(db_pool) -> int:
 
         for rank, (hood_id, composite, cat_scores) in enumerate(ranked, 1):
             import json
-            await conn.execute("""
+
+            await conn.execute(
+                """
                 INSERT INTO neighborhood_composite_scores
                     (neighborhood_id, overall_score, rank, category_scores, weights_used, period_start, period_end)
                 VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::date, $7::date)
@@ -597,15 +683,26 @@ async def _compute_and_store_scores(db_pool) -> int:
                               category_scores = EXCLUDED.category_scores,
                               weights_used = EXCLUDED.weights_used,
                               computed_at = NOW()
-            """, hood_id, composite, rank,
-                 json.dumps(cat_scores), json.dumps(DEFAULT_WEIGHTS),
-                 period_start.isoformat(), period_end.isoformat())
+            """,
+                hood_id,
+                composite,
+                rank,
+                json.dumps(cat_scores),
+                json.dumps(DEFAULT_WEIGHTS),
+                period_start.isoformat(),
+                period_end.isoformat(),
+            )
 
-        logger.info("Computed scores for %d neighborhoods, wrote %d category scores", len(ranked), written)
+        logger.info(
+            "Computed scores for %d neighborhoods, wrote %d category scores",
+            len(ranked),
+            written,
+        )
         return written
 
 
 # ── Master Ingestion Pipeline ─────────────────────────────────
+
 
 async def run_all_scrapers(session, db_pool) -> dict:
     """Run all open data scrapers, persist to DB, and compute scores.

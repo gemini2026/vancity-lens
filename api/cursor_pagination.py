@@ -30,23 +30,12 @@ class CursorPaginationParams(BaseModel):
     """
 
     cursor: Optional[str] = Field(
-        None,
-        description="Opaque cursor from previous response"
+        None, description="Opaque cursor from previous response"
     )
-    limit: int = Field(
-        20,
-        ge=1,
-        le=100,
-        description="Items per page (max 100)"
-    )
-    sort_by: str = Field(
-        "created_at",
-        description="Column to sort by"
-    )
+    limit: int = Field(20, ge=1, le=100, description="Items per page (max 100)")
+    sort_by: str = Field("created_at", description="Column to sort by")
     sort_order: str = Field(
-        "desc",
-        pattern="^(asc|desc)$",
-        description="Sort order (asc or desc)"
+        "desc", pattern="^(asc|desc)$", description="Sort order (asc or desc)"
     )
 
     @field_validator("limit")
@@ -78,25 +67,18 @@ class CursorPageResult(BaseModel):
         total_count: Optional total count (only if requested)
     """
 
-    items: List[Any] = Field(
-        ...,
-        description="Items in this page"
-    )
+    items: List[Any] = Field(..., description="Items in this page")
     next_cursor: Optional[str] = Field(
-        None,
-        description="Cursor for next page, or null if no next page"
+        None, description="Cursor for next page, or null if no next page"
     )
     previous_cursor: Optional[str] = Field(
-        None,
-        description="Cursor for previous page, or null if no previous page"
+        None, description="Cursor for previous page, or null if no previous page"
     )
     has_more: bool = Field(
-        ...,
-        description="Whether there are more items after this page"
+        ..., description="Whether there are more items after this page"
     )
     total_count: Optional[int] = Field(
-        None,
-        description="Total count of items (optional, only if requested)"
+        None, description="Total count of items (optional, only if requested)"
     )
 
 
@@ -121,7 +103,7 @@ def encode_cursor(item_id: Any, sort_value: Any) -> str:
             "id": str(item_id),
             "sort_value": str(sort_value),
         }
-        json_str = json.dumps(cursor_data, separators=(',', ':'))
+        json_str = json.dumps(cursor_data, separators=(",", ":"))
         encoded = base64.b64encode(json_str.encode()).decode()
         return encoded
     except (TypeError, ValueError) as e:
@@ -234,7 +216,9 @@ async def cursor_paginate(
         next_cursor = None
         if has_more and result_items:
             last_item = result_items[-1]
-            last_id = last_item.get("id") if isinstance(last_item, dict) else last_item[0]
+            last_id = (
+                last_item.get("id") if isinstance(last_item, dict) else last_item[0]
+            )
             last_sort_val = (
                 last_item.get(sort_by)
                 if isinstance(last_item, dict)

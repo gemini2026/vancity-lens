@@ -180,14 +180,24 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
         )
     except Knowledge2Error as exc:
         msg = str(exc)
-        if ("Corpus not found" in msg or "Invalid corpus identifier" in msg) and cfg.corpus_id not in _CORPUS_ID_CACHE:
+        if (
+            "Corpus not found" in msg or "Invalid corpus identifier" in msg
+        ) and cfg.corpus_id not in _CORPUS_ID_CACHE:
             try:
-                corpora = (client.list_corpora(limit=100, offset=0) or {}).get("corpora") or []
-                matches = [c for c in corpora if c.get("name") == cfg.corpus_id and c.get("id")]
+                corpora = (client.list_corpora(limit=100, offset=0) or {}).get(
+                    "corpora"
+                ) or []
+                matches = [
+                    c for c in corpora if c.get("name") == cfg.corpus_id and c.get("id")
+                ]
                 if len(matches) == 1:
                     resolved_id = matches[0]["id"]
                     _CORPUS_ID_CACHE[cfg.corpus_id] = resolved_id
-                    logger.info("Resolved K2 corpus name '%s' -> '%s'", cfg.corpus_id, resolved_id)
+                    logger.info(
+                        "Resolved K2 corpus name '%s' -> '%s'",
+                        cfg.corpus_id,
+                        resolved_id,
+                    )
                     response = client.search(
                         corpus_id=resolved_id,
                         query=query,
@@ -200,11 +210,15 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
                         "Set K2_CORPUS_ID to the corpus id."
                     )
                 else:
-                    logger.warning("K2 corpus name '%s' not found in list_corpora()", cfg.corpus_id)
+                    logger.warning(
+                        "K2 corpus name '%s' not found in list_corpora()", cfg.corpus_id
+                    )
                     raise
             except Exception:
                 # Keep the original "Corpus not found" context.
-                logger.warning("K2 search failed (corpus resolution attempt failed): %s", exc)
+                logger.warning(
+                    "K2 search failed (corpus resolution attempt failed): %s", exc
+                )
                 raise
         else:
             logger.warning("K2 search failed: %s", exc)
@@ -239,7 +253,9 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
             or ""
         )
         url_status = meta.get("url_status")
-        published_date = _parse_date(meta.get("published_date") or meta.get("published_at"))
+        published_date = _parse_date(
+            meta.get("published_date") or meta.get("published_at")
+        )
 
         score = r.get("score")
         final_score = float(score) if isinstance(score, (int, float)) else 0.0

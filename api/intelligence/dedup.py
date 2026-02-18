@@ -27,26 +27,28 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 logger = logging.getLogger(__name__)
 
 # Tracking query parameters to strip during URL normalization
-_TRACKING_PARAMS = frozenset([
-    "utm_source",
-    "utm_medium",
-    "utm_campaign",
-    "utm_term",
-    "utm_content",
-    "ref",
-    "fbclid",
-    "gclid",
-    "mc_cid",
-    "mc_eid",
-])
+_TRACKING_PARAMS = frozenset(
+    [
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "ref",
+        "fbclid",
+        "gclid",
+        "mc_cid",
+        "mc_eid",
+    ]
+)
 
 
 class DedupStrategy(str, Enum):
     """Available deduplication strategies."""
 
-    URL_EXACT = "url_exact"              # Exact URL match (after normalization)
-    CONTENT_HASH = "content_hash"        # SHA-256 of normalized content
-    URL_AND_DATE = "url_and_date"        # URL + publication date combo
+    URL_EXACT = "url_exact"  # Exact URL match (after normalization)
+    CONTENT_HASH = "content_hash"  # SHA-256 of normalized content
+    URL_AND_DATE = "url_and_date"  # URL + publication date combo
     TITLE_SIMILARITY = "title_similarity"  # Fuzzy title matching (>0.9 similarity)
 
 
@@ -100,10 +102,10 @@ class DedupEngine:
     """
 
     def __init__(self, title_similarity_threshold: float = 0.9):
-        self._seen_urls: dict[str, str] = {}           # normalized_url -> doc_id
-        self._seen_hashes: dict[str, str] = {}          # content_hash -> doc_id
-        self._seen_url_dates: dict[str, str] = {}       # "url|date" -> doc_id
-        self._seen_titles: list[tuple[str, str]] = []   # [(title, doc_id), ...]
+        self._seen_urls: dict[str, str] = {}  # normalized_url -> doc_id
+        self._seen_hashes: dict[str, str] = {}  # content_hash -> doc_id
+        self._seen_url_dates: dict[str, str] = {}  # "url|date" -> doc_id
+        self._seen_titles: list[tuple[str, str]] = []  # [(title, doc_id), ...]
         self._title_threshold = title_similarity_threshold
         self._stats = DedupStats()
 
@@ -222,7 +224,10 @@ class DedupEngine:
 
             elif strategy == DedupStrategy.TITLE_SIMILARITY and title:
                 for seen_title, doc_id in self._seen_titles:
-                    if self.title_similarity(title, seen_title) >= self._title_threshold:
+                    if (
+                        self.title_similarity(title, seen_title)
+                        >= self._title_threshold
+                    ):
                         return DedupResult(
                             is_duplicate=True,
                             strategy_matched="title_similarity",

@@ -17,7 +17,12 @@ from .audit import AuditMiddleware
 from .compression import CompressionMiddleware
 from .db import db
 from .cache import CacheManager
-from .entitlement import InvalidPIDFormatError, ParcelNotFoundError, compute_entitlement, validate_pid_format
+from .entitlement import (
+    InvalidPIDFormatError,
+    ParcelNotFoundError,
+    compute_entitlement,
+    validate_pid_format,
+)
 from .models import ParcelEntitlementResponse
 from .admin import router as admin_router
 from .intelligence.routes import router as intelligence_router
@@ -68,6 +73,7 @@ logger = logging.getLogger(__name__)
 
 # ── Security Headers Middleware ───────────────────────────────
 
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses."""
 
@@ -85,6 +91,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 # ── Rate Limiting Middleware ──────────────────────────────────
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Rate limit general API endpoints (30 req/min per IP)."""
@@ -110,6 +117,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 # ── Request ID Middleware ─────────────────────────────────────
 
+
 class RequestIdMiddleware(BaseHTTPMiddleware):
     """Generate and add request_id to each request for tracing."""
 
@@ -132,6 +140,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 # ── Lifespan ─────────────────────────────────────────────────
+
 
 def _configure_audit_logger():
     """Configure the dedicated audit logger with JSON-lines handler."""
@@ -188,15 +197,17 @@ async def lifespan(app: FastAPI):
 
     # Start scheduled materialized view refresh (VCL-79 / PERF-011)
     from .intelligence.materialized_views import ScheduledRefresh
+
     scheduled_refresh = ScheduledRefresh(
         db_pool=db.pool,
-        interval_seconds=int(os.getenv("MV_REFRESH_INTERVAL_SECONDS", "3600"))
+        interval_seconds=int(os.getenv("MV_REFRESH_INTERVAL_SECONDS", "3600")),
     )
     await scheduled_refresh.start()
     app.state.scheduled_refresh = scheduled_refresh
 
     # Start scraper scheduler (VCL-80 / DATA-004)
     from .intelligence.scheduler import ScraperScheduler
+
     scheduler = ScraperScheduler(db.pool)
 
     # Register actual scraper functions (use correct function names per module)
@@ -207,9 +218,12 @@ async def lifespan(app: FastAPI):
     from .intelligence.scraper_opendata import run_all_scrapers as scrape_opendata
     from .intelligence.scraper_bclaws import scrape_and_store as scrape_bclaws
     from .intelligence.scraper_gazette import scrape_and_store as scrape_gazette
-    from .intelligence.scraper_contaminated import scrape_and_store as scrape_contaminated
+    from .intelligence.scraper_contaminated import (
+        scrape_and_store as scrape_contaminated,
+    )
     from .statscan_client import scrape_and_store as scrape_statscan
     from .cmhc_client import scrape_and_store as scrape_cmhc
+
     scheduler.register_scraper("council", scrape_council, "0 6 * * *", enabled=True)
     scheduler.register_scraper("dpb", scrape_dpb, "0 7 * * *", enabled=True)
     scheduler.register_scraper("rezoning", scrape_rezoning, "0 8 * * *", enabled=True)
@@ -217,7 +231,9 @@ async def lifespan(app: FastAPI):
     scheduler.register_scraper("opendata", scrape_opendata, "0 3 * * 1", enabled=True)
     scheduler.register_scraper("bclaws", scrape_bclaws, "0 5 * * *", enabled=True)
     scheduler.register_scraper("gazette", scrape_gazette, "0 5 30 * *", enabled=True)
-    scheduler.register_scraper("contaminated", scrape_contaminated, "0 4 1 * *", enabled=True)
+    scheduler.register_scraper(
+        "contaminated", scrape_contaminated, "0 4 1 * *", enabled=True
+    )
     scheduler.register_scraper("statscan", scrape_statscan, "0 3 1 * *", enabled=True)
     scheduler.register_scraper("cmhc", scrape_cmhc, "0 3 15 * *", enabled=True)
     # tavily_search runs as K8s CronJob (k8s/cronjob-tavily-search.yaml), not in-process
@@ -236,8 +252,11 @@ async def lifespan(app: FastAPI):
         }
 
     scheduler.register_scraper(
-        "undervalued_email", _undervalued_email_task,
-        "0 15 * * 1", enabled=True, timeout_seconds=600,
+        "undervalued_email",
+        _undervalued_email_task,
+        "0 15 * * 1",
+        enabled=True,
+        timeout_seconds=600,
     )
 
     # F05-006: Register weekly political risk score refresh (Sunday 2am UTC)
@@ -253,8 +272,11 @@ async def lifespan(app: FastAPI):
         }
 
     scheduler.register_scraper(
-        "political_risk", _political_risk_refresh,
-        "0 2 * * 0", enabled=True, timeout_seconds=600,
+        "political_risk",
+        _political_risk_refresh,
+        "0 2 * * 0",
+        enabled=True,
+        timeout_seconds=600,
     )
 
     # Start background loop if enabled
@@ -308,8 +330,12 @@ app = FastAPI(
 _env = os.getenv("VANCITY_ENV", "development")
 _allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
 _cors_origins_env = os.environ.get("CORS_ORIGINS", "")
-_dev_origins = ["http://localhost:3000", "http://localhost:3001",
-                "http://localhost:3002", "http://localhost:3003"]
+_dev_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:3003",
+]
 
 if _allowed_origins_env:
     _cors_origins = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
@@ -320,7 +346,9 @@ else:
 
 # Block wildcard in production
 if _env == "production" and "*" in _cors_origins:
-    logger.warning("CORS wildcard '*' rejected in production — using empty origins list")
+    logger.warning(
+        "CORS wildcard '*' rejected in production — using empty origins list"
+    )
     _cors_origins = []
 
 app.add_middleware(
@@ -391,6 +419,7 @@ app.include_router(undervalued_router)
 
 
 # ── Routes ───────────────────────────────────────────────────
+
 
 @app.get("/health")
 async def health():
@@ -541,7 +570,8 @@ async def nearest_parcel(
     if response:
         response.headers["X-API-Version"] = "1"
     async with db.acquire() as conn:
-        row = await conn.fetchrow("""
+        row = await conn.fetchrow(
+            """
             SELECT pid, civic_address, current_zoning,
                 ROUND(ST_Distance(
                     ST_Centroid(geom)::geography,
@@ -560,7 +590,11 @@ async def nearest_parcel(
                 ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
             )
             LIMIT 1
-        """, lng, lat, radius_m)
+        """,
+            lng,
+            lat,
+            radius_m,
+        )
         if not row:
             raise HTTPException(status_code=404, detail="No parcel found within radius")
         return dict(row)
@@ -571,7 +605,9 @@ async def nearest_parcel(
     summary="Top opportunities ranked by composite score",
 )
 async def top_opportunities_ranked(
-    limit: int = Query(default=10, ge=1, le=50, description="Number of top opportunities"),
+    limit: int = Query(
+        default=10, ge=1, le=50, description="Number of top opportunities"
+    ),
     response: Response = None,
 ):
     """Returns top parcels ranked by composite_score = storey_uplift * (1 - ILR).
@@ -583,7 +619,8 @@ async def top_opportunities_ranked(
         response.headers["X-API-Version"] = "1"
 
     async with db.acquire() as conn:
-        rows = await conn.fetch("""
+        rows = await conn.fetch(
+            """
             WITH signal_counts AS (
                 SELECT neighborhood, count(*) AS signal_count
                 FROM intelligence_signals
@@ -618,7 +655,9 @@ async def top_opportunities_ranked(
             FROM deduped
             ORDER BY GREATEST(storey_uplift, 0) * (1.0 - COALESCE(ilr, 0.5)) DESC
             LIMIT $1
-        """, limit)
+        """,
+            limit,
+        )
 
         return [dict(r) for r in rows]
 
@@ -630,7 +669,11 @@ async def top_opportunities_ranked(
 async def top_opportunities(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    limit: int = Query(default=None, le=500, description="(Deprecated: use page_size instead) Legacy limit parameter"),
+    limit: int = Query(
+        default=None,
+        le=500,
+        description="(Deprecated: use page_size instead) Legacy limit parameter",
+    ),
     response: Response = None,
 ):
     """Returns top alpha parcels for rendering as markers on the map.
@@ -664,10 +707,11 @@ async def top_opportunities(
             )
             SELECT count(*) as total FROM deduped
         """)
-        total_count = count_row['total'] if count_row else 0
+        total_count = count_row["total"] if count_row else 0
 
         # Fetch paginated results
-        rows = await conn.fetch("""
+        rows = await conn.fetch(
+            """
             WITH signal_counts AS (
                 SELECT neighborhood, count(*) AS signal_count
                 FROM intelligence_signals
@@ -708,7 +752,10 @@ async def top_opportunities(
                 storey_uplift DESC,
                 est_value DESC NULLS LAST
             LIMIT $1 OFFSET $2
-        """, page_size, offset)
+        """,
+            page_size,
+            offset,
+        )
 
         return paginate(
             items=[dict(r) for r in rows],
@@ -954,9 +1001,7 @@ async def signals_geojson_stream(
             severity_levels = ["info", "low", "medium", "high", "critical"]
             if severity_min in severity_levels:
                 min_index = severity_levels.index(severity_min)
-                where_clauses.append(
-                    f"(s.severity = ANY(${param_count}::text[]))"
-                )
+                where_clauses.append(f"(s.severity = ANY(${param_count}::text[]))")
                 params.append(severity_levels[min_index:])
                 param_count += 1
 
@@ -1013,7 +1058,9 @@ async def signals_geojson_stream(
                     "neighborhood": row.get("neighborhood"),
                     "severity": row.get("severity"),
                     "confidence": row.get("confidence"),
-                    "event_date": str(row.get("event_date")) if row.get("event_date") else None,
+                    "event_date": str(row.get("event_date"))
+                    if row.get("event_date")
+                    else None,
                     "source_title": row.get("source_title"),
                     "source_url": row.get("source_url"),
                 },

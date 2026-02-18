@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class APIKey(NamedTuple):
     """Generated API key with metadata."""
+
     key: str
     key_prefix: str
     expires_at: Optional[datetime]
@@ -24,6 +25,7 @@ class APIKey(NamedTuple):
 
 class APIKeyInfo(NamedTuple):
     """API key information for display."""
+
     id: int
     user_id: int
     name: str
@@ -160,9 +162,7 @@ class APIKeyManager:
         )
 
     @staticmethod
-    async def revoke_api_key(
-        pool: asyncpg.Pool, key_id: int, user_id: int
-    ) -> bool:
+    async def revoke_api_key(pool: asyncpg.Pool, key_id: int, user_id: int) -> bool:
         """
         Revoke an API key.
 
@@ -230,7 +230,9 @@ class APIKeyManager:
         ]
 
     @staticmethod
-    async def rotate_api_key(pool: asyncpg.Pool, key_id: int, user_id: int) -> Optional[APIKey]:
+    async def rotate_api_key(
+        pool: asyncpg.Pool, key_id: int, user_id: int
+    ) -> Optional[APIKey]:
         """
         Rotate an API key (create new, revoke old).
 

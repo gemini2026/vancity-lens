@@ -27,17 +27,16 @@ from .parser import parse_pdf
 # Configure logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Constants
 BASE_URL = "https://council.vancouver.ca"
 RATE_LIMIT_DELAY = 1.0  # seconds between requests
 COUNCIL_MEETING_PATTERNS = {
-    'regular': 'regu{yyyymmdd}ag.htm',
-    'special': 'spec{yyyymmdd}ag.htm',
-    'public_hearing': 'phea{yyyymmdd}ag.htm',
+    "regular": "regu{yyyymmdd}ag.htm",
+    "special": "spec{yyyymmdd}ag.htm",
+    "public_hearing": "phea{yyyymmdd}ag.htm",
 }
 
 # Meeting types typically occur on Tuesdays, roughly bi-weekly
@@ -68,8 +67,11 @@ class RateLimiter:
 class VancouverCouncilScraper:
     """Scraper for Vancouver City Council meeting documents."""
 
-    def __init__(self, session: Optional[aiohttp.ClientSession] = None,
-                 rate_limiter: Optional[RateLimiter] = None):
+    def __init__(
+        self,
+        session: Optional[aiohttp.ClientSession] = None,
+        rate_limiter: Optional[RateLimiter] = None,
+    ):
         """
         Initialize the scraper.
 
@@ -80,7 +82,7 @@ class VancouverCouncilScraper:
         self.session = session
         self.rate_limiter = rate_limiter or RateLimiter(RATE_LIMIT_DELAY)
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; VancouverCouncilScraper/1.0)'
+            "User-Agent": "Mozilla/5.0 (compatible; VancouverCouncilScraper/1.0)"
         }
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -89,8 +91,9 @@ class VancouverCouncilScraper:
             self.session = aiohttp.ClientSession()
         return self.session
 
-    async def _make_request(self, url: str, method: str = 'GET',
-                           timeout: int = 10) -> Optional[str]:
+    async def _make_request(
+        self, url: str, method: str = "GET", timeout: int = 10
+    ) -> Optional[str]:
         """
         Make HTTP request with rate limiting.
 
@@ -107,13 +110,12 @@ class VancouverCouncilScraper:
         session = await self._get_session()
         try:
             async with session.request(
-                method, url, headers=self.headers, timeout=timeout,
-                allow_redirects=True
+                method, url, headers=self.headers, timeout=timeout, allow_redirects=True
             ) as response:
                 if response.status == 200:
-                    if method == 'GET':
+                    if method == "GET":
                         return await response.text()
-                    return ''  # For HEAD requests
+                    return ""  # For HEAD requests
                 elif response.status == 404:
                     logger.debug(f"URL not found (404): {url}")
                     return None
@@ -151,8 +153,9 @@ class VancouverCouncilScraper:
             logger.debug(f"Error checking {url}: {e}")
             return False
 
-    def discover_meetings(self, start_date: datetime,
-                         end_date: datetime) -> List[Dict[str, str]]:
+    def discover_meetings(
+        self, start_date: datetime, end_date: datetime
+    ) -> List[Dict[str, str]]:
         """
         Discover council meetings by iterating through dates and checking
         which meeting URL patterns exist.
@@ -177,28 +180,33 @@ class VancouverCouncilScraper:
                 days_ahead += 7
             current += timedelta(days=days_ahead)
 
-        logger.info(f"Discovering meetings between {start_date.date()} and {end_date.date()}")
+        logger.info(
+            f"Discovering meetings between {start_date.date()} and {end_date.date()}"
+        )
 
         while current <= end_date:
-            yyyymmdd = current.strftime('%Y%m%d')
+            yyyymmdd = current.strftime("%Y%m%d")
 
             for meeting_type, pattern in COUNCIL_MEETING_PATTERNS.items():
-                filename = pattern.replace('{yyyymmdd}', yyyymmdd)
+                filename = pattern.replace("{yyyymmdd}", yyyymmdd)
                 url = f"{BASE_URL}/{yyyymmdd}/{filename}"
-                meetings.append({
-                    'url': url,
-                    'date': current.date(),
-                    'type': meeting_type,
-                    'yyyymmdd': yyyymmdd,
-                })
+                meetings.append(
+                    {
+                        "url": url,
+                        "date": current.date(),
+                        "type": meeting_type,
+                        "yyyymmdd": yyyymmdd,
+                    }
+                )
 
             current += timedelta(weeks=2)
 
         logger.info(f"Generated {len(meetings)} potential meeting URLs to check")
         return meetings
 
-    async def discover_meetings_async(self, start_date: datetime,
-                                      end_date: datetime) -> List[Dict[str, str]]:
+    async def discover_meetings_async(
+        self, start_date: datetime, end_date: datetime
+    ) -> List[Dict[str, str]]:
         """
         Async version: Discover meetings and verify they exist via HEAD requests.
 
@@ -216,7 +224,7 @@ class VancouverCouncilScraper:
         tasks = []
 
         async def check_and_collect(meeting: Dict[str, str]):
-            exists = await self._check_url_exists(meeting['url'])
+            exists = await self._check_url_exists(meeting["url"])
             if exists:
                 verified_meetings.append(meeting)
                 logger.info(f"Found meeting: {meeting['type']} on {meeting['date']}")
@@ -248,64 +256,66 @@ class VancouverCouncilScraper:
             - pdf_links: List of PDF URLs found on page
             Or None if fetch fails
         """
-        html = await self._make_request(url, method='GET')
+        html = await self._make_request(url, method="GET")
         if not html:
             logger.warning(f"Failed to fetch meeting page: {url}")
             return None
 
         try:
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
 
             # Extract meeting title and date from page
             # Title typically in heading tags
-            title_tag = soup.find(['h1', 'h2', 'title'])
+            title_tag = soup.find(["h1", "h2", "title"])
             title = title_tag.get_text(strip=True) if title_tag else "Unknown"
 
             # Extract date from URL pattern (YYYYMMDD)
-            match = re.search(r'/(\d{8})/', url)
+            match = re.search(r"/(\d{8})/", url)
             date_str = match.group(1) if match else ""
             try:
-                meeting_date = datetime.strptime(date_str, '%Y%m%d').date()
+                meeting_date = datetime.strptime(date_str, "%Y%m%d").date()
             except ValueError:
                 meeting_date = None
 
             # Determine meeting type from URL
-            if 'regu' in url:
-                meeting_type = 'regular'
-            elif 'spec' in url:
-                meeting_type = 'special'
-            elif 'phea' in url:
-                meeting_type = 'public_hearing'
+            if "regu" in url:
+                meeting_type = "regular"
+            elif "spec" in url:
+                meeting_type = "special"
+            elif "phea" in url:
+                meeting_type = "public_hearing"
             else:
-                meeting_type = 'unknown'
+                meeting_type = "unknown"
 
             # Extract all agenda item text
             agenda_items = []
-            for item in soup.find_all(['li', 'p']):
+            for item in soup.find_all(["li", "p"]):
                 text = item.get_text(strip=True)
                 if text and len(text) > 10:  # Filter out very short lines
                     agenda_items.append(text)
 
             # Extract PDF links
             pdf_links = []
-            for link in soup.find_all('a', href=True):
-                href = link.get('href', '')
-                if href.lower().endswith('.pdf'):
+            for link in soup.find_all("a", href=True):
+                href = link.get("href", "")
+                if href.lower().endswith(".pdf"):
                     # Convert relative URLs to absolute
                     pdf_url = urljoin(url, href)
                     pdf_links.append(pdf_url)
 
-            logger.info(f"Parsed meeting: {meeting_type} on {meeting_date}, "
-                       f"found {len(agenda_items)} items, {len(pdf_links)} PDFs")
+            logger.info(
+                f"Parsed meeting: {meeting_type} on {meeting_date}, "
+                f"found {len(agenda_items)} items, {len(pdf_links)} PDFs"
+            )
 
             return {
-                'html': html,
-                'title': title,
-                'date': meeting_date,
-                'type': meeting_type,
-                'agenda_items': agenda_items,
-                'pdf_links': list(set(pdf_links)),  # Remove duplicates
-                'source_url': url,
+                "html": html,
+                "title": title,
+                "date": meeting_date,
+                "type": meeting_type,
+                "agenda_items": agenda_items,
+                "pdf_links": list(set(pdf_links)),  # Remove duplicates
+                "source_url": url,
             }
 
         except Exception as e:
@@ -330,11 +340,11 @@ class VancouverCouncilScraper:
 
         session = await self._get_session()
         try:
-            async with session.get(
-                url, headers=self.headers, timeout=30
-            ) as response:
+            async with session.get(url, headers=self.headers, timeout=30) as response:
                 if response.status != 200:
-                    logger.warning(f"Failed to download PDF (HTTP {response.status}): {url}")
+                    logger.warning(
+                        f"Failed to download PDF (HTTP {response.status}): {url}"
+                    )
                     return None
 
                 content = await response.read()
@@ -351,9 +361,9 @@ class VancouverCouncilScraper:
                 )
 
                 return {
-                    'text': result['text'],
-                    'page_count': result['page_count'],
-                    'source_url': url,
+                    "text": result["text"],
+                    "page_count": result["page_count"],
+                    "source_url": url,
                 }
 
         except asyncio.TimeoutError:
@@ -363,9 +373,13 @@ class VancouverCouncilScraper:
             logger.error(f"Error downloading/parsing PDF {url}: {e}")
             return None
 
-    async def scrape_and_store(self, db_pool: asyncpg.Pool,
-                               start_date: datetime, end_date: datetime,
-                               download_pdfs: bool = True) -> Dict[str, int]:
+    async def scrape_and_store(
+        self,
+        db_pool: asyncpg.Pool,
+        start_date: datetime,
+        end_date: datetime,
+        download_pdfs: bool = True,
+    ) -> Dict[str, int]:
         """
         Main orchestrator: Discover meetings, scrape pages, download PDFs, and store in DB.
 
@@ -379,17 +393,19 @@ class VancouverCouncilScraper:
             Dict with counts: meetings_found, pages_stored, pdfs_stored, errors
         """
         stats = {
-            'meetings_found': 0,
-            'pages_stored': 0,
-            'pdfs_stored': 0,
-            'errors': 0,
+            "meetings_found": 0,
+            "pages_stored": 0,
+            "pdfs_stored": 0,
+            "errors": 0,
         }
 
-        logger.info(f"Starting scrape_and_store: {start_date.date()} to {end_date.date()}")
+        logger.info(
+            f"Starting scrape_and_store: {start_date.date()} to {end_date.date()}"
+        )
 
         # Discover meetings
         meetings = await self.discover_meetings_async(start_date, end_date)
-        stats['meetings_found'] = len(meetings)
+        stats["meetings_found"] = len(meetings)
 
         if not meetings:
             logger.info("No meetings found in date range")
@@ -398,78 +414,86 @@ class VancouverCouncilScraper:
         # Scrape each meeting page
         for meeting in meetings:
             try:
-                meeting_data = await self.scrape_meeting_page(meeting['url'])
+                meeting_data = await self.scrape_meeting_page(meeting["url"])
                 if not meeting_data:
-                    stats['errors'] += 1
+                    stats["errors"] += 1
                     continue
 
                 # Store meeting page in database
                 await self._store_document(
                     db_pool,
-                    source_type='council_minutes',
-                    source_url=meeting['url'],
-                    title=meeting_data['title'],
-                    published_date=meeting_data['date'],
-                    meeting_date=meeting_data['date'],
-                    raw_text=meeting_data['html'],
-                    text_length=len(meeting_data['html']),
+                    source_type="council_minutes",
+                    source_url=meeting["url"],
+                    title=meeting_data["title"],
+                    published_date=meeting_data["date"],
+                    meeting_date=meeting_data["date"],
+                    raw_text=meeting_data["html"],
+                    text_length=len(meeting_data["html"]),
                     page_count=1,
-                    file_format='html',
+                    file_format="html",
                     metadata={
-                        'meeting_type': meeting_data['type'],
-                        'agenda_items_count': len(meeting_data['agenda_items']),
-                        'pdf_count': len(meeting_data['pdf_links']),
-                    }
+                        "meeting_type": meeting_data["type"],
+                        "agenda_items_count": len(meeting_data["agenda_items"]),
+                        "pdf_count": len(meeting_data["pdf_links"]),
+                    },
                 )
-                stats['pages_stored'] += 1
+                stats["pages_stored"] += 1
 
                 # Download and store PDFs if requested
-                if download_pdfs and meeting_data['pdf_links']:
-                    for pdf_url in meeting_data['pdf_links']:
+                if download_pdfs and meeting_data["pdf_links"]:
+                    for pdf_url in meeting_data["pdf_links"]:
                         try:
                             pdf_data = await self.download_and_parse_pdf(pdf_url)
                             if pdf_data:
                                 # Determine PDF type from URL or content
-                                if 'staff' in pdf_url.lower():
-                                    source_type = 'staff_report'
-                                elif 'referral' in pdf_url.lower():
-                                    source_type = 'public_hearing'
+                                if "staff" in pdf_url.lower():
+                                    source_type = "staff_report"
+                                elif "referral" in pdf_url.lower():
+                                    source_type = "public_hearing"
                                 else:
-                                    source_type = 'staff_report'
+                                    source_type = "staff_report"
 
                                 await self._store_document(
                                     db_pool,
                                     source_type=source_type,
                                     source_url=pdf_url,
                                     title=self._extract_pdf_title(pdf_url),
-                                    published_date=meeting_data['date'],
-                                    meeting_date=meeting_data['date'],
-                                    raw_text=pdf_data['text'],
-                                    text_length=len(pdf_data['text']),
-                                    page_count=pdf_data['page_count'],
-                                    file_format='pdf',
+                                    published_date=meeting_data["date"],
+                                    meeting_date=meeting_data["date"],
+                                    raw_text=pdf_data["text"],
+                                    text_length=len(pdf_data["text"]),
+                                    page_count=pdf_data["page_count"],
+                                    file_format="pdf",
                                     metadata={
-                                        'extracted_from_url': pdf_url,
-                                    }
+                                        "extracted_from_url": pdf_url,
+                                    },
                                 )
-                                stats['pdfs_stored'] += 1
+                                stats["pdfs_stored"] += 1
                         except Exception as e:
                             logger.error(f"Error processing PDF {pdf_url}: {e}")
-                            stats['errors'] += 1
+                            stats["errors"] += 1
 
             except Exception as e:
                 logger.error(f"Error processing meeting {meeting['url']}: {e}")
-                stats['errors'] += 1
+                stats["errors"] += 1
 
         logger.info(f"Scrape completed. Stats: {stats}")
         return stats
 
-    async def _store_document(self, db_pool: asyncpg.Pool,
-                             source_type: str, source_url: str, title: str,
-                             published_date: Optional[datetime.date],
-                             meeting_date: Optional[datetime.date],
-                             raw_text: str, text_length: int, page_count: int,
-                             file_format: str, metadata: Optional[Dict] = None) -> bool:
+    async def _store_document(
+        self,
+        db_pool: asyncpg.Pool,
+        source_type: str,
+        source_url: str,
+        title: str,
+        published_date: Optional[datetime.date],
+        meeting_date: Optional[datetime.date],
+        raw_text: str,
+        text_length: int,
+        page_count: int,
+        file_format: str,
+        metadata: Optional[Dict] = None,
+    ) -> bool:
         """
         Store a document in the database.
 
@@ -505,12 +529,19 @@ class VancouverCouncilScraper:
                     ON CONFLICT (source_url) DO NOTHING
                     RETURNING id
                     """,
-                    source_type, source_url, title, published_date,
-                    meeting_date, raw_text, text_length, page_count,
-                    file_format, metadata
+                    source_type,
+                    source_url,
+                    title,
+                    published_date,
+                    meeting_date,
+                    raw_text,
+                    text_length,
+                    page_count,
+                    file_format,
+                    metadata,
                 )
 
-                if result == 'INSERT 0 1':
+                if result == "INSERT 0 1":
                     logger.debug(f"Stored document: {title}")
                     return True
                 else:
@@ -537,10 +568,10 @@ class VancouverCouncilScraper:
         """
         # Get filename from URL
         parsed = urlparse(url)
-        filename = parsed.path.split('/')[-1]
+        filename = parsed.path.split("/")[-1]
 
         # Clean up filename: remove .pdf and replace underscores/hyphens with spaces
-        title = filename.replace('.pdf', '').replace('_', ' ').replace('-', ' ')
+        title = filename.replace(".pdf", "").replace("_", " ").replace("-", " ")
 
         return title
 
@@ -552,8 +583,10 @@ class VancouverCouncilScraper:
 
 # Standalone convenience functions
 
-async def discover_meetings(start_date: datetime,
-                           end_date: datetime) -> List[Dict[str, str]]:
+
+async def discover_meetings(
+    start_date: datetime, end_date: datetime
+) -> List[Dict[str, str]]:
     """
     Discover Vancouver City Council meetings in date range.
 
@@ -605,9 +638,12 @@ async def download_and_parse_pdf(url: str) -> Optional[Dict[str, Any]]:
         await scraper.close()
 
 
-async def scrape_and_store(db_pool: asyncpg.Pool,
-                          start_date: datetime, end_date: datetime,
-                          download_pdfs: bool = True) -> Dict[str, int]:
+async def scrape_and_store(
+    db_pool: asyncpg.Pool,
+    start_date: datetime,
+    end_date: datetime,
+    download_pdfs: bool = True,
+) -> Dict[str, int]:
     """
     Main orchestrator: scrape meetings and store in database.
 
@@ -629,7 +665,7 @@ async def scrape_and_store(db_pool: asyncpg.Pool,
         await scraper.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Example usage
     print("Vancouver City Council Scraper Module")
     print("Import this module to use its functions")

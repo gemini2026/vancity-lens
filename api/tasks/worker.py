@@ -31,6 +31,7 @@ CELERY_TIMEZONE = "UTC"
 # Celery Configuration Class
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class CeleryConfig:
     """Celery configuration settings."""
 
@@ -88,6 +89,7 @@ class CeleryConfig:
 # Create and Configure Celery App
 # ────────────────────────────────────────────────────────────────────────────
 
+
 def create_celery_app():
     """Create and configure Celery application."""
     celery_app = Celery("vancity_lens")
@@ -106,6 +108,7 @@ celery_app = create_celery_app()
 # ────────────────────────────────────────────────────────────────────────────
 # Base Task Class with Error Handling
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class DatabaseTask(Task):
     """
@@ -132,7 +135,7 @@ class DatabaseTask(Task):
                     "task_id": self.request.id,
                     "task_name": self.name,
                     "retries": self.request.retries,
-                }
+                },
             )
             raise
 
@@ -144,7 +147,7 @@ class DatabaseTask(Task):
                 "task_id": task_id,
                 "task_name": self.name,
                 "retry_count": self.request.retries,
-            }
+            },
         )
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
@@ -156,7 +159,7 @@ class DatabaseTask(Task):
                 "task_id": task_id,
                 "task_name": self.name,
                 "max_retries": self.max_retries,
-            }
+            },
         )
 
     def on_success(self, result, task_id, args, kwargs):
@@ -166,7 +169,7 @@ class DatabaseTask(Task):
             extra={
                 "task_id": task_id,
                 "task_name": self.name,
-            }
+            },
         )
 
 
@@ -177,6 +180,7 @@ celery_app.Task = DatabaseTask
 # ────────────────────────────────────────────────────────────────────────────
 # Exponential Backoff Retry Calculation
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def calculate_exponential_backoff(retry_count: int, base_delay: int = 60) -> int:
     """
@@ -190,7 +194,7 @@ def calculate_exponential_backoff(retry_count: int, base_delay: int = 60) -> int
         Delay in seconds for the next retry
     """
     # Exponential backoff: base_delay * (2 ** retry_count)
-    delay = base_delay * (2 ** retry_count)
+    delay = base_delay * (2**retry_count)
     return min(delay, 3600)  # Cap at 1 hour
 
 

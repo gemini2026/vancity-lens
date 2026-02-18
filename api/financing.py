@@ -24,22 +24,23 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class FinancingRequest(BaseModel):
     """Request payload for financing / deal model calculation."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     acquisition_cost: float = Field(
         ..., gt=0, description="Property purchase price in CAD"
     )
     equity_pct: float = Field(
-        ..., ge=0.0, le=1.0,
-        description="Equity percentage as decimal (0.25 = 25%)"
+        ..., ge=0.0, le=1.0, description="Equity percentage as decimal (0.25 = 25%)"
     )
     interest_rate: float = Field(
-        ..., ge=0.0, le=1.0,
-        description="Annual interest rate as decimal (0.065 = 6.5%)"
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Annual interest rate as decimal (0.065 = 6.5%)",
     )
     hold_period_months: int = Field(
-        ..., ge=1,
-        description="Hold period in months (typically 24-60)"
+        ..., ge=1, description="Hold period in months (typically 24-60)"
     )
     construction_cost: float = Field(
         ..., ge=0, description="Total construction (hard) cost estimate in CAD"
@@ -48,17 +49,21 @@ class FinancingRequest(BaseModel):
         ..., ge=0, description="Expected total revenue from sales in CAD"
     )
     soft_cost_pct: float = Field(
-        default=0.18, ge=0.0, le=1.0,
-        description="Soft costs as percentage of hard costs (0.18 = 18%)"
+        default=0.18,
+        ge=0.0,
+        le=1.0,
+        description="Soft costs as percentage of hard costs (0.18 = 18%)",
     )
     sellable_sqft: float = Field(
-        default=0.0, ge=0.0,
-        description="Total sellable square footage (for breakeven PSF calc)"
+        default=0.0,
+        ge=0.0,
+        description="Total sellable square footage (for breakeven PSF calc)",
     )
 
 
 class ScenarioResult(BaseModel):
     """Single scenario output (bull / base / bear)."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     label: str = Field(description="Scenario label (bull / base / bear)")
@@ -72,14 +77,21 @@ class ScenarioResult(BaseModel):
 
 class FinancingResult(BaseModel):
     """Full result of a financing / deal model calculation."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     # Capital structure
-    equity_required: float = Field(description="Equity contribution (acquisition_cost * equity_pct)")
-    debt_amount: float = Field(description="Debt portion (acquisition_cost * (1 - equity_pct))")
+    equity_required: float = Field(
+        description="Equity contribution (acquisition_cost * equity_pct)"
+    )
+    debt_amount: float = Field(
+        description="Debt portion (acquisition_cost * (1 - equity_pct))"
+    )
 
     # Cost breakdown
-    soft_costs: float = Field(description="Soft costs (construction_cost * soft_cost_pct)")
+    soft_costs: float = Field(
+        description="Soft costs (construction_cost * soft_cost_pct)"
+    )
     total_interest_cost: float = Field(
         description="Total interest over hold period (debt_amount * interest_rate * hold_period_months / 12)"
     )
@@ -89,9 +101,13 @@ class FinancingResult(BaseModel):
 
     # Profitability
     net_profit: float = Field(description="gross_revenue - total_project_cost")
-    roi: float = Field(description="Return on investment (net_profit / total_project_cost)")
+    roi: float = Field(
+        description="Return on investment (net_profit / total_project_cost)"
+    )
     roe: float = Field(description="Return on equity (net_profit / equity_required)")
-    cash_on_cash: float = Field(description="Cash-on-cash return (net_profit / equity_required)")
+    cash_on_cash: float = Field(
+        description="Cash-on-cash return (net_profit / equity_required)"
+    )
     irr_estimate: float = Field(
         description="Simplified annualized return: (1 + roi)^(12/hold_period_months) - 1"
     )
@@ -99,7 +115,7 @@ class FinancingResult(BaseModel):
     # Breakeven
     breakeven_price_psf: Optional[float] = Field(
         default=None,
-        description="Breakeven price per sellable sqft (total_project_cost / sellable_sqft)"
+        description="Breakeven price per sellable sqft (total_project_cost / sellable_sqft)",
     )
 
     # Viability
@@ -173,10 +189,7 @@ class FinancingCalculator:
         soft_costs = construction_cost * soft_cost_pct
         total_interest_cost = debt_amount * interest_rate * (hold_period_months / 12.0)
         total_project_cost = (
-            acquisition_cost
-            + construction_cost
-            + soft_costs
-            + total_interest_cost
+            acquisition_cost + construction_cost + soft_costs + total_interest_cost
         )
 
         # ── Profitability ───────────────────────────────────────────
@@ -253,9 +266,9 @@ class FinancingCalculator:
         scenarios: dict[str, ScenarioResult] = {}
 
         variants = {
-            "bull":  {"revenue_mult": 1.10, "cost_mult": 0.95},
-            "base":  {"revenue_mult": 1.00, "cost_mult": 1.00},
-            "bear":  {"revenue_mult": 0.90, "cost_mult": 1.10},
+            "bull": {"revenue_mult": 1.10, "cost_mult": 0.95},
+            "base": {"revenue_mult": 1.00, "cost_mult": 1.00},
+            "bear": {"revenue_mult": 0.90, "cost_mult": 1.10},
         }
 
         equity_required = acquisition_cost * equity_pct
@@ -266,10 +279,7 @@ class FinancingCalculator:
             adj_soft = adj_construction * soft_cost_pct
             adj_interest = debt_amount * interest_rate * (hold_period_months / 12.0)
             adj_total_cost = (
-                acquisition_cost
-                + adj_construction
-                + adj_soft
-                + adj_interest
+                acquisition_cost + adj_construction + adj_soft + adj_interest
             )
 
             adj_revenue = gross_revenue * mults["revenue_mult"]

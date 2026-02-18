@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class DeveloperEntity(BaseModel):
     """A resolved developer entity."""
+
     id: int
     canonical_name: str
     aliases: list[str] = Field(default_factory=list)
@@ -98,7 +99,9 @@ def _similarity_score(a: str, b: str) -> float:
     jaccard = len(intersection) / len(union)
 
     # Length-weighted similarity
-    len_ratio = min(len(a), len(b)) / max(len(a), len(b)) if max(len(a), len(b)) > 0 else 0
+    len_ratio = (
+        min(len(a), len(b)) / max(len(a), len(b)) if max(len(a), len(b)) > 0 else 0
+    )
 
     return (jaccard + len_ratio) / 2
 
@@ -155,7 +158,7 @@ async def resolve_developer(
     for r in all_rows:
         score = _similarity_score(normalized, r["canonical_name"])
         # Also check aliases
-        for alias in (r["aliases"] or []):
+        for alias in r["aliases"] or []:
             alias_score = _similarity_score(normalized, alias)
             score = max(score, alias_score)
         if score > best_score:
@@ -168,10 +171,13 @@ async def resolve_developer(
         if normalized.lower() not in [a.lower() for a in entity.aliases]:
             await conn.execute(
                 "UPDATE developer_entities SET aliases = array_append(aliases, $1) WHERE id = $2",
-                normalized, entity.id,
+                normalized,
+                entity.id,
             )
             entity.aliases.append(normalized)
-            logger.info(f"Added alias '{normalized}' to entity '{entity.canonical_name}'")
+            logger.info(
+                f"Added alias '{normalized}' to entity '{entity.canonical_name}'"
+            )
         return entity
 
     # 4. No match — create new entity
@@ -179,7 +185,8 @@ async def resolve_developer(
         "INSERT INTO developer_entities (canonical_name, aliases) "
         "VALUES ($1, $2) "
         "RETURNING id, canonical_name, aliases, bc_corp_number, metadata",
-        normalized, [raw_name] if raw_name != normalized else [],
+        normalized,
+        [raw_name] if raw_name != normalized else [],
     )
     logger.info(f"Created new developer entity: '{normalized}'")
     return _row_to_entity(row)
@@ -197,7 +204,8 @@ async def search_developers(
         "WHERE canonical_name ILIKE $1 "
         "   OR EXISTS (SELECT 1 FROM unnest(aliases) a WHERE a ILIKE $1) "
         "ORDER BY canonical_name LIMIT $2",
-        f"%{query}%", limit,
+        f"%{query}%",
+        limit,
     )
     return [_row_to_entity(r) for r in rows]
 

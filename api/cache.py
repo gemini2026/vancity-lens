@@ -358,9 +358,7 @@ class RedisCache(CacheBackend):
 
             while True:
                 cursor, keys = await self._client.scan(
-                    cursor=cursor,
-                    match=pattern,
-                    count=100
+                    cursor=cursor, match=pattern, count=100
                 )
 
                 if keys:
@@ -388,7 +386,7 @@ class CacheManager:
     - Falls back to InMemoryCache otherwise
     """
 
-    _instance: Optional['CacheManager'] = None
+    _instance: Optional["CacheManager"] = None
     _lock = asyncio.Lock()
 
     def __new__(cls):
@@ -397,7 +395,7 @@ class CacheManager:
         return cls._instance
 
     def __init__(self):
-        if hasattr(self, '_initialized'):
+        if hasattr(self, "_initialized"):
             return
 
         self._backend: Optional[CacheBackend] = None
@@ -413,7 +411,9 @@ class CacheManager:
             try:
                 await redis_backend.connect()
             except Exception as e:
-                logger.warning(f"Redis initialization failed, falling back to in-memory: {e}")
+                logger.warning(
+                    f"Redis initialization failed, falling back to in-memory: {e}"
+                )
             if redis_backend._connected:
                 self._backend = redis_backend
             else:
@@ -434,7 +434,9 @@ class CacheManager:
     def get_backend(self) -> CacheBackend:
         """Get the current cache backend."""
         if self._backend is None:
-            raise RuntimeError("Cache manager not initialized. Call initialize() first.")
+            raise RuntimeError(
+                "Cache manager not initialized. Call initialize() first."
+            )
         return self._backend
 
     async def get(self, key: str) -> Optional[Any]:
@@ -483,6 +485,7 @@ def cached(
         async def get_signal_feed(limit: int, offset: int):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         prefix = key_prefix or f"{func.__module__}.{func.__name__}"
 

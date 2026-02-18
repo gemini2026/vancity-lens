@@ -67,7 +67,9 @@ async def invite_member(org_id: int, body: MemberInvite, request: Request):
         raise HTTPException(401, "Authentication required")
     member = await organizations.add_member(org_id, body.email, body.role, user["id"])
     if not member:
-        raise HTTPException(400, "Could not add member (user not found or seat limit reached)")
+        raise HTTPException(
+            400, "Could not add member (user not found or seat limit reached)"
+        )
     member["joined_at"] = member["joined_at"].isoformat()
     return member
 

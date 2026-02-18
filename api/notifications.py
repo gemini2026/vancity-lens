@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
 class NotificationType(str, Enum):
     """Notification types for filtering and categorization."""
+
     INFO = "info"
     WARNING = "warning"
     ALERT = "alert"
@@ -34,6 +35,7 @@ class NotificationType(str, Enum):
 
 class NotificationModel(BaseModel):
     """Single notification response model."""
+
     id: str
     type: NotificationType
     title: str
@@ -49,6 +51,7 @@ class NotificationModel(BaseModel):
 
 class NotificationListResponse(BaseModel):
     """Response for notification list endpoint."""
+
     notifications: List[NotificationModel]
     total: int
     limit: int
@@ -57,11 +60,13 @@ class NotificationListResponse(BaseModel):
 
 class UnreadCountResponse(BaseModel):
     """Response for unread count endpoint."""
+
     unread_count: int
 
 
 class CreateNotificationRequest(BaseModel):
     """Request model for creating notifications."""
+
     type: NotificationType
     title: str
     message: str

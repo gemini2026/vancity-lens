@@ -21,24 +21,41 @@ from pydantic import BaseModel, Field
 
 # ── Models ──────────────────────────────────────────────────────
 
+
 class CommunityPlanBonus(BaseModel):
     """A single community plan density bonus applicable to a parcel."""
+
     plan_name: str
     plan_area: str
     bonus_fsr: Optional[Decimal] = Field(None, description="Additional FSR above base")
-    bonus_storeys: Optional[int] = Field(None, description="Additional storeys above base")
-    max_fsr: Optional[Decimal] = Field(None, description="Absolute max FSR under this plan")
-    max_storeys: Optional[int] = Field(None, description="Absolute max storeys under this plan")
+    bonus_storeys: Optional[int] = Field(
+        None, description="Additional storeys above base"
+    )
+    max_fsr: Optional[Decimal] = Field(
+        None, description="Absolute max FSR under this plan"
+    )
+    max_storeys: Optional[int] = Field(
+        None, description="Absolute max storeys under this plan"
+    )
     conditions: Optional[str] = Field(None, description="Conditions for the bonus")
 
 
 class CommunityPlanResult(BaseModel):
     """Result of community plan bonus lookup for a parcel."""
-    has_bonus: bool = Field(False, description="Whether any community plan bonus applies")
+
+    has_bonus: bool = Field(
+        False, description="Whether any community plan bonus applies"
+    )
     bonuses: list[CommunityPlanBonus] = Field(default_factory=list)
-    best_bonus: Optional[CommunityPlanBonus] = Field(None, description="Highest FSR/storeys bonus")
-    effective_max_fsr: Optional[Decimal] = Field(None, description="Max FSR from best community plan")
-    effective_max_storeys: Optional[int] = Field(None, description="Max storeys from best community plan")
+    best_bonus: Optional[CommunityPlanBonus] = Field(
+        None, description="Highest FSR/storeys bonus"
+    )
+    effective_max_fsr: Optional[Decimal] = Field(
+        None, description="Max FSR from best community plan"
+    )
+    effective_max_storeys: Optional[int] = Field(
+        None, description="Max storeys from best community plan"
+    )
 
 
 # ── SQL ─────────────────────────────────────────────────────────
@@ -54,6 +71,7 @@ SQL_COMMUNITY_PLAN_BONUSES = """
 
 
 # ── Engine ──────────────────────────────────────────────────────
+
 
 async def compute_community_plan_bonus(
     conn,
@@ -74,15 +92,17 @@ async def compute_community_plan_bonus(
 
     bonuses = []
     for row in rows:
-        bonuses.append(CommunityPlanBonus(
-            plan_name=row["plan_name"],
-            plan_area=row["plan_area"],
-            bonus_fsr=row["bonus_fsr"],
-            bonus_storeys=row["bonus_storeys"],
-            max_fsr=row["max_fsr"],
-            max_storeys=row["max_storeys"],
-            conditions=row["conditions"],
-        ))
+        bonuses.append(
+            CommunityPlanBonus(
+                plan_name=row["plan_name"],
+                plan_area=row["plan_area"],
+                bonus_fsr=row["bonus_fsr"],
+                bonus_storeys=row["bonus_storeys"],
+                max_fsr=row["max_fsr"],
+                max_storeys=row["max_storeys"],
+                conditions=row["conditions"],
+            )
+        )
 
     # Best bonus = highest max_fsr (already sorted DESC from SQL)
     best = bonuses[0] if bonuses else None

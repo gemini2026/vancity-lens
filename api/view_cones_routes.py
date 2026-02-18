@@ -36,11 +36,13 @@ router = APIRouter(prefix="/api/v1", tags=["view_cones"])
 # Database Pool Dependency
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def get_db_pool(request: Request) -> asyncpg.Pool:
     """Extract asyncpg pool from request.app.state or fallback to default."""
     pool = getattr(request.app.state, "pool", None)
     if pool is None:
         from .db import db
+
         pool = db.pool
     if pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -50,6 +52,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
 # ════════════════════════════════════════════════════════════════════════════
 # Admin Endpoints
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @router.post(
     "/admin/load-view-cones",
@@ -98,7 +101,9 @@ async def load_view_cones(
         }
     except Exception as e:
         logger.error(f"Failed to load view cones: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to load view cones: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to load view cones: {str(e)}"
+        )
 
 
 @router.get(
@@ -122,12 +127,15 @@ async def get_view_cone_impact(request: Request) -> ParcelViewConeStats:
         return stats
     except Exception as e:
         logger.error(f"Failed to get view cone impact: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get statistics: {str(e)}"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # Public Endpoints
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @router.get(
     "/view-cones",
@@ -149,7 +157,9 @@ async def list_view_cones(request: Request) -> List[ViewCone]:
         return cones
     except Exception as e:
         logger.error(f"Failed to list view cones: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list view cones: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list view cones: {str(e)}"
+        )
 
 
 @router.get(
@@ -191,14 +201,14 @@ async def check_parcel_view_cones(
     except Exception as e:
         logger.error(f"Failed to check view cone intersection for {pid}: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to check view cone intersection: {str(e)}"
+            status_code=500, detail=f"Failed to check view cone intersection: {str(e)}"
         )
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # Utility Endpoint (Unauthenticated)
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @router.get(
     "/view-cones/sample",

@@ -31,6 +31,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
         raise HTTPException(status_code=503, detail="Database not available")
     return pool
 
+
 logger = logging.getLogger(__name__)
 
 # Create router for subscription endpoints
@@ -41,6 +42,7 @@ admin_router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 # ────────────────────────────────────────────────────────────────────────────
 # Public Endpoints
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/tiers", response_model=List[TierInfo])
 async def list_tiers(db_pool: asyncpg.Pool = Depends(get_db_pool)) -> List[TierInfo]:
@@ -344,9 +346,7 @@ async def get_usage_summary(
         if days < 1 or days > 365:
             raise ValueError("days must be between 1 and 365")
 
-        summary = await SubscriptionManager.get_usage_summary(
-            db_pool, user["id"], days
-        )
+        summary = await SubscriptionManager.get_usage_summary(db_pool, user["id"], days)
         return summary
     except ValueError as e:
         raise HTTPException(
@@ -364,6 +364,7 @@ async def get_usage_summary(
 # ────────────────────────────────────────────────────────────────────────────
 # Admin Endpoints
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @admin_router.get("/subscriptions/stats", response_model=Dict)
 async def get_subscription_stats(

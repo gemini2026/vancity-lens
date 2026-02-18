@@ -51,9 +51,7 @@ class RateLimiter:
             self.requests[identifier] = []
 
         cutoff = now - self.window_seconds
-        self.requests[identifier] = [
-            t for t in self.requests[identifier] if t > cutoff
-        ]
+        self.requests[identifier] = [t for t in self.requests[identifier] if t > cutoff]
 
         if len(self.requests[identifier]) >= self.max_requests:
             return False
@@ -74,10 +72,7 @@ def cached_mapbox_geocode(query: str, token: str) -> Optional[dict]:
         import requests
 
         encoded_query = quote(query.strip(), safe="")
-        url = (
-            f"https://api.mapbox.com/geocoding/v5/mapbox.places/"
-            f"{encoded_query}.json"
-        )
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_query}.json"
         response = requests.get(
             url,
             params={
@@ -203,10 +198,7 @@ async def reverse_geocode(
 
         import requests
 
-        url = (
-            f"https://api.mapbox.com/geocoding/v5/mapbox.places/"
-            f"{lng},{lat}.json"
-        )
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{lng},{lat}.json"
         response = requests.get(url, params={"access_token": token}, timeout=5)
         if response.status_code == 200:
             data = response.json()

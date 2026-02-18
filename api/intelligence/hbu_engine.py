@@ -29,9 +29,7 @@ logger = logging.getLogger(__name__)
 CACHE_TTL_DAYS = 7
 
 
-async def get_cached_hbu(
-    db_pool: asyncpg.Pool, pid: str
-) -> Optional[dict[str, Any]]:
+async def get_cached_hbu(db_pool: asyncpg.Pool, pid: str) -> Optional[dict[str, Any]]:
     """Return cached HBU analysis if fresh, else None."""
     try:
         async with db_pool.acquire() as conn:
@@ -65,12 +63,18 @@ async def get_cached_hbu(
                 "address": row["civic_address"] or "",
                 "current_zoning": row["current_zoning"] or "",
                 "highest_best_use": analysis,
-                "confidence_score": float(row["confidence_score"]) if row["confidence_score"] else None,
+                "confidence_score": float(row["confidence_score"])
+                if row["confidence_score"]
+                else None,
                 "sources": sources or [],
                 "llm_model": row["llm_model"],
                 "analysis_duration_ms": 0,  # not tracked for cached results
-                "cached_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "expires_at": row["expires_at"].isoformat() if row["expires_at"] else None,
+                "cached_at": row["created_at"].isoformat()
+                if row["created_at"]
+                else None,
+                "expires_at": row["expires_at"].isoformat()
+                if row["expires_at"]
+                else None,
             }
     except Exception as e:
         logger.warning("Failed to fetch cached HBU for %s: %s", pid, e)
@@ -156,7 +160,9 @@ async def analyze_hbu(
     for q in queries:
         try:
             chunks = await retrieve_document_chunks(
-                db_pool, query=q, search_mode="full",
+                db_pool,
+                query=q,
+                search_mode="full",
             )
             all_chunks.extend(chunks)
         except Exception as e:
@@ -189,7 +195,9 @@ async def analyze_hbu(
             max_tokens=3000,
         )
     except Exception as e:
-        logger.error("LLM synthesis failed for HBU %s: %s: %s", pid, type(e).__name__, e)
+        logger.error(
+            "LLM synthesis failed for HBU %s: %s: %s", pid, type(e).__name__, e
+        )
         return _build_fallback_response(pid, ent_data, pro_forma_data)
 
     # 5. Parse LLM response
@@ -208,7 +216,9 @@ async def analyze_hbu(
     ]
 
     total_ms = int((time.perf_counter() - t0) * 1000)
-    logger.info("HBU analysis for %s completed in %dms (model=%s)", pid, total_ms, model_used)
+    logger.info(
+        "HBU analysis for %s completed in %dms (model=%s)", pid, total_ms, model_used
+    )
 
     # 6. Cache result
     try:
@@ -294,9 +304,7 @@ def _parse_llm_response(answer_text: str) -> dict[str, Any]:
     return parsed
 
 
-def _compute_confidence(
-    ent_data: dict, chunks: list[dict], hbu: dict
-) -> float:
+def _compute_confidence(ent_data: dict, chunks: list[dict], hbu: dict) -> float:
     """Compute confidence score (0.0-1.0) based on data quality."""
     score = 0.5  # baseline
 
@@ -343,7 +351,9 @@ def _build_fallback_response(
             "estimated_units": None,
             "unit_mix": None,
             "buildable_sqft": pro_forma_data.get("buildable_sqft"),
-            "key_constraints": ["AI analysis unavailable — showing rule-engine estimates only"],
+            "key_constraints": [
+                "AI analysis unavailable — showing rule-engine estimates only"
+            ],
             "feasibility_verdict": "unknown",
             "narrative": None,
             "cited_sources": [],

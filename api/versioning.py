@@ -22,9 +22,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # ── API Version Metadata ───────────────────────────────────────
 
+
 @dataclass
 class APIVersion:
     """Metadata about an API version."""
+
     version: str
     """Version identifier (e.g., '1', '2')."""
 
@@ -46,12 +48,13 @@ AVAILABLE_VERSIONS = {
         version="1",
         deprecated=False,
         sunset_date=None,
-        description="Current stable release with parcels, opportunities, and TOA endpoints"
+        description="Current stable release with parcels, opportunities, and TOA endpoints",
     ),
 }
 
 
 # ── Version Router ─────────────────────────────────────────────
+
 
 class VersionRouter(APIRouter):
     """
@@ -67,6 +70,7 @@ class VersionRouter(APIRouter):
 
 
 # ── Version Middleware ────────────────────────────────────────
+
 
 class APIVersionMiddleware(BaseHTTPMiddleware):
     """
@@ -133,6 +137,7 @@ class APIVersionMiddleware(BaseHTTPMiddleware):
 
 # ── Version Listing Endpoint ───────────────────────────────────
 
+
 async def get_api_versions() -> dict:
     """
     List all available API versions with their metadata.
@@ -146,7 +151,9 @@ async def get_api_versions() -> dict:
         version_dict = {
             "version": version_info.version,
             "deprecated": version_info.deprecated,
-            "sunset_date": version_info.sunset_date.isoformat() if version_info.sunset_date else None,
+            "sunset_date": version_info.sunset_date.isoformat()
+            if version_info.sunset_date
+            else None,
             "description": version_info.description,
             "url_prefix": f"/api/v{version_info.version}",
         }

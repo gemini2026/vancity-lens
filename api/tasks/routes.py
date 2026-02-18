@@ -26,18 +26,22 @@ logger = logging.getLogger(__name__)
 # Request/Response Models
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class RetryJobRequest(BaseModel):
     """Request model for retrying a failed job."""
+
     pass  # No body required, just the job_id in path
 
 
 class CleanupJobsRequest(BaseModel):
     """Request model for cleaning up old jobs."""
+
     days: int = 30  # Delete jobs older than this many days
 
 
 class CleanupJobsResponse(BaseModel):
     """Response model for cleanup operation."""
+
     deleted_count: int
     message: str
 
@@ -45,6 +49,7 @@ class CleanupJobsResponse(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 # Helper Functions
 # ────────────────────────────────────────────────────────────────────────────
+
 
 async def _require_admin(
     request: Request,
@@ -66,11 +71,10 @@ async def _require_admin(
     if user.get("role") != "admin":
         logger.warning(
             f"Unauthorized job access attempt by user {user.get('id')}",
-            extra={"user_id": user.get("id"), "user_role": user.get("role")}
+            extra={"user_id": user.get("id"), "user_role": user.get("role")},
         )
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required"
         )
     return user
 
@@ -108,14 +112,14 @@ async def list_jobs(
     """
     logger.info(
         f"Listing jobs (status={status_filter}, type={job_type})",
-        extra={"user_id": user.get("id")}
+        extra={"user_id": user.get("id")},
     )
 
     db_pool = request.app.state.pool
     if not db_pool:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
+            detail="Database not available",
         )
 
     try:
@@ -138,11 +142,11 @@ async def list_jobs(
         logger.error(
             f"Failed to list jobs: {exc}",
             exc_info=True,
-            extra={"user_id": user.get("id")}
+            extra={"user_id": user.get("id")},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list jobs"
+            detail="Failed to list jobs",
         )
 
 
@@ -166,15 +170,14 @@ async def get_job(
         HTTPException 403: If not admin
     """
     logger.debug(
-        f"Getting job {job_id}",
-        extra={"user_id": user.get("id"), "job_id": job_id}
+        f"Getting job {job_id}", extra={"user_id": user.get("id"), "job_id": job_id}
     )
 
     db_pool = request.app.state.pool
     if not db_pool:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
+            detail="Database not available",
         )
 
     try:
@@ -182,8 +185,7 @@ async def get_job(
 
         if not job:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job {job_id} not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
             )
 
         return job
@@ -194,11 +196,11 @@ async def get_job(
         logger.error(
             f"Failed to get job {job_id}: {exc}",
             exc_info=True,
-            extra={"user_id": user.get("id"), "job_id": job_id}
+            extra={"user_id": user.get("id"), "job_id": job_id},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get job"
+            detail="Failed to get job",
         )
 
 
@@ -227,15 +229,14 @@ async def retry_job(
         HTTPException 403: If not admin
     """
     logger.info(
-        f"Retrying job {job_id}",
-        extra={"user_id": user.get("id"), "job_id": job_id}
+        f"Retrying job {job_id}", extra={"user_id": user.get("id"), "job_id": job_id}
     )
 
     db_pool = request.app.state.pool
     if not db_pool:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
+            detail="Database not available",
         )
 
     try:
@@ -243,15 +244,14 @@ async def retry_job(
         job = await JobTracker.get_job(db_pool, job_id)
         if not job:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job {job_id} not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
             )
 
         # Only allow retry for failed/retrying jobs
         if job.status not in ("failed", "retrying"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot retry job in {job.status} status"
+                detail=f"Cannot retry job in {job.status} status",
             )
 
         # Revoke current task in Celery
@@ -267,7 +267,7 @@ async def retry_job(
 
         logger.info(
             f"Job {job_id} retried successfully",
-            extra={"user_id": user.get("id"), "job_id": job_id}
+            extra={"user_id": user.get("id"), "job_id": job_id},
         )
 
         return {
@@ -283,11 +283,11 @@ async def retry_job(
         logger.error(
             f"Failed to retry job {job_id}: {exc}",
             exc_info=True,
-            extra={"user_id": user.get("id"), "job_id": job_id}
+            extra={"user_id": user.get("id"), "job_id": job_id},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retry job"
+            detail="Failed to retry job",
         )
 
 
@@ -314,15 +314,14 @@ async def delete_job(
         HTTPException 403: If not admin
     """
     logger.info(
-        f"Deleting job {job_id}",
-        extra={"user_id": user.get("id"), "job_id": job_id}
+        f"Deleting job {job_id}", extra={"user_id": user.get("id"), "job_id": job_id}
     )
 
     db_pool = request.app.state.pool
     if not db_pool:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
+            detail="Database not available",
         )
 
     try:
@@ -330,8 +329,7 @@ async def delete_job(
         job = await JobTracker.get_job(db_pool, job_id)
         if not job:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job {job_id} not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
             )
 
         # Revoke task in Celery (forcefully if running)
@@ -347,7 +345,7 @@ async def delete_job(
 
         logger.info(
             f"Job {job_id} deleted successfully",
-            extra={"user_id": user.get("id"), "job_id": job_id}
+            extra={"user_id": user.get("id"), "job_id": job_id},
         )
 
         return {
@@ -362,11 +360,11 @@ async def delete_job(
         logger.error(
             f"Failed to delete job {job_id}: {exc}",
             exc_info=True,
-            extra={"user_id": user.get("id"), "job_id": job_id}
+            extra={"user_id": user.get("id"), "job_id": job_id},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete job"
+            detail="Failed to delete job",
         )
 
 
@@ -393,14 +391,14 @@ async def cleanup_jobs(
     """
     logger.info(
         f"Cleaning up jobs older than {body.days} days",
-        extra={"user_id": user.get("id"), "days": body.days}
+        extra={"user_id": user.get("id"), "days": body.days},
     )
 
     db_pool = request.app.state.pool
     if not db_pool:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
+            detail="Database not available",
         )
 
     try:
@@ -408,7 +406,7 @@ async def cleanup_jobs(
 
         logger.info(
             f"Cleanup completed: {deleted_count} jobs deleted",
-            extra={"user_id": user.get("id"), "deleted_count": deleted_count}
+            extra={"user_id": user.get("id"), "deleted_count": deleted_count},
         )
 
         return CleanupJobsResponse(
@@ -420,11 +418,11 @@ async def cleanup_jobs(
         logger.error(
             f"Failed to cleanup jobs: {exc}",
             exc_info=True,
-            extra={"user_id": user.get("id")}
+            extra={"user_id": user.get("id")},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to cleanup jobs"
+            detail="Failed to cleanup jobs",
         )
 
 

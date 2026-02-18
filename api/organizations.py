@@ -17,12 +17,14 @@ async def create_org(name: str, owner_id: int) -> dict:
                 """INSERT INTO organizations (name, slug)
                    VALUES ($1, $2)
                    RETURNING id, name, slug, plan, max_seats, created_at""",
-                name, slug,
+                name,
+                slug,
             )
             await conn.execute(
                 """INSERT INTO org_members (org_id, user_id, role)
                    VALUES ($1, $2, 'owner')""",
-                row["id"], owner_id,
+                row["id"],
+                owner_id,
             )
     return dict(row)
 
@@ -63,16 +65,22 @@ async def list_members(org_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-async def add_member(org_id: int, user_email: str, role: str = "member", invited_by: int | None = None) -> dict | None:
+async def add_member(
+    org_id: int, user_email: str, role: str = "member", invited_by: int | None = None
+) -> dict | None:
     pool = await db.get_pool()
-    user = await pool.fetchrow("SELECT id, email, full_name FROM users WHERE email = $1", user_email)
+    user = await pool.fetchrow(
+        "SELECT id, email, full_name FROM users WHERE email = $1", user_email
+    )
     if not user:
         return None
     org = await get_org(org_id)
     if not org:
         return None
     # Check seat limit
-    current = await pool.fetchval("SELECT COUNT(*) FROM org_members WHERE org_id = $1", org_id)
+    current = await pool.fetchval(
+        "SELECT COUNT(*) FROM org_members WHERE org_id = $1", org_id
+    )
     if current >= org["max_seats"]:
         return None
     row = await pool.fetchrow(
@@ -80,7 +88,10 @@ async def add_member(org_id: int, user_email: str, role: str = "member", invited
            VALUES ($1, $2, $3, $4)
            ON CONFLICT (org_id, user_id) DO UPDATE SET role = $3
            RETURNING id, user_id, role, joined_at""",
-        org_id, user["id"], role, invited_by,
+        org_id,
+        user["id"],
+        role,
+        invited_by,
     )
     result = dict(row)
     result["email"] = user["email"]
@@ -92,6 +103,7 @@ async def remove_member(org_id: int, user_id: int) -> bool:
     pool = await db.get_pool()
     result = await pool.execute(
         "DELETE FROM org_members WHERE org_id = $1 AND user_id = $2 AND role != 'owner'",
-        org_id, user_id,
+        org_id,
+        user_id,
     )
     return result == "DELETE 1"

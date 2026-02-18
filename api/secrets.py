@@ -119,17 +119,13 @@ class SecretsManager:
         if definition.docker_secret_path:
             value = self._read_docker_secret(definition.docker_secret_path)
             if value:
-                logger.debug(
-                    f"Loaded secret '{definition.name}' from Docker secrets"
-                )
+                logger.debug(f"Loaded secret '{definition.name}' from Docker secrets")
                 return value
 
         # 2. Try environment variable
         value = os.environ.get(definition.env_var)
         if value:
-            logger.debug(
-                f"Loaded secret '{definition.name}' from environment variable"
-            )
+            logger.debug(f"Loaded secret '{definition.name}' from environment variable")
             return value
 
         # 3. Try .env file (only if not production)
@@ -182,9 +178,7 @@ class SecretsManager:
             self._cache[definition.name] = value
 
             if value:
-                logger.debug(
-                    f"Secret '{definition.name}': {self._mask_secret(value)}"
-                )
+                logger.debug(f"Secret '{definition.name}': {self._mask_secret(value)}")
             else:
                 logger.debug(f"Secret '{definition.name}': <not-set>")
 

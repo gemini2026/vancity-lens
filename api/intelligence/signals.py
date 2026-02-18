@@ -31,7 +31,7 @@ async def get_signal_feed(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     limit: int = 20,
-    offset: int = 0
+    offset: int = 0,
 ) -> SignalFeedResponse:
     """
     Retrieve a paginated feed of intelligence signals with optional filters.
@@ -78,7 +78,7 @@ async def get_signal_feed(
         async with db_pool.acquire() as conn:
             # Get count
             count_row = await conn.fetchrow(count_query, *count_params)
-            total_count = count_row['total'] if count_row else 0
+            total_count = count_row["total"] if count_row else 0
 
             # Get paginated results
             rows = await conn.fetch(feed_query, *feed_params)
@@ -87,34 +87,34 @@ async def get_signal_feed(
         signals = []
         for row in rows:
             signal = SignalResponse(
-                id=row['id'],
-                document_id=row['document_id'],
-                signal_type=row['signal_type'],
-                summary=row['summary'],
-                headline=row['headline'],
-                addresses=row['addresses'] or [],
-                neighborhood=row['neighborhood'],
-                decision=row['decision'],
-                vote_for=row['vote_for'],
-                vote_against=row['vote_against'],
-                sentiment=row['sentiment'],
-                severity=row['severity'],
-                confidence=row['confidence'],
-                event_date=row['event_date'],
-                source_title=row['source_title'],
-                source_url=row['source_url'],
-                source_type=row['source_type'],
-                source_date=row['source_date']
+                id=row["id"],
+                document_id=row["document_id"],
+                signal_type=row["signal_type"],
+                summary=row["summary"],
+                headline=row["headline"],
+                addresses=row["addresses"] or [],
+                neighborhood=row["neighborhood"],
+                decision=row["decision"],
+                vote_for=row["vote_for"],
+                vote_against=row["vote_against"],
+                sentiment=row["sentiment"],
+                severity=row["severity"],
+                confidence=row["confidence"],
+                event_date=row["event_date"],
+                source_title=row["source_title"],
+                source_url=row["source_url"],
+                source_type=row["source_type"],
+                source_date=row["source_date"],
             )
             signals.append(signal)
 
         has_more = (offset + limit) < total_count
 
-        logger.info(f"Signal feed query returned {len(signals)} of {total_count} total signals")
+        logger.info(
+            f"Signal feed query returned {len(signals)} of {total_count} total signals"
+        )
         return SignalFeedResponse(
-            signals=signals,
-            total_count=total_count,
-            has_more=has_more
+            signals=signals, total_count=total_count, has_more=has_more
         )
 
     except Exception as e:
@@ -123,8 +123,7 @@ async def get_signal_feed(
 
 
 async def get_signal_by_id(
-    db_pool: asyncpg.Pool,
-    signal_id: int
+    db_pool: asyncpg.Pool, signal_id: int
 ) -> Optional[SignalResponse]:
     """
     Retrieve a single intelligence signal by ID.
@@ -173,24 +172,24 @@ async def get_signal_by_id(
             return None
 
         signal = SignalResponse(
-            id=row['id'],
-            document_id=row['document_id'],
-            signal_type=row['signal_type'],
-            summary=row['summary'],
-            headline=row['headline'],
-            addresses=row['addresses'] or [],
-            neighborhood=row['neighborhood'],
-            decision=row['decision'],
-            vote_for=row['vote_for'],
-            vote_against=row['vote_against'],
-            sentiment=row['sentiment'],
-            severity=row['severity'],
-            confidence=row['confidence'],
-            event_date=row['event_date'],
-            source_title=row['source_title'],
-            source_url=row['source_url'],
-            source_type=row['source_type'],
-            source_date=row['source_date']
+            id=row["id"],
+            document_id=row["document_id"],
+            signal_type=row["signal_type"],
+            summary=row["summary"],
+            headline=row["headline"],
+            addresses=row["addresses"] or [],
+            neighborhood=row["neighborhood"],
+            decision=row["decision"],
+            vote_for=row["vote_for"],
+            vote_against=row["vote_against"],
+            sentiment=row["sentiment"],
+            severity=row["severity"],
+            confidence=row["confidence"],
+            event_date=row["event_date"],
+            source_title=row["source_title"],
+            source_url=row["source_url"],
+            source_type=row["source_type"],
+            source_date=row["source_date"],
         )
 
         logger.info(f"Retrieved signal {signal_id}")
@@ -202,9 +201,7 @@ async def get_signal_by_id(
 
 
 async def get_signals_for_parcel(
-    db_pool: asyncpg.Pool,
-    parcel_pid: str,
-    radius_meters: float = 500
+    db_pool: asyncpg.Pool, parcel_pid: str, radius_meters: float = 500
 ) -> List[SignalResponse]:
     """
     Retrieve intelligence signals near a parcel using spatial proximity.
@@ -268,30 +265,32 @@ async def get_signals_for_parcel(
             rows = await conn.fetch(query, parcel_pid, radius_meters)
 
         if not rows:
-            logger.info(f"No signals found within {radius_meters}m of parcel {parcel_pid}")
+            logger.info(
+                f"No signals found within {radius_meters}m of parcel {parcel_pid}"
+            )
             return []
 
         signals = []
         for row in rows:
             signal = SignalResponse(
-                id=row['id'],
-                document_id=row['document_id'],
-                signal_type=row['signal_type'],
-                summary=row['summary'],
-                headline=row['headline'],
-                addresses=row['addresses'] or [],
-                neighborhood=row['neighborhood'],
-                decision=row['decision'],
-                vote_for=row['vote_for'],
-                vote_against=row['vote_against'],
-                sentiment=row['sentiment'],
-                severity=row['severity'],
-                confidence=row['confidence'],
-                event_date=row['event_date'],
-                source_title=row['source_title'],
-                source_url=row['source_url'],
-                source_type=row['source_type'],
-                source_date=row['source_date']
+                id=row["id"],
+                document_id=row["document_id"],
+                signal_type=row["signal_type"],
+                summary=row["summary"],
+                headline=row["headline"],
+                addresses=row["addresses"] or [],
+                neighborhood=row["neighborhood"],
+                decision=row["decision"],
+                vote_for=row["vote_for"],
+                vote_against=row["vote_against"],
+                sentiment=row["sentiment"],
+                severity=row["severity"],
+                confidence=row["confidence"],
+                event_date=row["event_date"],
+                source_title=row["source_title"],
+                source_url=row["source_url"],
+                source_type=row["source_type"],
+                source_date=row["source_date"],
             )
             signals.append(signal)
 
@@ -299,14 +298,14 @@ async def get_signals_for_parcel(
         return signals
 
     except Exception as e:
-        logger.error(f"Error retrieving signals for parcel {parcel_pid}: {e}", exc_info=True)
+        logger.error(
+            f"Error retrieving signals for parcel {parcel_pid}: {e}", exc_info=True
+        )
         raise
 
 
 @cached(ttl=CACHE_TTL_MEDIUM, key_prefix="signal_stats")
-async def get_signal_stats(
-    db_pool: asyncpg.Pool
-) -> Dict[str, Any]:
+async def get_signal_stats(db_pool: asyncpg.Pool) -> Dict[str, Any]:
     """
     Retrieve dashboard statistics about intelligence signals.
 
@@ -363,12 +362,14 @@ async def get_signal_stats(
             severity_rows = await conn.fetch(severity_query)
 
         result = {
-            "total_signals": stats_row['total_signals'] if stats_row else 0,
-            "recent_count_7d": stats_row['recent_7d'] if stats_row else 0,
-            "recent_count_30d": stats_row['recent_30d'] if stats_row else 0,
-            "by_type": {row['signal_type']: row['count'] for row in type_rows},
-            "by_neighborhood": {row['neighborhood']: row['count'] for row in neighborhood_rows},
-            "by_severity": {row['severity']: row['count'] for row in severity_rows}
+            "total_signals": stats_row["total_signals"] if stats_row else 0,
+            "recent_count_7d": stats_row["recent_7d"] if stats_row else 0,
+            "recent_count_30d": stats_row["recent_30d"] if stats_row else 0,
+            "by_type": {row["signal_type"]: row["count"] for row in type_rows},
+            "by_neighborhood": {
+                row["neighborhood"]: row["count"] for row in neighborhood_rows
+            },
+            "by_severity": {row["severity"]: row["count"] for row in severity_rows},
         }
 
         logger.info("Retrieved signal statistics")
@@ -380,9 +381,7 @@ async def get_signal_stats(
 
 
 @cached(ttl=CACHE_TTL_LONG, key_prefix="neighborhoods")
-async def get_neighborhoods(
-    db_pool: asyncpg.Pool
-) -> List[str]:
+async def get_neighborhoods(db_pool: asyncpg.Pool) -> List[str]:
     """
     Retrieve distinct neighborhoods from intelligence signals.
 
@@ -406,7 +405,7 @@ async def get_neighborhoods(
         async with db_pool.acquire() as conn:
             rows = await conn.fetch(query)
 
-        neighborhoods = [row['neighborhood'] for row in rows]
+        neighborhoods = [row["neighborhood"] for row in rows]
 
         logger.info(f"Retrieved {len(neighborhoods)} distinct neighborhoods")
         return neighborhoods
@@ -417,8 +416,7 @@ async def get_neighborhoods(
 
 
 async def get_signal_document(
-    db_pool: asyncpg.Pool,
-    signal_id: int
+    db_pool: asyncpg.Pool, signal_id: int
 ) -> Optional[Dict[str, Any]]:
     """
     Retrieve a signal's linked document content and extracted details.
@@ -495,7 +493,9 @@ async def get_signal_document(
                 "title": row["document_title"],
                 "source_type": row["source_type"],
                 "source_url": row["source_url"],
-                "published_date": str(row["published_date"]) if row["published_date"] else None,
+                "published_date": str(row["published_date"])
+                if row["published_date"]
+                else None,
                 "raw_text": row["raw_text"],
                 "url_status": row["url_status"],
                 "archive_url": row["archive_url"],
@@ -503,15 +503,15 @@ async def get_signal_document(
         }
 
     except Exception as e:
-        logger.error(f"Error retrieving document for signal {signal_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error retrieving document for signal {signal_id}: {e}", exc_info=True
+        )
         raise
 
 
 @cached(ttl=CACHE_TTL_MEDIUM, key_prefix="signals_geojson")
 async def get_signals_geojson(
-    db_pool: asyncpg.Pool,
-    limit: int = 200,
-    days: int = 90
+    db_pool: asyncpg.Pool, limit: int = 200, days: int = 90
 ) -> Dict[str, Any]:
     """
     Return intelligence signals as a GeoJSON FeatureCollection for map display.
@@ -556,31 +556,28 @@ async def get_signals_geojson(
                 "type": "Feature",
                 "geometry": {
                     "type": "Point",
-                    "coordinates": [float(row['lng']), float(row['lat'])]
+                    "coordinates": [float(row["lng"]), float(row["lat"])],
                 },
                 "properties": {
-                    "id": row['id'],
-                    "signal_type": row['signal_type'],
-                    "headline": row['headline'] or row['summary'][:60],
-                    "summary": row['summary'],
-                    "neighborhood": row['neighborhood'],
-                    "severity": row['severity'],
-                    "decision": row['decision'],
-                    "confidence": float(row['confidence']),
-                    "event_date": str(row['event_date']) if row['event_date'] else None,
-                    "addresses": row['addresses'] or [],
-                    "source_title": row['source_title'],
-                    "source_url": row['source_url'],
-                    "source_type": row['source_type'],
-                }
+                    "id": row["id"],
+                    "signal_type": row["signal_type"],
+                    "headline": row["headline"] or row["summary"][:60],
+                    "summary": row["summary"],
+                    "neighborhood": row["neighborhood"],
+                    "severity": row["severity"],
+                    "decision": row["decision"],
+                    "confidence": float(row["confidence"]),
+                    "event_date": str(row["event_date"]) if row["event_date"] else None,
+                    "addresses": row["addresses"] or [],
+                    "source_title": row["source_title"],
+                    "source_url": row["source_url"],
+                    "source_type": row["source_type"],
+                },
             }
             features.append(feature)
 
         logger.info(f"Generated GeoJSON with {len(features)} signal features")
-        return {
-            "type": "FeatureCollection",
-            "features": features
-        }
+        return {"type": "FeatureCollection", "features": features}
 
     except Exception as e:
         logger.error(f"Error generating signals GeoJSON: {e}", exc_info=True)

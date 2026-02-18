@@ -70,7 +70,9 @@ def build_hbu_context(
     sections.append("## ENTITLEMENT ANALYSIS (Rule Engine Output)")
     best = entitlement_data.get("best_entitlement")
     if best:
-        sections.append(f"Nearest Station: {best.get('station_name', 'N/A')} ({best.get('distance_m', '?')}m)")
+        sections.append(
+            f"Nearest Station: {best.get('station_name', 'N/A')} ({best.get('distance_m', '?')}m)"
+        )
         sections.append(f"TOD Tier: {best.get('tier', 'N/A')}")
         sections.append(f"Bill 47 Max Storeys: {best.get('max_storeys', 'N/A')}")
         sections.append(f"Bill 47 Max FSR: {best.get('max_fsr', 'N/A')}")
@@ -78,7 +80,9 @@ def build_hbu_context(
         sections.append(f"Current FSR: {best.get('current_fsr', 'N/A')}")
         sections.append(f"Storey Uplift: +{best.get('storey_uplift', 0)}")
         sections.append(f"FSR Uplift: +{best.get('fsr_uplift', 0)}")
-        sections.append(f"Zoning Already Exceeds: {best.get('zoning_already_exceeds', False)}")
+        sections.append(
+            f"Zoning Already Exceeds: {best.get('zoning_already_exceeds', False)}"
+        )
     else:
         sections.append("Parcel is NOT in a Transit-Oriented Area (TOA).")
 
@@ -88,13 +92,19 @@ def build_hbu_context(
         if b44.get("max_units"):
             sections.append(f"Bill 44 Max Units: {b44['max_units']}")
 
-    if entitlement_data.get("community_plan") and entitlement_data["community_plan"].get("has_bonus"):
+    if entitlement_data.get("community_plan") and entitlement_data[
+        "community_plan"
+    ].get("has_bonus"):
         cp = entitlement_data["community_plan"]
-        sections.append(f"Community Plan Bonus: {cp.get('plan_name', 'N/A')} — +{cp.get('best_bonus', {}).get('fsr_bonus', 0)} FSR")
+        sections.append(
+            f"Community Plan Bonus: {cp.get('plan_name', 'N/A')} — +{cp.get('best_bonus', {}).get('fsr_bonus', 0)} FSR"
+        )
 
     if entitlement_data.get("setbacks"):
         sb = entitlement_data["setbacks"]
-        sections.append(f"Setbacks: front={sb.get('front_m', '?')}m, rear={sb.get('rear_m', '?')}m, side={sb.get('side_m', '?')}m")
+        sections.append(
+            f"Setbacks: front={sb.get('front_m', '?')}m, rear={sb.get('rear_m', '?')}m, side={sb.get('side_m', '?')}m"
+        )
     sections.append("")
 
     # Pro forma data
@@ -109,7 +119,9 @@ def build_hbu_context(
 
     # Regulatory document chunks
     sections.append("## REGULATORY DOCUMENT EXCERPTS")
-    sections.append("(Retrieved from K2 knowledge base — use these as your primary regulatory source)")
+    sections.append(
+        "(Retrieved from K2 knowledge base — use these as your primary regulatory source)"
+    )
     sections.append("")
     for i, chunk in enumerate(regulatory_chunks, 1):
         title = chunk.get("document_title", "Unknown Document")

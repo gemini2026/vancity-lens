@@ -42,7 +42,9 @@ async def list_pending_reviews(
 ):
     """Get signals flagged for manual review (confidence < threshold)."""
     pool = request.app.state.pool
-    return await get_pending_reviews(pool, limit=limit, offset=offset, signal_type=signal_type)
+    return await get_pending_reviews(
+        pool, limit=limit, offset=offset, signal_type=signal_type
+    )
 
 
 @router.get("/stats", summary="Review queue statistics")
@@ -63,9 +65,7 @@ async def review_single_signal(
     # In production, get reviewer_id from auth token
     reviewer_id = 1  # placeholder
 
-    result = await review_signal(
-        pool, signal_id, body.action, reviewer_id, body.notes
-    )
+    result = await review_signal(pool, signal_id, body.action, reviewer_id, body.notes)
     if not result:
         raise HTTPException(status_code=404, detail=f"Signal {signal_id} not found")
     return result

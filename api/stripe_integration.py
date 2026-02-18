@@ -45,6 +45,7 @@ PRICE_ID_TO_TIER = {
 # Stripe Service Class
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class StripeService:
     """Service for Stripe integration: checkout, webhooks, subscriptions."""
 

@@ -40,13 +40,26 @@ GAZETTE_COLLECTIONS = [
 
 # Keywords to filter relevant gazette entries
 RELEVANCE_KEYWORDS = [
-    "transit", "zoning", "land use", "housing", "density",
-    "development", "strata", "building", "municipal",
-    "vancouver", "local government", "community plan",
-    "residential", "commercial", "industrial",
+    "transit",
+    "zoning",
+    "land use",
+    "housing",
+    "density",
+    "development",
+    "strata",
+    "building",
+    "municipal",
+    "vancouver",
+    "local government",
+    "community plan",
+    "residential",
+    "commercial",
+    "industrial",
 ]
 
-DOC_URL_TEMPLATE = "https://www.bclaws.gov.bc.ca/civix/document/id/{collection}/{doc_id}"
+DOC_URL_TEMPLATE = (
+    "https://www.bclaws.gov.bc.ca/civix/document/id/{collection}/{doc_id}"
+)
 
 HEADERS = {
     "User-Agent": "VanCityLensBot/0.1 (real-estate-intelligence)",
@@ -74,7 +87,9 @@ class BCGazetteScraper:
     async def _fetch(self, url: str) -> Optional[str]:
         await self._rate_limit()
         try:
-            async with self.session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            async with self.session.get(
+                url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
                 if resp.status == 200:
                     return await resp.text()
                 logger.warning("BC Gazette fetch %s returned %d", url, resp.status)
@@ -83,7 +98,9 @@ class BCGazetteScraper:
             logger.error("BC Gazette fetch error %s: %s", url, e)
             return None
 
-    async def list_gazette_entries(self, collection_url: str, max_entries: int = 50) -> List[dict]:
+    async def list_gazette_entries(
+        self, collection_url: str, max_entries: int = 50
+    ) -> List[dict]:
         """List recent Gazette entries from a CIVIX collection."""
         xml_text = await self._fetch(collection_url)
         if not xml_text:
@@ -97,18 +114,24 @@ class BCGazetteScraper:
                 title_el = item.find("CIVIX_DOCUMENT_TITLE")
                 if doc_id_el is not None and doc_id_el.text:
                     doc_id = doc_id_el.text.strip()
-                    title = title_el.text.strip() if title_el is not None and title_el.text else doc_id
+                    title = (
+                        title_el.text.strip()
+                        if title_el is not None and title_el.text
+                        else doc_id
+                    )
 
                     # Determine collection name from URL
                     collection = "bcgaz2" if "bcgaz2" in collection_url else "bcgaz1"
                     url = DOC_URL_TEMPLATE.format(collection=collection, doc_id=doc_id)
 
-                    entries.append({
-                        "doc_id": doc_id,
-                        "title": title,
-                        "url": url,
-                        "collection": collection,
-                    })
+                    entries.append(
+                        {
+                            "doc_id": doc_id,
+                            "title": title,
+                            "url": url,
+                            "collection": collection,
+                        }
+                    )
                     if len(entries) >= max_entries:
                         break
         except ElementTree.ParseError as e:
@@ -127,13 +150,15 @@ class BCGazetteScraper:
         if not html:
             return None
 
-        text = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL)
+        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
 
         if len(text) > 100_000:
-            text = text[:100_000] + "\n\n[Truncated — full text available at source URL]"
+            text = (
+                text[:100_000] + "\n\n[Truncated — full text available at source URL]"
+            )
 
         return text
 
@@ -143,11 +168,17 @@ class BCGazetteScraper:
         for collection_url in GAZETTE_COLLECTIONS:
             entries = await self.list_gazette_entries(collection_url)
             for entry in entries:
-                if self._is_relevant(entry["title"]) and entry["doc_id"] not in all_docs:
+                if (
+                    self._is_relevant(entry["title"])
+                    and entry["doc_id"] not in all_docs
+                ):
                     all_docs[entry["doc_id"]] = entry
 
-        logger.info("BC Gazette discovery: %d relevant entries from %d collections",
-                     len(all_docs), len(GAZETTE_COLLECTIONS))
+        logger.info(
+            "BC Gazette discovery: %d relevant entries from %d collections",
+            len(all_docs),
+            len(GAZETTE_COLLECTIONS),
+        )
         return list(all_docs.values())
 
 
@@ -219,7 +250,9 @@ async def scrape_and_store(
                         stats["documents_skipped"] += 1
 
                 except Exception as e:
-                    logger.error("Error storing Gazette doc %s: %s", doc.get("url", "?"), e)
+                    logger.error(
+                        "Error storing Gazette doc %s: %s", doc.get("url", "?"), e
+                    )
                     stats["errors"] += 1
 
     logger.info("BC Gazette scraper complete: %s", stats)

@@ -37,6 +37,7 @@ HEADERS = {
 
 # ── Helpers ───────────────────────────────────────────────────
 
+
 def _fetch_json(url: str, headers: dict | None = None, *, timeout_s: int = 15) -> dict:
     """Blocking JSON fetch (run via asyncio.to_thread)."""
     req = urllib.request.Request(url, headers=headers or HEADERS)
@@ -49,9 +50,16 @@ def _normalize_address(addr: str) -> str:
     addr = addr.upper().strip()
     addr = re.sub(r",?\s*(VANCOUVER|BC|V\d\w\s*\d\w\d).*$", "", addr)
     for old, new in [
-        ("STREET", "ST"), ("AVENUE", "AV"), ("BOULEVARD", "BLVD"),
-        ("DRIVE", "DR"), ("ROAD", "RD"), ("CRESCENT", "CRES"),
-        ("WEST ", "W "), ("EAST ", "E "), ("NORTH ", "N "), ("SOUTH ", "S "),
+        ("STREET", "ST"),
+        ("AVENUE", "AV"),
+        ("BOULEVARD", "BLVD"),
+        ("DRIVE", "DR"),
+        ("ROAD", "RD"),
+        ("CRESCENT", "CRES"),
+        ("WEST ", "W "),
+        ("EAST ", "E "),
+        ("NORTH ", "N "),
+        ("SOUTH ", "S "),
     ]:
         addr = addr.replace(old, new)
     return re.sub(r"\s+", " ", addr).strip()
@@ -95,17 +103,20 @@ def _parse_listings_html(html: str) -> list[dict]:
         if price < 100_000:
             continue
 
-        results.append({
-            "address": address,
-            "href": href,
-            "full_title": full_title,
-            "price": price,
-        })
+        results.append(
+            {
+                "address": address,
+                "href": href,
+                "full_title": full_title,
+                "price": price,
+            }
+        )
 
     return results
 
 
 # ── REW.ca Scraper ────────────────────────────────────────────
+
 
 @router.post("/scrape-rew")
 async def scrape_rew(
@@ -173,7 +184,8 @@ async def scrape_rew(
                     row = await conn.fetchrow(
                         "SELECT pid, civic_address FROM parcels "
                         "WHERE UPPER(civic_address) LIKE '%' || $1 || ' ' || $2 || '%' LIMIT 1",
-                        parts[0], parts[-1],
+                        parts[0],
+                        parts[-1],
                     )
             if row:
                 href = listing["href"]
@@ -183,16 +195,20 @@ async def scrape_rew(
                     rew_url = f"https://www.rew.ca{href}"
                 await conn.execute(
                     "UPDATE parcels SET asking_price = $1, rew_url = $3, updated_at = now() WHERE pid = $2",
-                    listing["price"], row["pid"], rew_url,
+                    listing["price"],
+                    row["pid"],
+                    rew_url,
                 )
                 matched += 1
-                match_details.append({
-                    "pid": row["pid"],
-                    "civic_address": row["civic_address"],
-                    "rew_address": listing["address"],
-                    "price": listing["price"],
-                    "rew_url": rew_url,
-                })
+                match_details.append(
+                    {
+                        "pid": row["pid"],
+                        "civic_address": row["civic_address"],
+                        "rew_address": listing["address"],
+                        "price": listing["price"],
+                        "rew_url": rew_url,
+                    }
+                )
 
         total_priced = await conn.fetchval(
             "SELECT count(*) FROM parcels WHERE asking_price IS NOT NULL"
@@ -208,6 +224,7 @@ async def scrape_rew(
 
 
 # ── BCA Assessed Values Loader ────────────────────────────────
+
 
 @router.post("/load-bca")
 async def load_bca(
@@ -235,10 +252,14 @@ async def load_bca(
                 f"tax_assessment_year&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"],
-                    "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -269,7 +290,10 @@ async def load_bca(
                 result = await conn.execute(
                     "UPDATE parcels SET assessed_value = $1, land_value = $3, improvement_value = $4, updated_at = now() "
                     "WHERE pid = $2",
-                    total_value, pid, int(land_val or 0), int(impr_val or 0),
+                    total_value,
+                    pid,
+                    int(land_val or 0),
+                    int(impr_val or 0),
                 )
                 if "UPDATE 1" in result:
                     updated += 1
@@ -297,6 +321,7 @@ async def load_bca(
 
 
 # ── Heritage Sites Loader ─────────────────────────────────────
+
 
 @router.post("/load-heritage")
 async def load_heritage(
@@ -327,10 +352,14 @@ async def load_heritage(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"],
-                    "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -360,7 +389,11 @@ async def load_heritage(
                     await conn.execute(
                         "INSERT INTO heritage_sites (name, address, category, geom) "
                         "VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326))",
-                        name or address, address, category, lon, lat,
+                        name or address,
+                        address,
+                        category,
+                        lon,
+                        lat,
                     )
                     loaded += 1
                 except Exception as e:
@@ -371,9 +404,7 @@ async def load_heritage(
             # Polite delay
             await asyncio.sleep(0.5)
 
-        total_heritage = await conn.fetchval(
-            "SELECT count(*) FROM heritage_sites"
-        )
+        total_heritage = await conn.fetchval("SELECT count(*) FROM heritage_sites")
 
     return {
         "loaded": loaded,
@@ -383,6 +414,7 @@ async def load_heritage(
 
 
 # ── Floodplain Zones Loader ───────────────────────────────────
+
 
 @router.post("/load-floodplain")
 async def load_floodplain(
@@ -412,10 +444,14 @@ async def load_floodplain(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"],
-                    "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -440,7 +476,8 @@ async def load_floodplain(
                     await conn.execute(
                         "INSERT INTO floodplain_zones (zone_type, geom) "
                         "VALUES ($1, ST_SetSRID(ST_GeomFromGeoJSON($2), 4326))",
-                        zone_type, geo_json,
+                        zone_type,
+                        geo_json,
                     )
                     loaded += 1
                 except Exception as e:
@@ -451,9 +488,7 @@ async def load_floodplain(
             # Polite delay
             await asyncio.sleep(0.5)
 
-        total_floodplain = await conn.fetchval(
-            "SELECT count(*) FROM floodplain_zones"
-        )
+        total_floodplain = await conn.fetchval("SELECT count(*) FROM floodplain_zones")
 
     return {
         "loaded": loaded,
@@ -464,9 +499,12 @@ async def load_floodplain(
 
 # ── Property Easements Loader ──────────────────────────────────
 
+
 @router.post("/load-easements")
 async def load_easements(
-    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    batch_size: int = Query(
+        default=1000, le=5000, description="Insert batch size (rows per DB flush)"
+    ),
     max_records: int = Query(default=50000, le=300000),
 ):
     """
@@ -537,9 +575,7 @@ async def load_easements(
             except Exception as e:
                 errors.append(f"batch insert error: {e}")
 
-        total_easements = await conn.fetchval(
-            "SELECT count(*) FROM property_easements"
-        )
+        total_easements = await conn.fetchval("SELECT count(*) FROM property_easements")
 
     return {
         "loaded": loaded,
@@ -549,6 +585,7 @@ async def load_easements(
 
 
 # ── Utility Infrastructure Loader (Water/Sewer Mains) ────────────
+
 
 def _extract_geojson_geometry(record: dict) -> str | None:
     """
@@ -612,7 +649,9 @@ async def _load_utility_lines_from_opendata(
 
     async with db.acquire() as conn:
         # Delete only rows from this dataset so multiple datasets can coexist.
-        await conn.execute("DELETE FROM utility_lines WHERE source_dataset = $1", dataset_id)
+        await conn.execute(
+            "DELETE FROM utility_lines WHERE source_dataset = $1", dataset_id
+        )
 
         try:
             data = await asyncio.to_thread(
@@ -641,8 +680,7 @@ async def _load_utility_lines_from_opendata(
 
         features = data.get("features", []) if isinstance(data, dict) else []
 
-        insert_sql = (
-            """
+        insert_sql = """
             INSERT INTO utility_lines (
                 utility_type, asset_id, line_type, diameter_mm, material,
                 source_dataset, source_url, geom, metadata
@@ -652,7 +690,6 @@ async def _load_utility_lines_from_opendata(
                 $6, $7, ST_SetSRID(ST_GeomFromGeoJSON($8), 4326), $9::jsonb
             )
             """
-        )
 
         pending: list[tuple] = []
         for feature in features:
@@ -672,14 +709,20 @@ async def _load_utility_lines_from_opendata(
             if not geom_json:
                 continue
 
-            asset_id = _pick_first(props, ["asset_id", "assetid", "id", "objectid", "fid", "recordid"])
+            asset_id = _pick_first(
+                props, ["asset_id", "assetid", "id", "objectid", "fid", "recordid"]
+            )
             diameter_mm = (
                 _as_float(props.get("diameter_mm"))
                 or _as_float(props.get("diameter"))
                 or _as_float(props.get("pipe_diameter"))
             )
-            material = _pick_first(props, ["material", "pipe_material", "construction_material"])
-            line_type = _pick_first(props, ["line_type", "sewer_type", "effluent_type", "system", "type"])
+            material = _pick_first(
+                props, ["material", "pipe_material", "construction_material"]
+            )
+            line_type = _pick_first(
+                props, ["line_type", "sewer_type", "effluent_type", "system", "type"]
+            )
 
             pending.append(
                 (
@@ -727,10 +770,16 @@ async def _load_utility_lines_from_opendata(
 
 @router.post("/load-utility-lines")
 async def load_utility_lines(
-    dataset_id: str = Query(..., description="Open Data dataset id, e.g. 'water-distribution-mains'"),
-    utility_type: str = Query(..., description="Logical type stored in DB, e.g. 'water' or 'sewer'"),
+    dataset_id: str = Query(
+        ..., description="Open Data dataset id, e.g. 'water-distribution-mains'"
+    ),
+    utility_type: str = Query(
+        ..., description="Logical type stored in DB, e.g. 'water' or 'sewer'"
+    ),
     source_url: str = Query(..., description="Human-friendly dataset page URL"),
-    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    batch_size: int = Query(
+        default=1000, le=5000, description="Insert batch size (rows per DB flush)"
+    ),
     max_records: int = Query(default=200000, le=500000),
 ):
     """Load a utility line dataset from City of Vancouver Open Data into `utility_lines`."""
@@ -745,7 +794,9 @@ async def load_utility_lines(
 
 @router.post("/load-utilities-water")
 async def load_utilities_water(
-    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    batch_size: int = Query(
+        default=1000, le=5000, description="Insert batch size (rows per DB flush)"
+    ),
     max_records: int = Query(default=200000, le=500000),
 ):
     """Convenience loader for water mains (dataset id may be updated if CoV changes naming)."""
@@ -760,7 +811,9 @@ async def load_utilities_water(
 
 @router.post("/load-utilities-sewer")
 async def load_utilities_sewer(
-    batch_size: int = Query(default=1000, le=5000, description="Insert batch size (rows per DB flush)"),
+    batch_size: int = Query(
+        default=1000, le=5000, description="Insert batch size (rows per DB flush)"
+    ),
     max_records: int = Query(default=200000, le=500000),
 ):
     """Convenience loader for sewer mains (dataset id may be updated if CoV changes naming)."""
@@ -775,6 +828,7 @@ async def load_utilities_sewer(
 
 # ── Manual Listing Loader ─────────────────────────────────────
 
+
 @router.post("/load-listing")
 async def load_listing(
     pid: str = Query(..., description="Parcel PID (XXX-XXX-XXX)"),
@@ -784,7 +838,8 @@ async def load_listing(
     async with db.acquire() as conn:
         result = await conn.execute(
             "UPDATE parcels SET asking_price = $1, updated_at = now() WHERE pid = $2",
-            asking_price, pid,
+            asking_price,
+            pid,
         )
         if "UPDATE 0" in result:
             return {"error": f"PID {pid} not found", "updated": False}
@@ -849,29 +904,35 @@ CREA_HEADERS = {
 }
 
 
-def _crea_search(page: int = 1, records_per_page: int = 50,
-                 price_min: int = 0, price_max: int = 0,
-                 property_type: int = 1) -> dict:
+def _crea_search(
+    page: int = 1,
+    records_per_page: int = 50,
+    price_min: int = 0,
+    price_max: int = 0,
+    property_type: int = 1,
+) -> dict:
     """Call Realtor.ca's internal CREA PropertySearch API. Returns parsed JSON.
     property_type: 1=Residential, 3=Commercial
     """
-    form_data = urllib.parse.urlencode({
-        "CultureId": "1",
-        "ApplicationId": "1",
-        "PropertySearchTypeId": "0",
-        "TransactionTypeId": "2",  # For sale
-        "LatitudeMin": str(VAN_BBOX["LatitudeMin"]),
-        "LatitudeMax": str(VAN_BBOX["LatitudeMax"]),
-        "LongitudeMin": str(VAN_BBOX["LongitudeMin"]),
-        "LongitudeMax": str(VAN_BBOX["LongitudeMax"]),
-        "PriceMin": str(price_min) if price_min else "",
-        "PriceMax": str(price_max) if price_max else "",
-        "PropertyTypeGroupID": str(property_type),
-        "CurrentPage": str(page),
-        "RecordsPerPage": str(records_per_page),
-        "Sort": "6-D",
-        "Currency": "CAD",
-    }).encode()
+    form_data = urllib.parse.urlencode(
+        {
+            "CultureId": "1",
+            "ApplicationId": "1",
+            "PropertySearchTypeId": "0",
+            "TransactionTypeId": "2",  # For sale
+            "LatitudeMin": str(VAN_BBOX["LatitudeMin"]),
+            "LatitudeMax": str(VAN_BBOX["LatitudeMax"]),
+            "LongitudeMin": str(VAN_BBOX["LongitudeMin"]),
+            "LongitudeMax": str(VAN_BBOX["LongitudeMax"]),
+            "PriceMin": str(price_min) if price_min else "",
+            "PriceMax": str(price_max) if price_max else "",
+            "PropertyTypeGroupID": str(property_type),
+            "CurrentPage": str(page),
+            "RecordsPerPage": str(records_per_page),
+            "Sort": "6-D",
+            "Currency": "CAD",
+        }
+    ).encode()
     req = urllib.request.Request(CREA_API_URL, data=form_data, headers=CREA_HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -883,7 +944,9 @@ def _crea_search(page: int = 1, records_per_page: int = 50,
 
 @router.post("/scrape-realtor")
 async def scrape_realtor(
-    pages: int = Query(default=5, le=20, description="Number of result pages to scrape"),
+    pages: int = Query(
+        default=5, le=20, description="Number of result pages to scrape"
+    ),
     price_min: int = Query(default=500000, description="Minimum price"),
     price_max: int = Query(default=10000000, description="Maximum price"),
 ):
@@ -950,7 +1013,7 @@ async def scrape_realtor(
 
             await asyncio.sleep(2)  # polite delay between pages
         except Exception as e:
-            errors.append(f"Page {i+1}: {e}")
+            errors.append(f"Page {i + 1}: {e}")
             break
 
     # Match to parcels
@@ -979,7 +1042,8 @@ async def scrape_realtor(
                         row = await conn.fetchrow(
                             "SELECT pid, civic_address FROM parcels "
                             "WHERE UPPER(civic_address) LIKE '%' || $1 || ' ' || $2 || '%' LIMIT 1",
-                            parts[0], parts[-1],
+                            parts[0],
+                            parts[-1],
                         )
                 # Strategy 3: lat/lng proximity if available
                 if not row and listing.get("lat") and listing.get("lng"):
@@ -993,23 +1057,27 @@ async def scrape_realtor(
                         "  ST_Centroid(geom)::geography,"
                         "  ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography"
                         ") LIMIT 1",
-                        listing["lng"], listing["lat"],
+                        listing["lng"],
+                        listing["lat"],
                     )
 
                 if row:
                     await conn.execute(
                         "UPDATE parcels SET asking_price = $1, updated_at = now() "
                         "WHERE pid = $2 AND (asking_price IS NULL OR asking_price != $1)",
-                        price, row["pid"],
+                        price,
+                        row["pid"],
                     )
                     matched += 1
-                    match_details.append({
-                        "pid": row["pid"],
-                        "civic_address": row["civic_address"],
-                        "realtor_address": listing.get("address", ""),
-                        "price": price,
-                        "mls": listing.get("mls", ""),
-                    })
+                    match_details.append(
+                        {
+                            "pid": row["pid"],
+                            "civic_address": row["civic_address"],
+                            "realtor_address": listing.get("address", ""),
+                            "price": price,
+                            "mls": listing.get("mls", ""),
+                        }
+                    )
 
             total_priced = await conn.fetchval(
                 "SELECT count(*) FROM parcels WHERE asking_price IS NOT NULL"
@@ -1025,7 +1093,11 @@ async def scrape_realtor(
         "matches": match_details[:50],
         "errors": errors,
         "sample_listings": [
-            {"address": listing.get("address"), "price": listing.get("price"), "mls": listing.get("mls")}
+            {
+                "address": listing.get("address"),
+                "price": listing.get("price"),
+                "mls": listing.get("mls"),
+            }
             for listing in all_listings[:5]
         ],
     }
@@ -1150,7 +1222,9 @@ async def debug_realtor():
                 results["rapidapi_page1"] = {
                     "success": True,
                     "type": type(page1).__name__,
-                    "keys": list(page1.keys())[:15] if isinstance(page1, dict) else None,
+                    "keys": list(page1.keys())[:15]
+                    if isinstance(page1, dict)
+                    else None,
                     "sample": str(page1)[:2000],
                 }
             except Exception as e:
@@ -1167,8 +1241,11 @@ async def debug_realtor():
     # Test 2: CREA direct API (usually blocked by Imperva WAF from servers)
     try:
         crea_data = await asyncio.to_thread(
-            _crea_search, page=1, records_per_page=3,
-            price_min=500000, price_max=5000000,
+            _crea_search,
+            page=1,
+            records_per_page=3,
+            price_min=500000,
+            price_max=5000000,
         )
         paging = crea_data.get("Paging", {})
         results["crea_direct"] = {
@@ -1187,6 +1264,7 @@ async def debug_realtor():
 
 
 # ── Debug ─────────────────────────────────────────────────────
+
 
 @router.get("/debug-rew")
 async def debug_rew():
@@ -1207,18 +1285,24 @@ async def debug_rew():
             length = -1
 
         # Try parsing with current parser
-        html = listings_raw if isinstance(listings_raw, str) else "".join(str(h) for h in listings_raw) if isinstance(listings_raw, list) else ""
+        html = (
+            listings_raw
+            if isinstance(listings_raw, str)
+            else "".join(str(h) for h in listings_raw)
+            if isinstance(listings_raw, list)
+            else ""
+        )
         parsed = _parse_listings_html(html)
 
         # Also try the v2 scraper approach (article-based parsing)
-        articles = re.findall(r'<article[^>]*>(.*?)</article>', html, re.DOTALL)
+        articles = re.findall(r"<article[^>]*>(.*?)</article>", html, re.DOTALL)
         article_sample = articles[0][:500] if articles else "NO ARTICLES FOUND"
 
         # Find ALL <a> tags with title
         a_tags = re.findall(r'<a[^>]+title="([^"]+)"', html)
 
         # Find ALL prices
-        prices = re.findall(r'\$([\d,]+)', html)
+        prices = re.findall(r"\$([\d,]+)", html)
 
         return {
             "keys": list(data.keys()),
@@ -1238,6 +1322,7 @@ async def debug_rew():
 
 # ── Run Migrations ────────────────────────────────────────────
 
+
 @router.post("/run-migrations")
 async def run_migrations():
     """Run pending database migrations for local/dev DBs with existing volumes."""
@@ -1245,10 +1330,14 @@ async def run_migrations():
     async with db.acquire() as conn:
         # Migration 003: Add rew_url column
         try:
-            await conn.execute("ALTER TABLE parcels ADD COLUMN IF NOT EXISTS rew_url TEXT")
+            await conn.execute(
+                "ALTER TABLE parcels ADD COLUMN IF NOT EXISTS rew_url TEXT"
+            )
             results.append({"migration": "003_add_rew_url", "status": "ok"})
         except Exception as e:
-            results.append({"migration": "003_add_rew_url", "status": "error", "detail": str(e)})
+            results.append(
+                {"migration": "003_add_rew_url", "status": "error", "detail": str(e)}
+            )
 
         # Migration 004: Risk layers tables + land/improvement split
         migration_004_stmts = [
@@ -1274,7 +1363,14 @@ async def run_migrations():
             try:
                 await conn.execute(stmt)
             except Exception as e:
-                results.append({"migration": "004_risk_layers", "status": "error", "detail": str(e), "stmt": stmt[:80]})
+                results.append(
+                    {
+                        "migration": "004_risk_layers",
+                        "status": "error",
+                        "detail": str(e),
+                        "stmt": stmt[:80],
+                    }
+                )
                 break
         else:
             results.append({"migration": "004_risk_layers", "status": "ok"})
@@ -1322,7 +1418,14 @@ async def run_migrations():
             try:
                 await conn.execute(stmt)
             except Exception as e:
-                results.append({"migration": "005_v2_risk_layers", "status": "error", "detail": str(e), "stmt": stmt[:80]})
+                results.append(
+                    {
+                        "migration": "005_v2_risk_layers",
+                        "status": "error",
+                        "detail": str(e),
+                        "stmt": stmt[:80],
+                    }
+                )
                 break
         else:
             results.append({"migration": "005_v2_risk_layers", "status": "ok"})
@@ -1343,7 +1446,14 @@ async def run_migrations():
             try:
                 await conn.execute(stmt)
             except Exception as e:
-                results.append({"migration": "006_v3_execution_risk", "status": "error", "detail": str(e), "stmt": stmt[:80]})
+                results.append(
+                    {
+                        "migration": "006_v3_execution_risk",
+                        "status": "error",
+                        "detail": str(e),
+                        "stmt": stmt[:80],
+                    }
+                )
                 break
         else:
             results.append({"migration": "006_v3_execution_risk", "status": "ok"})
@@ -1371,7 +1481,14 @@ async def run_migrations():
             try:
                 await conn.execute(stmt)
             except Exception as e:
-                results.append({"migration": "030_utility_lines", "status": "error", "detail": str(e), "stmt": stmt[:80]})
+                results.append(
+                    {
+                        "migration": "030_utility_lines",
+                        "status": "error",
+                        "detail": str(e),
+                        "stmt": stmt[:80],
+                    }
+                )
                 break
         else:
             results.append({"migration": "030_utility_lines", "status": "ok"})
@@ -1380,6 +1497,7 @@ async def run_migrations():
 
 
 # ── V2 Data Loaders ──────────────────────────────────────────
+
 
 @router.post("/load-view-cones")
 async def load_view_cones():
@@ -1395,9 +1513,14 @@ async def load_view_cones():
         await conn.execute("TRUNCATE view_cones CASCADE")
         url = f"{base_url}?select=view_number,view_cone_name,description,geom&limit=100&offset=0"
         try:
-            data = await asyncio.to_thread(_fetch_json, url, {
-                "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-            })
+            data = await asyncio.to_thread(
+                _fetch_json,
+                url,
+                {
+                    "User-Agent": HEADERS["User-Agent"],
+                    "Accept": "application/json",
+                },
+            )
         except Exception as e:
             return {"error": str(e)}
 
@@ -1452,9 +1575,14 @@ async def load_trees(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1482,7 +1610,8 @@ async def load_trees(
                         record.get("common_name", ""),
                         float(diameter) if diameter else None,
                         float(height) if height else None,
-                        lon, lat,
+                        lon,
+                        lat,
                     )
                     loaded += 1
                 except Exception as e:
@@ -1518,9 +1647,14 @@ async def load_non_market_housing(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1582,9 +1716,14 @@ async def load_community_gardens(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1612,7 +1751,8 @@ async def load_community_gardens(
                         record.get("name", ""),
                         record.get("merged_address", ""),
                         plots,
-                        lon, lat,
+                        lon,
+                        lat,
                     )
                     loaded += 1
                 except Exception as e:
@@ -1652,9 +1792,14 @@ async def load_building_permits(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1687,7 +1832,8 @@ async def load_building_permits(
                         specific_use or "",
                         int(pv) if pv else None,
                         int(iy) if iy else None,
-                        lon, lat,
+                        lon,
+                        lat,
                     )
                     loaded += 1
                 except Exception as e:
@@ -1724,9 +1870,14 @@ async def load_zoning_districts(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1789,9 +1940,14 @@ async def load_year_built(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1818,7 +1974,9 @@ async def load_year_built(
                     result = await conn.execute(
                         "UPDATE parcels SET year_built = $1, geo_local_area = $2, updated_at = now() "
                         "WHERE pid = $3 AND (year_built IS NULL OR geo_local_area IS NULL)",
-                        int(yb), neighborhood, pid,
+                        int(yb),
+                        neighborhood,
+                        pid,
                     )
                     if "UPDATE 1" in result:
                         updated += 1
@@ -1833,10 +1991,16 @@ async def load_year_built(
             "SELECT count(*) FROM parcels WHERE year_built IS NOT NULL"
         )
 
-    return {"processed": processed, "updated": updated, "total_with_year_built": total_enriched, "errors": errors[:10]}
+    return {
+        "processed": processed,
+        "updated": updated,
+        "total_with_year_built": total_enriched,
+        "errors": errors[:10],
+    }
 
 
 # ── V3 Business Licences Loader ────────────────────────────────
+
 
 @router.post("/load-business-licences")
 async def load_business_licences(
@@ -1869,9 +2033,14 @@ async def load_business_licences(
                 f"&limit={batch_size}&offset={offset}"
             )
             try:
-                data = await asyncio.to_thread(_fetch_json, url, {
-                    "User-Agent": HEADERS["User-Agent"], "Accept": "application/json",
-                })
+                data = await asyncio.to_thread(
+                    _fetch_json,
+                    url,
+                    {
+                        "User-Agent": HEADERS["User-Agent"],
+                        "Accept": "application/json",
+                    },
+                )
             except Exception as e:
                 errors.append(f"offset {offset}: {e}")
                 break
@@ -1906,8 +2075,11 @@ async def load_business_licences(
                         record.get("status", ""),
                         address,
                         record.get("localarea", ""),
-                        int(record["numberofemployees"]) if record.get("numberofemployees") else None,
-                        lon, lat,
+                        int(record["numberofemployees"])
+                        if record.get("numberofemployees")
+                        else None,
+                        lon,
+                        lat,
                     )
                     loaded += 1
                 except Exception as e:
@@ -1922,6 +2094,7 @@ async def load_business_licences(
 
 
 # ── Status ────────────────────────────────────────────────────
+
 
 @router.get("/data-status")
 async def data_status():
@@ -1980,11 +2153,19 @@ async def data_status():
             stats["parcels_with_land_split"] = 0
 
         # V2 + V3 data layers
-        for table_name in ["view_cones", "protected_trees", "non_market_housing",
-                           "community_gardens", "issued_building_permits", "zoning_districts",
-                           "business_licences"]:
+        for table_name in [
+            "view_cones",
+            "protected_trees",
+            "non_market_housing",
+            "community_gardens",
+            "issued_building_permits",
+            "zoning_districts",
+            "business_licences",
+        ]:
             try:
-                stats[table_name] = await conn.fetchval(f"SELECT count(*) FROM {table_name}")
+                stats[table_name] = await conn.fetchval(
+                    f"SELECT count(*) FROM {table_name}"
+                )
             except Exception:
                 stats[table_name] = 0
 
@@ -2018,11 +2199,12 @@ async def data_status():
 
 # ── Pool Monitoring Routes ────────────────────────────────────────
 
+
 @router.get(
     "/pool/metrics",
     summary="Get connection pool metrics",
     description="Returns real-time connection pool statistics including utilization, "
-                "timing, and error counts. Admin-only endpoint.",
+    "timing, and error counts. Admin-only endpoint.",
 )
 async def get_pool_metrics():
     """Get current connection pool metrics (VCL-87 / PERF-013)."""
@@ -2059,7 +2241,7 @@ async def get_pool_metrics():
     "/pool/health",
     summary="Get connection pool health status",
     description="Returns pool health assessment (healthy/degraded/unhealthy) "
-                "based on utilization and error thresholds.",
+    "based on utilization and error thresholds.",
 )
 async def get_pool_health():
     """Get connection pool health status (VCL-87 / PERF-013)."""
@@ -2092,7 +2274,7 @@ async def get_pool_health():
     "/scrapers/status",
     summary="Get scraper schedule status",
     description="Returns status of all registered scrapers including schedules, "
-                "last run time, and next scheduled run.",
+    "last run time, and next scheduled run.",
 )
 async def get_scrapers_status(request: Request):
     """Get status of all registered scrapers."""
@@ -2210,7 +2392,7 @@ async def get_scrapers_history(
     "/data-freshness",
     summary="Data freshness dashboard",
     description="Returns freshness metrics for all data sources — last updated timestamp, "
-                "record count, and staleness assessment.",
+    "record count, and staleness assessment.",
 )
 async def data_freshness():
     """Sprint 10.1: Data freshness admin dashboard.
@@ -2327,9 +2509,7 @@ async def data_freshness():
                 ts_val = await conn.fetchval(
                     f"SELECT MAX({src['ts_col']}) FROM {src['table']}"
                 )
-                count_val = await conn.fetchval(
-                    f"SELECT COUNT(*) FROM {src['table']}"
-                )
+                count_val = await conn.fetchval(f"SELECT COUNT(*) FROM {src['table']}")
                 entry["record_count"] = count_val or 0
                 if ts_val:
                     # Ensure timezone-aware
@@ -2416,7 +2596,9 @@ async def scraper_health(request: Request):
                 )
                 if row:
                     entry["status"] = row["status"]
-                    entry["last_run"] = row["started_at"].isoformat() if row["started_at"] else None
+                    entry["last_run"] = (
+                        row["started_at"].isoformat() if row["started_at"] else None
+                    )
                     entry["documents_found"] = row["documents_found"] or 0
                     entry["documents_new"] = row["documents_new"] or 0
             except Exception:
@@ -2442,15 +2624,13 @@ async def scraper_health(request: Request):
     total_documents = 0
     total_signals = 0
     try:
-        total_documents = await pool.fetchval(
-            "SELECT COUNT(*) FROM documents"
-        ) or 0
+        total_documents = await pool.fetchval("SELECT COUNT(*) FROM documents") or 0
     except Exception:
         pass
     try:
-        total_signals = await pool.fetchval(
-            "SELECT COUNT(*) FROM intelligence_signals"
-        ) or 0
+        total_signals = (
+            await pool.fetchval("SELECT COUNT(*) FROM intelligence_signals") or 0
+        )
     except Exception:
         pass
 
@@ -2464,7 +2644,9 @@ async def scraper_health(request: Request):
 
 
 @router.post("/scraper/{name}/run")
-async def scraper_run(name: str = Path(..., pattern=r"^[a-z_]{1,50}$"), request: Request = None):
+async def scraper_run(
+    name: str = Path(..., pattern=r"^[a-z_]{1,50}$"), request: Request = None
+):
     """
     Manually trigger a scraper by name via the scheduler's run_scraper()
     method.  Returns the ScraperResult dict on success.

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, ConfigDict
 # ────────────────────────────────────────────────────────────────────────────
 
 VANCOUVER_PROPERTY_TAX_RATE = 0.00278  # 0.278% effective tax rate
-VANCOUVER_ANNUAL_INSURANCE = 2400.0    # Per year
+VANCOUVER_ANNUAL_INSURANCE = 2400.0  # Per year
 VANCOUVER_MONTHLY_MAINTENANCE = 200.0  # Per month
 
 
@@ -31,6 +31,7 @@ VANCOUVER_MONTHLY_MAINTENANCE = 200.0  # Per month
 
 class HoldingCostRequest(BaseModel):
     """Request payload for holding cost calculation."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     purchase_price: float = Field(..., gt=0, description="Purchase price in CAD")
@@ -38,63 +39,67 @@ class HoldingCostRequest(BaseModel):
     annual_property_tax_rate: Optional[float] = Field(
         default=VANCOUVER_PROPERTY_TAX_RATE,
         ge=0,
-        description="Annual property tax as decimal (0.278% = 0.00278)"
+        description="Annual property tax as decimal (0.278% = 0.00278)",
     )
     annual_insurance: Optional[float] = Field(
         default=VANCOUVER_ANNUAL_INSURANCE,
         ge=0,
-        description="Annual insurance cost in CAD"
+        description="Annual insurance cost in CAD",
     )
     monthly_maintenance: Optional[float] = Field(
         default=VANCOUVER_MONTHLY_MAINTENANCE,
         ge=0,
-        description="Monthly maintenance cost in CAD"
+        description="Monthly maintenance cost in CAD",
     )
     financing_rate: Optional[float] = Field(
         default=0.06,
         ge=0,
         le=1,
-        description="Annual financing rate as decimal (6% = 0.06)"
+        description="Annual financing rate as decimal (6% = 0.06)",
     )
     ltv_ratio: Optional[float] = Field(
         default=0.75,
         ge=0,
         le=1,
-        description="Loan-to-value ratio (0 = all-cash, 1.0 = 100% financed)"
+        description="Loan-to-value ratio (0 = all-cash, 1.0 = 100% financed)",
     )
 
 
 class HoldingCostResult(BaseModel):
     """Holding cost calculation result."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     purchase_price: float
     holding_months: int
-    property_tax_total: float = Field(description="Total property tax for holding period")
+    property_tax_total: float = Field(
+        description="Total property tax for holding period"
+    )
     insurance_total: float = Field(description="Total insurance for holding period")
     maintenance_total: float = Field(description="Total maintenance for holding period")
     financing_cost_total: float = Field(description="Total financing cost (interest)")
-    opportunity_cost_total: float = Field(description="Opportunity cost at discount rate")
+    opportunity_cost_total: float = Field(
+        description="Opportunity cost at discount rate"
+    )
     total_monthly_average: float = Field(description="Average monthly holding cost")
     total_holding_cost: float = Field(description="Total holding cost for period")
 
 
 class NPVRequest(BaseModel):
     """Request payload for net present value calculation."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     future_value: float = Field(..., description="Cash flow at future time")
     discount_rate: float = Field(
-        ...,
-        ge=0,
-        le=1,
-        description="Annual discount rate as decimal (5% = 0.05)"
+        ..., ge=0, le=1, description="Annual discount rate as decimal (5% = 0.05)"
     )
     years: float = Field(..., gt=0, description="Number of years to discount")
 
 
 class NPVResult(BaseModel):
     """Net present value result."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     future_value: float
@@ -105,31 +110,33 @@ class NPVResult(BaseModel):
 
 class IRRRequest(BaseModel):
     """Request payload for IRR calculation."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     cash_flows: list[float] = Field(
         ...,
-        description="Sequence of cash flows (initial investment negative, inflows positive)"
+        description="Sequence of cash flows (initial investment negative, inflows positive)",
     )
 
 
 class IRRResult(BaseModel):
     """IRR calculation result."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     cash_flows: list[float]
     irr: Optional[float] = Field(
         default=None,
-        description="Internal rate of return as decimal (None if no IRR found)"
+        description="Internal rate of return as decimal (None if no IRR found)",
     )
     converged: bool = Field(
-        default=False,
-        description="Whether Newton-Raphson converged to solution"
+        default=False, description="Whether Newton-Raphson converged to solution"
     )
 
 
 class ProjectCostSummary(BaseModel):
     """Total project cost breakdown."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     land_cost: float = Field(description="Land acquisition cost")
@@ -139,8 +146,7 @@ class ProjectCostSummary(BaseModel):
     financing_costs: float = Field(description="Interest on construction financing")
     total_project_cost: float = Field(description="Sum of all costs")
     cost_per_sqft: Optional[float] = Field(
-        default=None,
-        description="Cost per square foot (if building_sqft provided)"
+        default=None, description="Cost per square foot (if building_sqft provided)"
     )
 
 
@@ -195,17 +201,19 @@ class HoldingCostCalculator:
         financing_cost_total = monthly_financing_cost * holding_months
 
         # Opportunity cost (cost of capital not earning elsewhere)
-        opportunity_rate = financing_rate  # Use financing rate as opportunity cost proxy
+        opportunity_rate = (
+            financing_rate  # Use financing rate as opportunity cost proxy
+        )
         monthly_opportunity_cost = purchase_price * (opportunity_rate / 12.0)
         opportunity_cost_total = monthly_opportunity_cost * holding_months
 
         # Total holding costs
         total_holding_cost = (
-            property_tax_total +
-            insurance_total +
-            maintenance_total +
-            financing_cost_total +
-            opportunity_cost_total
+            property_tax_total
+            + insurance_total
+            + maintenance_total
+            + financing_cost_total
+            + opportunity_cost_total
         )
 
         total_monthly_average = (
@@ -367,11 +375,7 @@ class HoldingCostCalculator:
 
         # Total project cost
         total_project_cost = (
-            land_cost +
-            hard_costs +
-            soft_costs +
-            holding_costs +
-            financing_costs
+            land_cost + hard_costs + soft_costs + holding_costs + financing_costs
         )
 
         # Cost per sqft (if building size provided)

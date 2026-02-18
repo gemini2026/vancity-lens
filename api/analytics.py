@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 # Enums
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class EventType(str, Enum):
     """Analytics event types."""
+
     PARCEL_LOOKUP = "parcel_lookup"
     CHAT_QUERY = "chat_query"
     SIGNAL_VIEW = "signal_view"
@@ -40,8 +42,10 @@ class EventType(str, Enum):
 # Pydantic Models
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class AnalyticsEvent(BaseModel):
     """Single analytics event."""
+
     id: int
     user_id: int
     event_type: str
@@ -54,6 +58,7 @@ class AnalyticsEvent(BaseModel):
 
 class UserActivitySummary(BaseModel):
     """User activity summary over a time period."""
+
     user_id: int
     total_events: int
     parcel_lookups: int
@@ -69,6 +74,7 @@ class UserActivitySummary(BaseModel):
 
 class PlatformMetrics(BaseModel):
     """Platform-wide metrics for a time period."""
+
     period: str  # "daily", "weekly", "monthly"
     total_events: int
     unique_users: int
@@ -84,6 +90,7 @@ class PlatformMetrics(BaseModel):
 
 class TopItem(BaseModel):
     """Top item result (neighborhood or signal)."""
+
     rank: int
     name: str
     count: int
@@ -92,6 +99,7 @@ class TopItem(BaseModel):
 
 class TopItemsResponse(BaseModel):
     """Response with top items."""
+
     period_days: int
     total_count: int
     items: List[TopItem]
@@ -99,6 +107,7 @@ class TopItemsResponse(BaseModel):
 
 class ActiveUsersMetrics(BaseModel):
     """Active users aggregation by time period."""
+
     period: str  # "daily", "weekly", "monthly"
     active_users: int
     returning_users: int
@@ -108,6 +117,7 @@ class ActiveUsersMetrics(BaseModel):
 
 class RetentionCohort(BaseModel):
     """Retention cohort data."""
+
     cohort_date: str  # YYYY-MM or YYYY-MM-DD
     cohort_size: int
     day_1_retention: Optional[float] = None
@@ -117,12 +127,14 @@ class RetentionCohort(BaseModel):
 
 class RetentionMetrics(BaseModel):
     """User retention metrics."""
+
     cohorts: List[RetentionCohort]
 
 
 # ────────────────────────────────────────────────────────────────────────────
 # AnalyticsTracker Service
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class AnalyticsTracker:
     """Service for tracking and retrieving analytics data."""

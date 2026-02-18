@@ -39,15 +39,22 @@ admin_router = APIRouter(
 # PUBLIC ENDPOINTS
 # ════════════════════════════════════════════════════════════════════════════
 
+
 @router.get("/pipeline", response_model=dict)
 async def list_pipeline(
     neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
     stage: Optional[str] = Query(None, description="Filter by pipeline stage"),
-    height_min: Optional[int] = Query(None, ge=1, description="Minimum proposed storeys"),
-    height_max: Optional[int] = Query(None, ge=1, description="Maximum proposed storeys"),
+    height_min: Optional[int] = Query(
+        None, ge=1, description="Minimum proposed storeys"
+    ),
+    height_max: Optional[int] = Query(
+        None, ge=1, description="Maximum proposed storeys"
+    ),
     units_min: Optional[int] = Query(None, ge=1, description="Minimum proposed units"),
     units_max: Optional[int] = Query(None, ge=1, description="Maximum proposed units"),
-    developer: Optional[str] = Query(None, min_length=2, description="Developer name search (partial match)"),
+    developer: Optional[str] = Query(
+        None, min_length=2, description="Developer name search (partial match)"
+    ),
     limit: int = Query(50, ge=1, le=100, description="Results per page"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
 ) -> dict:
@@ -74,7 +81,7 @@ async def list_pipeline(
             units_max=units_max,
             developer=developer,
             limit=limit,
-            offset=offset
+            offset=offset,
         )
 
         has_more = (offset + limit) < total_count
@@ -113,10 +120,12 @@ async def search_pipeline_in_polygon(
     if geom_type not in ("Polygon", "MultiPolygon"):
         raise HTTPException(
             status_code=422,
-            detail=f"Expected GeoJSON Polygon or MultiPolygon, got '{geom_type}'"
+            detail=f"Expected GeoJSON Polygon or MultiPolygon, got '{geom_type}'",
         )
     if "coordinates" not in body:
-        raise HTTPException(status_code=422, detail="Missing 'coordinates' in GeoJSON geometry")
+        raise HTTPException(
+            status_code=422, detail="Missing 'coordinates' in GeoJSON geometry"
+        )
 
     try:
         entries = await SupplyPipelineTracker.get_pipeline_in_polygon(
@@ -131,7 +140,9 @@ async def search_pipeline_in_polygon(
         }
     except Exception as e:
         logger.error(f"Error searching pipeline in polygon: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to search pipeline in polygon")
+        raise HTTPException(
+            status_code=500, detail="Failed to search pipeline in polygon"
+        )
 
 
 @router.get("/pipeline/summary", response_model=dict)
@@ -159,12 +170,14 @@ async def get_summary() -> dict:
 
     except Exception as e:
         logger.error(f"Error retrieving pipeline summary: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline summary")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve pipeline summary"
+        )
 
 
 @router.get("/pipeline/stats", response_model=dict)
 async def get_stats(
-    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood")
+    neighborhood: Optional[str] = Query(None, description="Filter by neighborhood"),
 ) -> dict:
     """
     Get detailed pipeline statistics.
@@ -200,7 +213,9 @@ async def get_stats(
 
     except Exception as e:
         logger.error(f"Error retrieving pipeline statistics: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve pipeline statistics")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve pipeline statistics"
+        )
 
 
 @router.get("/pipeline/neighborhood/{neighborhood}", response_model=dict)
@@ -232,14 +247,18 @@ async def get_neighborhood_supply(neighborhood: str) -> dict:
 
     except Exception as e:
         logger.error(f"Error retrieving neighborhood supply: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve neighborhood supply")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve neighborhood supply"
+        )
 
 
 @router.get("/pipeline/clusters", response_model=dict)
 async def get_clusters(
     radius_m: int = Query(500, ge=100, le=5000, description="Cluster radius in metres"),
     window_days: int = Query(90, ge=7, le=365, description="Time window in days"),
-    min_apps: int = Query(3, ge=2, le=20, description="Minimum applications for a cluster"),
+    min_apps: int = Query(
+        3, ge=2, le=20, description="Minimum applications for a cluster"
+    ),
 ) -> dict:
     """
     FR-PIPE-006: Detect spatial/temporal clusters of development applications.
@@ -265,7 +284,9 @@ async def get_clusters(
         }
     except Exception as e:
         logger.error(f"Error detecting clusters: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to detect development clusters")
+        raise HTTPException(
+            status_code=500, detail="Failed to detect development clusters"
+        )
 
 
 @router.get("/pipeline/{pipeline_id}", response_model=dict)
@@ -323,6 +344,7 @@ async def get_stage_history(pipeline_id: int) -> dict:
 # ADMIN ENDPOINTS
 # ════════════════════════════════════════════════════════════════════════════
 
+
 @admin_router.post("/pipeline", response_model=dict)
 async def create_pipeline_entry(entry: PipelineEntryCreate) -> dict:
     """
@@ -379,11 +401,7 @@ async def update_pipeline_stage(
     """
     try:
         updated = await SupplyPipelineTracker.update_stage(
-            db.pool,
-            pipeline_id,
-            new_stage,
-            signal_id=signal_id,
-            notes=notes
+            db.pool, pipeline_id, new_stage, signal_id=signal_id, notes=notes
         )
         return updated.model_dump()
 

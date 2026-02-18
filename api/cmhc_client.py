@@ -103,7 +103,8 @@ class CMHCClient:
     async def _fetch_csv(self, url: str) -> Optional[str]:
         try:
             async with self.session.get(
-                url, headers=HEADERS,
+                url,
+                headers=HEADERS,
                 timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
                 if resp.status == 200:

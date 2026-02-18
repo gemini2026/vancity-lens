@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 class OpportunityProfileCreate(BaseModel):
     """Request model for creating an opportunity profile."""
+
     profile_name: str = Field(..., max_length=255)
     min_lot_area_sqm: Optional[float] = None
     max_price: Optional[int] = None
@@ -36,6 +37,7 @@ class OpportunityProfileCreate(BaseModel):
 
 class OpportunityProfileUpdate(BaseModel):
     """Request model for updating an opportunity profile."""
+
     profile_name: Optional[str] = Field(None, max_length=255)
     min_lot_area_sqm: Optional[float] = None
     max_price: Optional[int] = None
@@ -49,6 +51,7 @@ class OpportunityProfileUpdate(BaseModel):
 
 class OpportunityProfileResponse(BaseModel):
     """Response model for opportunity profile."""
+
     id: int
     user_id: int
     profile_name: str
@@ -69,6 +72,7 @@ class OpportunityProfileResponse(BaseModel):
 
 class OpportunityMatchResponse(BaseModel):
     """Response model for opportunity match."""
+
     id: int
     profile_id: int
     parcel_pid: str
@@ -85,7 +89,10 @@ class OpportunityMatchResponse(BaseModel):
 
 class MatchReason(BaseModel):
     """Individual match reason with score contribution."""
-    category: str  # e.g. "storey_uplift", "fsr_uplift", "proximity", "lot_size", "price"
+
+    category: (
+        str  # e.g. "storey_uplift", "fsr_uplift", "proximity", "lot_size", "price"
+    )
     score: float
     details: Optional[str] = None
 
@@ -139,7 +146,9 @@ class OpportunityAlertEngine:
                 profile.min_fsr_uplift,
                 profile.max_distance_m,
             )
-            logger.info(f"Created opportunity profile {result['id']} for user {user_id}")
+            logger.info(
+                f"Created opportunity profile {result['id']} for user {user_id}"
+            )
             return OpportunityProfileResponse(**result)
 
     @staticmethod
@@ -233,7 +242,7 @@ class OpportunityAlertEngine:
             result = await conn.fetchrow(
                 f"""
                 UPDATE opportunity_profiles
-                SET {', '.join(set_clauses)}
+                SET {", ".join(set_clauses)}
                 WHERE id = ${param_count}
                 RETURNING *
                 """,
@@ -424,7 +433,9 @@ class OpportunityAlertEngine:
                     "distance_m": float(row["dist_to_nearest_station"]),
                     "lot_area_sqm": float(row["lot_area_sqm"]),
                     "entitled_storeys": row["entitled_storeys"],
-                    "entitled_fsr": float(row["entitled_fsr"]) if row["entitled_fsr"] else 0,
+                    "entitled_fsr": float(row["entitled_fsr"])
+                    if row["entitled_fsr"]
+                    else 0,
                     "current_zoning": row["current_zoning"],
                 }
 

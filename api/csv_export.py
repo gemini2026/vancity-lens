@@ -24,9 +24,12 @@ logger = logging.getLogger(__name__)
 
 class SignalExportFilters(BaseModel):
     """Filters for signal feed export."""
+
     neighborhood: Optional[str] = Field(None, description="Filter by neighborhood")
     category: Optional[str] = Field(None, description="Filter by signal category/type")
-    date_from: Optional[date] = Field(None, description="Filter signals from this date onwards")
+    date_from: Optional[date] = Field(
+        None, description="Filter signals from this date onwards"
+    )
     date_to: Optional[date] = Field(None, description="Filter signals up to this date")
     severity: Optional[str] = Field(None, description="Filter by severity level")
     limit: int = Field(default=1000, ge=1, le=10000, description="Max rows to export")
@@ -37,10 +40,15 @@ class SignalExportFilters(BaseModel):
 
 class ParcelExportFilters(BaseModel):
     """Filters for parcel data export."""
+
     neighborhood: Optional[str] = Field(None, description="Filter by neighborhood")
     zoning: Optional[str] = Field(None, description="Filter by zoning code")
-    min_lot_sqft: Optional[float] = Field(None, ge=0, description="Minimum lot size in sqft")
-    max_lot_sqft: Optional[float] = Field(None, ge=0, description="Maximum lot size in sqft")
+    min_lot_sqft: Optional[float] = Field(
+        None, ge=0, description="Minimum lot size in sqft"
+    )
+    max_lot_sqft: Optional[float] = Field(
+        None, ge=0, description="Maximum lot size in sqft"
+    )
     limit: int = Field(default=1000, ge=1, le=5000, description="Max rows to export")
 
     class Config:
@@ -49,10 +57,15 @@ class ParcelExportFilters(BaseModel):
 
 class ExportMetadata(BaseModel):
     """Metadata about exported data."""
-    export_type: str = Field(..., description="Type of export: 'signals', 'neighborhood', 'parcels'")
+
+    export_type: str = Field(
+        ..., description="Type of export: 'signals', 'neighborhood', 'parcels'"
+    )
     row_count: int = Field(..., description="Number of rows exported")
     exported_at: datetime = Field(..., description="Timestamp of export")
-    filters_applied: Dict[str, Any] = Field(default_factory=dict, description="Filters used")
+    filters_applied: Dict[str, Any] = Field(
+        default_factory=dict, description="Filters used"
+    )
     source_url: Optional[str] = Field(None, description="Original data source URL")
 
     class Config:
@@ -222,7 +235,9 @@ class CSVExporter:
                     ",".join(signal.get("conditions") or [])
                 ),
                 "sentiment": signal.get("sentiment"),
-                "source_title": CSVExporter._sanitize_csv_value(signal.get("source_title")),
+                "source_title": CSVExporter._sanitize_csv_value(
+                    signal.get("source_title")
+                ),
                 "source_url": signal.get("source_url"),
                 "source_type": signal.get("source_type"),
                 "source_date": signal.get("source_date"),
@@ -333,8 +348,12 @@ class CSVExporter:
                     "slug": CSVExporter._sanitize_csv_value(s.get("slug")),
                     "overall_score": s.get("overall_score"),
                     "rank": s.get("rank"),
-                    "top_category": CSVExporter._sanitize_csv_value(s.get("top_category")),
-                    "bottom_category": CSVExporter._sanitize_csv_value(s.get("bottom_category")),
+                    "top_category": CSVExporter._sanitize_csv_value(
+                        s.get("top_category")
+                    ),
+                    "bottom_category": CSVExporter._sanitize_csv_value(
+                        s.get("bottom_category")
+                    ),
                 }
             )
 
@@ -402,7 +421,9 @@ class CSVExporter:
             lot_sqft = float(lot_sqm) * 10.764 if lot_sqm else None
             row = {
                 "pid": parcel.get("pid"),
-                "civic_address": CSVExporter._sanitize_csv_value(parcel.get("civic_address")),
+                "civic_address": CSVExporter._sanitize_csv_value(
+                    parcel.get("civic_address")
+                ),
                 "neighborhood": parcel.get("geo_local_area"),
                 "zoning": parcel.get("current_zoning"),
                 "lot_area_sqft": round(lot_sqft, 1) if lot_sqft else None,

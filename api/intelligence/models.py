@@ -54,6 +54,7 @@ class Severity(str, Enum):
 
 # ── Document models ──────────────────────────────────────────
 
+
 class DocumentCreate(BaseModel):
     source_type: SourceType
     source_url: str
@@ -84,8 +85,10 @@ class DocumentResponse(BaseModel):
 
 # ── Intelligence Signal models ───────────────────────────────
 
+
 class ExtractedSignal(BaseModel):
     """What the LLM outputs for each chunk it processes."""
+
     signal_type: SignalType
     summary: str
     headline: Optional[str] = None
@@ -133,8 +136,10 @@ class SignalResponse(BaseModel):
 
 # ── Chat models ──────────────────────────────────────────────
 
+
 class ChatRequest(BaseModel):
     """Chat request with input validation (SEC-007 / VCL-17)."""
+
     query: str = Field(
         ...,
         min_length=1,
@@ -152,7 +157,7 @@ class ChatRequest(BaseModel):
 
     def model_post_init(self, __context) -> None:
         """Strip whitespace from query after validation."""
-        object.__setattr__(self, 'query', self.query.strip())
+        object.__setattr__(self, "query", self.query.strip())
 
 
 class SourceCitation(BaseModel):
@@ -174,10 +179,13 @@ class ChatResponse(BaseModel):
     citations: list[SourceCitation] = Field(default_factory=list)
     related_signals: list[SignalResponse] = Field(default_factory=list)
     session_id: str
-    mode: str = Field(default="full", description="Operating mode: full, partial, or demo")
+    mode: str = Field(
+        default="full", description="Operating mode: full, partial, or demo"
+    )
 
 
 # ── Feed / Alert models ─────────────────────────────────────
+
 
 class SignalFeedRequest(BaseModel):
     neighborhood: Optional[str] = None
@@ -196,6 +204,7 @@ class SignalFeedResponse(BaseModel):
 
 
 # ── Neighborhood Scorecard models ─────────────────────────────
+
 
 class MetricCategory(str, Enum):
     SAFETY = "safety"
@@ -221,6 +230,7 @@ class NeighborhoodBase(BaseModel):
 
 class CategoryScore(BaseModel):
     """Score for a single dimension (e.g., safety, schools)."""
+
     category: MetricCategory
     score: float = Field(ge=0.0, le=10.0)
     raw_value: Optional[float] = None
@@ -231,6 +241,7 @@ class CategoryScore(BaseModel):
 
 class NeighborhoodScorecard(BaseModel):
     """Full scorecard for a single neighborhood (Madlan-style)."""
+
     neighborhood: NeighborhoodBase
     overall_score: float = Field(ge=0.0, le=10.0)
     rank: Optional[int] = None
@@ -242,6 +253,7 @@ class NeighborhoodScorecard(BaseModel):
 
 class NeighborhoodSummary(BaseModel):
     """Compact summary for list/map views."""
+
     name: str
     slug: str
     overall_score: float = Field(ge=0.0, le=10.0)
@@ -252,12 +264,14 @@ class NeighborhoodSummary(BaseModel):
 
 class NeighborhoodComparison(BaseModel):
     """Side-by-side comparison of 2-3 neighborhoods."""
+
     neighborhoods: list[NeighborhoodScorecard]
     categories: list[MetricCategory]
 
 
 class MetricIngestion(BaseModel):
     """Model for ingesting raw metrics from open data."""
+
     neighborhood_name: str
     category: MetricCategory
     metric_name: str
@@ -273,8 +287,10 @@ class MetricIngestion(BaseModel):
 
 # ── URL Ingestion models ──────────────────────────────────────
 
+
 class DocumentViewResponse(BaseModel):
     """RAG-001: Archived document viewer response."""
+
     id: int
     title: Optional[str] = None
     source_url: str
@@ -289,6 +305,7 @@ class DocumentViewResponse(BaseModel):
 
 class SearchConfigRequest(BaseModel):
     """RAG-007: Search configuration update request."""
+
     vector_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     text_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     rrf_k: Optional[int] = Field(default=None, ge=1, le=200)
@@ -297,6 +314,7 @@ class SearchConfigRequest(BaseModel):
 
 class SearchConfigResponse(BaseModel):
     """RAG-007: Search configuration response."""
+
     vector_weight: float
     text_weight: float
     rrf_k: int
@@ -306,6 +324,7 @@ class SearchConfigResponse(BaseModel):
 
 class DocumentStatusResponse(BaseModel):
     """RAG-011: Document processing status for polling."""
+
     document_id: int
     title: Optional[str] = None
     status: str = Field(description="'pending', 'processing', 'completed', or 'failed'")
@@ -318,25 +337,37 @@ class DocumentStatusResponse(BaseModel):
 
 class IngestUrlRequest(BaseModel):
     """Request body for URL document ingestion."""
-    url: str = Field(..., min_length=10, max_length=2048, description="URL to download and analyze")
+
+    url: str = Field(
+        ..., min_length=10, max_length=2048, description="URL to download and analyze"
+    )
     source_type: str = Field(default="external", description="Document source type")
-    title: Optional[str] = Field(default=None, max_length=500, description="Optional title override")
+    title: Optional[str] = Field(
+        default=None, max_length=500, description="Optional title override"
+    )
 
 
 class IngestUrlResponse(BaseModel):
     """Response from URL document ingestion."""
+
     document_id: int
     title: Optional[str] = None
     text_length: int = 0
     page_count: int = 0
-    status: str = Field(description="'new' if freshly ingested, 'exists' if already in DB")
-    processing: bool = Field(default=False, description="True if background processing was triggered")
+    status: str = Field(
+        description="'new' if freshly ingested, 'exists' if already in DB"
+    )
+    processing: bool = Field(
+        default=False, description="True if background processing was triggered"
+    )
 
 
 # ── Chat Session Management models ───────────────────────────
 
+
 class ChatHistoryMessage(BaseModel):
     """A single message in chat history."""
+
     id: int
     role: str  # 'user' or 'assistant'
     content: str
@@ -347,12 +378,14 @@ class ChatHistoryMessage(BaseModel):
 
 class ChatMessageHistory(BaseModel):
     """Full conversation history for a session."""
+
     session_id: str
     messages: list[ChatHistoryMessage] = Field(default_factory=list)
 
 
 class ChatSession(BaseModel):
     """Chat session metadata."""
+
     id: int
     session_id: str
     user_label: str
@@ -363,6 +396,7 @@ class ChatSession(BaseModel):
 
 class ChatSessionList(BaseModel):
     """Paginated list of chat sessions."""
+
     sessions: list[ChatSession] = Field(default_factory=list)
     total_count: int
     has_more: bool

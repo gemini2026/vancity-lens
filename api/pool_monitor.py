@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # ── Data Classes ──────────────────────────────────────────────────
 
+
 @dataclass
 class PoolMetrics:
     """Real-time metrics snapshot of the connection pool."""
@@ -39,6 +40,7 @@ class PoolMetrics:
 
 
 # ── Pool Monitor ──────────────────────────────────────────────────
+
 
 class PoolMonitor:
     """Wraps asyncpg.Pool to collect and expose metrics."""
@@ -229,7 +231,9 @@ class PoolMonitor:
                     logger.error(f"Error in pool health check: {e}")
 
         self._background_task = asyncio.create_task(check_loop())
-        logger.info(f"Pool monitor background check started (interval={self.check_interval}s)")
+        logger.info(
+            f"Pool monitor background check started (interval={self.check_interval}s)"
+        )
 
     async def stop_background_check(self) -> None:
         """Stop the background health check task."""
@@ -246,6 +250,7 @@ class PoolMonitor:
 
 
 # ── Monitored Database Class ──────────────────────────────────────
+
 
 class MonitoredDatabase:
     """Extended Database class with pool monitoring (backward compatible)."""

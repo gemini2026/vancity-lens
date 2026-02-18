@@ -58,13 +58,15 @@ def detect_bylaw_references(text: str) -> List[dict]:
             end = min(len(text), match.end() + 100)
             context = text[start:end].strip()
 
-            references.append({
-                "pattern_index": i,
-                "match_text": match.group(),
-                "bylaw_number": match.group(1) if match.lastindex else None,
-                "context": context,
-                "position": match.start(),
-            })
+            references.append(
+                {
+                    "pattern_index": i,
+                    "match_text": match.group(),
+                    "bylaw_number": match.group(1) if match.lastindex else None,
+                    "context": context,
+                    "position": match.start(),
+                }
+            )
 
     return references
 
@@ -73,11 +75,13 @@ def detect_zoning_changes(text: str) -> List[dict]:
     """Detect zoning change references (from X to Y)."""
     changes = []
     for match in ZONING_CHANGE_PATTERN.finditer(text):
-        changes.append({
-            "zoning_from": match.group(1),
-            "zoning_to": match.group(2),
-            "context": text[max(0, match.start() - 50):match.end() + 50].strip(),
-        })
+        changes.append(
+            {
+                "zoning_from": match.group(1),
+                "zoning_to": match.group(2),
+                "context": text[max(0, match.start() - 50) : match.end() + 50].strip(),
+            }
+        )
     return changes
 
 
@@ -95,7 +99,8 @@ async def scan_documents_for_bylaws(
 
     async with db_pool.acquire() as conn:
         # Get recent documents not yet scanned for bylaws
-        docs = await conn.fetch("""
+        docs = await conn.fetch(
+            """
             SELECT d.id, d.title, d.raw_text, d.source_type, d.source_url
             FROM documents d
             WHERE d.created_at >= NOW() - INTERVAL '%s days'
@@ -106,7 +111,9 @@ async def scan_documents_for_bylaws(
               )
             ORDER BY d.created_at DESC
             LIMIT %s
-        """ % (days_back, limit))
+        """
+            % (days_back, limit)
+        )
 
         stats["documents_scanned"] = len(docs)
 
@@ -123,20 +130,27 @@ async def scan_documents_for_bylaws(
                 zoning_changes = detect_zoning_changes(text)
 
                 # Create a bylaw_amendment signal
-                summary_parts = [f"Bylaw reference: {r['match_text']}" for r in references[:3]]
+                summary_parts = [
+                    f"Bylaw reference: {r['match_text']}" for r in references[:3]
+                ]
                 summary = "; ".join(summary_parts)
                 if len(summary) > 500:
                     summary = summary[:497] + "..."
 
-                zoning_from = zoning_changes[0]["zoning_from"] if zoning_changes else None
+                zoning_from = (
+                    zoning_changes[0]["zoning_from"] if zoning_changes else None
+                )
                 zoning_to = zoning_changes[0]["zoning_to"] if zoning_changes else None
 
                 # Determine confidence based on number of matches
                 confidence = min(0.5 + len(references) * 0.1, 0.95)
 
-                review_status = "auto_approved" if confidence >= 0.85 else "pending_review"
+                review_status = (
+                    "auto_approved" if confidence >= 0.85 else "pending_review"
+                )
 
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO intelligence_signals (
                         document_id, signal_type, summary, headline,
                         zoning_from, zoning_to,
@@ -148,7 +162,9 @@ async def scan_documents_for_bylaws(
                     doc["id"],
                     "bylaw_amendment",
                     summary,
-                    f"Bylaw amendment detected in: {doc['title'][:100]}" if doc["title"] else "Bylaw amendment detected",
+                    f"Bylaw amendment detected in: {doc['title'][:100]}"
+                    if doc["title"]
+                    else "Bylaw amendment detected",
                     zoning_from,
                     zoning_to,
                     "medium",

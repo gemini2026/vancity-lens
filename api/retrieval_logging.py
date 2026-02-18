@@ -90,13 +90,16 @@ async def log_retrieval(db_pool, source_id: str, query_params: Optional[dict] = 
             if now - _last_error_log_time >= _ERROR_LOG_INTERVAL_S:
                 logger.error(
                     "Failed to log retrieval for %s: %s",
-                    source_id, log_err, exc_info=True,
+                    source_id,
+                    log_err,
+                    exc_info=True,
                 )
                 _last_error_log_time = now
             else:
                 logger.warning(
                     "Failed to log retrieval for %s: %s",
-                    source_id, log_err,
+                    source_id,
+                    log_err,
                 )
 
 
@@ -147,6 +150,4 @@ async def record_ingestion_success(db_pool, source_id: str) -> None:
                 resolved_id,
             )
     except Exception as exc:
-        logger.warning(
-            "record_ingestion_success failed for %s: %s", resolved_id, exc
-        )
+        logger.warning("record_ingestion_success failed for %s: %s", resolved_id, exc)

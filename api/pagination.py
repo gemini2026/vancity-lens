@@ -24,12 +24,13 @@ from starlette.responses import Response
 logger = logging.getLogger(__name__)
 
 # Type variable for generic response models
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # PaginationParams - FastAPI Depends for query parameter validation
 # ──────────────────────────────────────────────────────────────────────────
+
 
 class PaginationParams:
     """
@@ -43,9 +44,13 @@ class PaginationParams:
     def __init__(
         self,
         page: int = Query(1, ge=1, description="Page number (1-indexed)"),
-        page_size: int = Query(20, ge=1, le=100, description="Items per page (max 100)"),
+        page_size: int = Query(
+            20, ge=1, le=100, description="Items per page (max 100)"
+        ),
         sort_by: Optional[str] = Query(None, description="Field to sort by"),
-        sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order (asc or desc)"),
+        sort_order: str = Query(
+            "desc", pattern="^(asc|desc)$", description="Sort order (asc or desc)"
+        ),
     ):
         self.page = page
         self.page_size = page_size
@@ -67,6 +72,7 @@ class PaginationParams:
 # PaginatedResponse - Generic model for paginated responses
 # ──────────────────────────────────────────────────────────────────────────
 
+
 class PaginatedResponse(BaseModel, Generic[T]):
     """
     Generic paginated response model.
@@ -80,47 +86,20 @@ class PaginatedResponse(BaseModel, Generic[T]):
         )
     """
 
-    items: List[T] = Field(
-        ...,
-        description="Items in this page"
-    )
-    total: int = Field(
-        ...,
-        ge=0,
-        description="Total number of items across all pages"
-    )
-    page: int = Field(
-        ...,
-        ge=1,
-        description="Current page number (1-indexed)"
-    )
-    page_size: int = Field(
-        ...,
-        ge=1,
-        description="Number of items per page"
-    )
-    total_pages: int = Field(
-        ...,
-        ge=0,
-        description="Total number of pages"
-    )
+    items: List[T] = Field(..., description="Items in this page")
+    total: int = Field(..., ge=0, description="Total number of items across all pages")
+    page: int = Field(..., ge=1, description="Current page number (1-indexed)")
+    page_size: int = Field(..., ge=1, description="Number of items per page")
+    total_pages: int = Field(..., ge=0, description="Total number of pages")
     has_next: bool = Field(
-        ...,
-        description="Whether there are more pages after this one"
+        ..., description="Whether there are more pages after this one"
     )
-    has_prev: bool = Field(
-        ...,
-        description="Whether there are pages before this one"
-    )
+    has_prev: bool = Field(..., description="Whether there are pages before this one")
     next_page: Optional[int] = Field(
-        None,
-        ge=1,
-        description="Next page number, or null if no next page"
+        None, ge=1, description="Next page number, or null if no next page"
     )
     prev_page: Optional[int] = Field(
-        None,
-        ge=1,
-        description="Previous page number, or null if no previous page"
+        None, ge=1, description="Previous page number, or null if no previous page"
     )
 
     @classmethod
@@ -160,6 +139,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 # paginate() Helper Function
 # ──────────────────────────────────────────────────────────────────────────
 
+
 def paginate(
     items: List[T],
     total: int,
@@ -193,6 +173,7 @@ def paginate(
 # MaxPageSizeMiddleware - Enforces maximum page size
 # ──────────────────────────────────────────────────────────────────────────
 
+
 class MaxPageSizeMiddleware(BaseHTTPMiddleware):
     """
     Middleware to enforce maximum page size across all endpoints.
@@ -219,9 +200,11 @@ class MaxPageSizeMiddleware(BaseHTTPMiddleware):
                     page_size = int(page_size_param)
                     if page_size > self.max_page_size:
                         return Response(
-                            content=json.dumps({
-                                "detail": f"page_size {page_size} exceeds maximum {self.max_page_size}"
-                            }),
+                            content=json.dumps(
+                                {
+                                    "detail": f"page_size {page_size} exceeds maximum {self.max_page_size}"
+                                }
+                            ),
                             status_code=400,
                             media_type="application/json",
                         )
@@ -236,6 +219,7 @@ class MaxPageSizeMiddleware(BaseHTTPMiddleware):
 # Cursor-Based Pagination
 # ──────────────────────────────────────────────────────────────────────────
 
+
 class CursorPaginationParams(BaseModel):
     """
     Parameters for cursor-based pagination.
@@ -246,19 +230,11 @@ class CursorPaginationParams(BaseModel):
     """
 
     cursor: Optional[str] = Field(
-        None,
-        description="Opaque cursor from previous response for next page"
+        None, description="Opaque cursor from previous response for next page"
     )
-    page_size: int = Field(
-        20,
-        ge=1,
-        le=100,
-        description="Number of items to return"
-    )
+    page_size: int = Field(20, ge=1, le=100, description="Number of items to return")
     sort_order: str = Field(
-        "desc",
-        pattern="^(asc|desc)$",
-        description="Sort order (asc or desc)"
+        "desc", pattern="^(asc|desc)$", description="Sort order (asc or desc)"
     )
 
     @field_validator("page_size")
@@ -277,23 +253,14 @@ class CursorPaginationResponse(BaseModel, Generic[T]):
     Includes a cursor for the next page if available.
     """
 
-    items: List[T] = Field(
-        ...,
-        description="Items in this page"
-    )
+    items: List[T] = Field(..., description="Items in this page")
     cursor: Optional[str] = Field(
-        None,
-        description="Opaque cursor to fetch next page, or null if no next page"
+        None, description="Opaque cursor to fetch next page, or null if no next page"
     )
     has_next: bool = Field(
-        ...,
-        description="Whether there are more items after this page"
+        ..., description="Whether there are more items after this page"
     )
-    count: int = Field(
-        ...,
-        ge=0,
-        description="Number of items in this page"
-    )
+    count: int = Field(..., ge=0, description="Number of items in this page")
 
 
 class CursorPagination:
@@ -319,7 +286,7 @@ class CursorPagination:
             "id": str(last_id),
             "sort_value": str(last_sort_value),
         }
-        json_str = json.dumps(cursor_data, separators=(',', ':'))
+        json_str = json.dumps(cursor_data, separators=(",", ":"))
         encoded = base64.b64encode(json_str.encode()).decode()
         return encoded
 
@@ -372,9 +339,11 @@ class CursorPagination:
             last_item = result_items[-1]
             # Assume last_item has 'id' and a sort field (e.g., 'created_at')
             # Subclasses should override this logic if needed
-            last_id = getattr(last_item, 'id', None)
+            last_id = getattr(last_item, "id", None)
             # Try to find a reasonable sort value
-            last_sort_value = getattr(last_item, 'created_at', None) or getattr(last_item, 'updated_at', None)
+            last_sort_value = getattr(last_item, "created_at", None) or getattr(
+                last_item, "updated_at", None
+            )
             if last_id is not None and last_sort_value is not None:
                 cursor = CursorPagination.encode_cursor(last_id, last_sort_value)
 

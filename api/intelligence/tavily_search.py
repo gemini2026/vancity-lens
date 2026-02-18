@@ -43,6 +43,7 @@ SEARCH_DAYS = 7
 
 # ── Lazy API Key Loading ─────────────────────────────────────
 
+
 def _get_api_key() -> str:
     """
     Lazy-load Tavily API key from environment.
@@ -64,10 +65,12 @@ def _get_client():
         TavilyClient instance.
     """
     from tavily import TavilyClient
+
     return TavilyClient(api_key=_get_api_key())
 
 
 # ── Search Functions ─────────────────────────────────────────
+
 
 async def search_web(
     queries: Optional[List[str]] = None,
@@ -105,19 +108,23 @@ async def search_web(
             )
 
             results = response.get("results", [])
-            logger.info("Tavily search returned %d results for: %s", len(results), query)
+            logger.info(
+                "Tavily search returned %d results for: %s", len(results), query
+            )
 
             for r in results:
                 url = r.get("url", "")
                 if url and url not in seen_urls:
                     seen_urls.add(url)
-                    all_results.append({
-                        "title": r.get("title", ""),
-                        "url": url,
-                        "content": r.get("content", ""),
-                        "published_date": r.get("published_date"),
-                        "query": query,
-                    })
+                    all_results.append(
+                        {
+                            "title": r.get("title", ""),
+                            "url": url,
+                            "content": r.get("content", ""),
+                            "published_date": r.get("published_date"),
+                            "query": query,
+                        }
+                    )
 
         except Exception as e:
             logger.error("Tavily search error for query '%s': %s", query, e)
@@ -154,7 +161,9 @@ async def extract_content(urls: List[str]) -> Dict[str, str]:
             if url and raw:
                 extracted[url] = raw
 
-        logger.info("Tavily extract returned content for %d/%d URLs", len(extracted), len(urls))
+        logger.info(
+            "Tavily extract returned content for %d/%d URLs", len(extracted), len(urls)
+        )
 
     except Exception as e:
         logger.error("Tavily extract error: %s", e)
@@ -163,6 +172,7 @@ async def extract_content(urls: List[str]) -> Dict[str, str]:
 
 
 # ── Database Storage ─────────────────────────────────────────
+
 
 async def store_document(
     conn: asyncpg.Connection,
@@ -202,11 +212,13 @@ async def store_document(
         content,
         len(content) if content else 0,
         "html",
-        json.dumps({
-            "source": "tavily",
-            "search_query": source_query,
-            "discovered_at": datetime.now(timezone.utc).isoformat(),
-        }),
+        json.dumps(
+            {
+                "source": "tavily",
+                "search_query": source_query,
+                "discovered_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ),
         datetime.now(timezone.utc),
     )
     # asyncpg execute returns command tag like "INSERT 0 1" or "INSERT 0 0"
@@ -214,6 +226,7 @@ async def store_document(
 
 
 # ── Main Orchestrator ────────────────────────────────────────
+
 
 async def search_and_store(
     pool: asyncpg.Pool,
@@ -373,7 +386,9 @@ if __name__ == "__main__":
             result = await search_and_store(pool)
             print(json.dumps(result, indent=2, default=str))
             if result.get("new_documents", 0) > 0:
-                logger.info("Tavily CronJob success: %d new documents", result["new_documents"])
+                logger.info(
+                    "Tavily CronJob success: %d new documents", result["new_documents"]
+                )
         finally:
             await pool.close()
 

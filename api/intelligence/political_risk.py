@@ -21,12 +21,28 @@ logger = logging.getLogger(__name__)
 
 # Vancouver neighborhoods (canonical list)
 VANCOUVER_NEIGHBORHOODS = [
-    "Arbutus Ridge", "Downtown", "Dunbar-Southlands", "Fairview",
-    "Grandview-Woodland", "Hastings-Sunrise", "Kensington-Cedar Cottage",
-    "Kerrisdale", "Killarney", "Kitsilano", "Marpole", "Mount Pleasant",
-    "Oakridge", "Renfrew-Collingwood", "Riley Park", "Shaughnessy",
-    "South Cambie", "Strathcona", "Sunset", "Victoria-Fraserview",
-    "West End", "West Point Grey",
+    "Arbutus Ridge",
+    "Downtown",
+    "Dunbar-Southlands",
+    "Fairview",
+    "Grandview-Woodland",
+    "Hastings-Sunrise",
+    "Kensington-Cedar Cottage",
+    "Kerrisdale",
+    "Killarney",
+    "Kitsilano",
+    "Marpole",
+    "Mount Pleasant",
+    "Oakridge",
+    "Renfrew-Collingwood",
+    "Riley Park",
+    "Shaughnessy",
+    "South Cambie",
+    "Strathcona",
+    "Sunset",
+    "Victoria-Fraserview",
+    "West End",
+    "West Point Grey",
 ]
 
 # Component weights for composite score
@@ -36,8 +52,8 @@ WEIGHT_SENTIMENT = 0.30
 WEIGHT_COUNCIL = 0.20
 
 # Minimum thresholds
-MIN_APPLICATIONS = 5        # AC-OPP: need at least 5 applications
-MIN_SIGNALS = 10            # Need at least 10 signals for theme/sentiment analysis
+MIN_APPLICATIONS = 5  # AC-OPP: need at least 5 applications
+MIN_SIGNALS = 10  # Need at least 10 signals for theme/sentiment analysis
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 10.0) -> float:
@@ -216,7 +232,8 @@ async def compute_neighborhood_risk(
 
     async with db_pool.acquire() as conn:
         # 1. Opposition rate: count applications vs opposed applications
-        app_stats = await conn.fetchrow("""
+        app_stats = await conn.fetchrow(
+            """
             SELECT
                 COUNT(DISTINCT sp.id) AS total_apps,
                 COUNT(DISTINCT CASE
@@ -231,14 +248,20 @@ async def compute_neighborhood_risk(
             FROM supply_pipeline sp
             WHERE sp.neighborhood = $1
               AND sp.created_at >= $2
-        """, neighborhood, cutoff)
+        """,
+            neighborhood,
+            cutoff,
+        )
 
         total_apps = app_stats["total_apps"] if app_stats else 0
         opposed_apps = app_stats["opposed_apps"] if app_stats else 0
-        opp_rate, opp_score, opp_status = compute_opposition_rate(total_apps, opposed_apps)
+        opp_rate, opp_score, opp_status = compute_opposition_rate(
+            total_apps, opposed_apps
+        )
 
         # 2. Delay attribution: avg time between rezoning_application and council_decision
-        delay_row = await conn.fetchrow("""
+        delay_row = await conn.fetchrow(
+            """
             SELECT AVG(
                 EXTRACT(EPOCH FROM (h2.changed_at - h1.changed_at)) / (30.0 * 86400)
             ) AS avg_delay_months
@@ -249,40 +272,59 @@ async def compute_neighborhood_risk(
               AND h2.to_stage IN ('council_decision', 'development_permit')
               AND sp.neighborhood = $1
               AND h1.changed_at >= $2
-        """, neighborhood, cutoff)
+        """,
+            neighborhood,
+            cutoff,
+        )
 
-        avg_delay = float(delay_row["avg_delay_months"]) if delay_row and delay_row["avg_delay_months"] else None
+        avg_delay = (
+            float(delay_row["avg_delay_months"])
+            if delay_row and delay_row["avg_delay_months"]
+            else None
+        )
         d_score = compute_delay_score(avg_delay)
 
         # 3. Sentiment intensity: fetch signals for this neighborhood
-        signals = await conn.fetch("""
+        signals = await conn.fetch(
+            """
             SELECT sentiment, event_date, confidence
             FROM intelligence_signals
             WHERE neighborhood = $1
               AND event_date >= $2
               AND confidence >= 0.60
-        """, neighborhood, cutoff)
+        """,
+            neighborhood,
+            cutoff,
+        )
 
         signal_list = [dict(s) for s in signals]
         s_score = compute_sentiment_intensity(signal_list, period_months)
 
         # 4. Council resistance: voting patterns
-        votes = await conn.fetch("""
+        votes = await conn.fetch(
+            """
             SELECT vote_for, vote_against
             FROM intelligence_signals
             WHERE neighborhood = $1
               AND event_date >= $2
               AND signal_type IN ('rezoning_decision', 'council_decision')
               AND (vote_for IS NOT NULL OR vote_against IS NOT NULL)
-        """, neighborhood, cutoff)
+        """,
+            neighborhood,
+            cutoff,
+        )
 
         vote_list = [dict(v) for v in votes]
         avg_against_pct, c_score = compute_council_resistance(vote_list)
 
         # Composite
-        composite, score_status = compute_composite_score(opp_score, d_score, s_score, c_score)
+        composite, score_status = compute_composite_score(
+            opp_score, d_score, s_score, c_score
+        )
 
-        neg_signals = sum(1 for s in signal_list if s.get("sentiment") == "negative_for_development")
+        neg_signals = sum(
+            1 for s in signal_list if s.get("sentiment") == "negative_for_development"
+        )
 
         # Determine themes_status based on signal count
         themes_status = None
@@ -327,7 +369,9 @@ async def materialize_all_scores(
 
     for neighborhood in VANCOUVER_NEIGHBORHOODS:
         try:
-            result = await compute_neighborhood_risk(db_pool, neighborhood, period_months)
+            result = await compute_neighborhood_risk(
+                db_pool, neighborhood, period_months
+            )
 
             # Skip DB materialization when score is None (insufficient data)
             if result["risk_score"] is None:
@@ -341,7 +385,8 @@ async def materialize_all_scores(
                 continue
 
             async with db_pool.acquire() as conn:
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO political_risk_scores (
                         neighborhood, risk_score, opposition_rate,
                         delay_score, sentiment_intensity, council_resistance,
@@ -384,10 +429,13 @@ async def get_neighborhood_risk(
     """Get the latest political risk score for a neighborhood."""
     try:
         async with db_pool.acquire() as conn:
-            row = await conn.fetchrow("""
+            row = await conn.fetchrow(
+                """
                 SELECT * FROM latest_political_risk
                 WHERE neighborhood = $1
-            """, neighborhood)
+            """,
+                neighborhood,
+            )
             return dict(row) if row else None
     except Exception as e:
         logger.debug("Error fetching risk for %s: %s", neighborhood, e)
@@ -415,13 +463,31 @@ async def get_all_risk_scores(
 
 # Common opposition theme keywords
 THEME_KEYWORDS = {
-    "traffic_congestion": ["traffic", "congestion", "parking", "transportation", "transit"],
+    "traffic_congestion": [
+        "traffic",
+        "congestion",
+        "parking",
+        "transportation",
+        "transit",
+    ],
     "building_height": ["height", "shadow", "tower", "storey", "tall", "high-rise"],
     "density": ["density", "overcrowd", "too many units", "overbuilt", "densification"],
-    "neighborhood_character": ["character", "heritage", "neighborhood feel", "scale", "out of place"],
+    "neighborhood_character": [
+        "character",
+        "heritage",
+        "neighborhood feel",
+        "scale",
+        "out of place",
+    ],
     "infrastructure": ["sewer", "water", "infrastructure", "capacity", "school"],
     "affordability": ["affordable", "affordability", "expensive", "market housing"],
-    "environment": ["tree", "green space", "environment", "sustainability", "contamination"],
+    "environment": [
+        "tree",
+        "green space",
+        "environment",
+        "sustainability",
+        "contamination",
+    ],
     "noise": ["noise", "construction", "disturbance", "disruption"],
     "view_impact": ["view", "sight line", "view cone", "obstruct"],
     "process": ["consultation", "process", "notification", "input", "rushed"],
@@ -542,13 +608,17 @@ async def get_opposition_themes(
 
     try:
         async with db_pool.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await conn.fetch(
+                """
                 SELECT summary, headline, sentiment
                 FROM intelligence_signals
                 WHERE neighborhood = $1
                   AND event_date >= $2
                   AND confidence >= 0.60
-            """, neighborhood, cutoff)
+            """,
+                neighborhood,
+                cutoff,
+            )
 
             return extract_opposition_themes([dict(r) for r in rows])
     except Exception as e:
@@ -578,13 +648,17 @@ async def get_parcel_political_risk(
             neighborhood = parcel["geo_local_area"]
 
             # Get neighborhood risk score
-            risk = await conn.fetchrow("""
+            risk = await conn.fetchrow(
+                """
                 SELECT * FROM latest_political_risk
                 WHERE neighborhood = $1
-            """, neighborhood)
+            """,
+                neighborhood,
+            )
 
             # Get parcel-specific opposition signals
-            parcel_signals = await conn.fetch("""
+            parcel_signals = await conn.fetch(
+                """
                 SELECT summary, headline, sentiment, event_date, confidence
                 FROM intelligence_signals
                 WHERE parcel_pid = $1
@@ -592,7 +666,9 @@ async def get_parcel_political_risk(
                   AND confidence >= 0.60
                 ORDER BY event_date DESC
                 LIMIT 5
-            """, pid)
+            """,
+                pid,
+            )
 
             result = {
                 "pid": pid,
@@ -605,15 +681,21 @@ async def get_parcel_political_risk(
 
             # Get themes for the neighborhood
             cutoff = date.today() - timedelta(days=36 * 30)
-            all_signals = await conn.fetch("""
+            all_signals = await conn.fetch(
+                """
                 SELECT summary, headline, sentiment
                 FROM intelligence_signals
                 WHERE neighborhood = $1
                   AND event_date >= $2
                   AND confidence >= 0.60
-            """, neighborhood, cutoff)
+            """,
+                neighborhood,
+                cutoff,
+            )
 
-            themes, themes_status = extract_opposition_themes([dict(r) for r in all_signals])
+            themes, themes_status = extract_opposition_themes(
+                [dict(r) for r in all_signals]
+            )
             result["themes"] = themes
             if themes_status:
                 result["themes_status"] = themes_status

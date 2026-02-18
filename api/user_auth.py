@@ -25,8 +25,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class UserRole(str, Enum):
     """User roles for role-based access control."""
+
     USER = "user"
     ADMIN = "admin"
     MODERATOR = "moderator"
@@ -53,8 +55,10 @@ bearer_scheme = HTTPBearer(auto_error=False)
 # Pydantic Models
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class UserCreate(BaseModel):
     """Request model for user registration."""
+
     email: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=8, max_length=255)
     display_name: Optional[str] = Field(None, max_length=255)
@@ -62,12 +66,14 @@ class UserCreate(BaseModel):
 
 class UserLogin(BaseModel):
     """Request model for user login."""
+
     email: str
     password: str
 
 
 class UserResponse(BaseModel):
     """Response model for user data."""
+
     id: int
     email: str
     display_name: Optional[str]
@@ -82,6 +88,7 @@ class UserResponse(BaseModel):
 
 class TokenResponse(BaseModel):
     """JWT token pair response."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -90,6 +97,7 @@ class TokenResponse(BaseModel):
 
 class APIKeyCreate(BaseModel):
     """Request model for creating an API key."""
+
     label: str = Field(..., max_length=255)
     permissions: List[str] = Field(default=["read"])
     expires_days: Optional[int] = Field(None, ge=1, le=3650)
@@ -97,6 +105,7 @@ class APIKeyCreate(BaseModel):
 
 class APIKeyResponse(BaseModel):
     """Response model for API key (with masked key)."""
+
     id: int
     label: str
     permissions: List[str]
@@ -109,17 +118,20 @@ class APIKeyResponse(BaseModel):
 
 class APIKeyCreateResponse(APIKeyResponse):
     """Response model for newly created API key (includes full key)."""
+
     key: str  # Full key - only shown once
 
 
 class RefreshTokenRequest(BaseModel):
     """Request model for refreshing access token."""
+
     refresh_token: str
 
 
 # ────────────────────────────────────────────────────────────────────────────
 # Password Hashing
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password using bcrypt."""
@@ -134,6 +146,7 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
 # ────────────────────────────────────────────────────────────────────────────
 # JWT Token Management
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _create_jwt(
     user_id: int,
@@ -196,6 +209,7 @@ def validate_token(token: str) -> Optional[int]:
 # ────────────────────────────────────────────────────────────────────────────
 # API Key Management
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _generate_api_key() -> str:
     """Generate a random API key."""
@@ -296,7 +310,9 @@ async def validate_api_key(db_pool: asyncpg.Pool, key: str) -> Optional[Dict]:
                         row["id"],
                     )
             except Exception as e:
-                logger.warning(f"Failed to update last_used_at for api_key {row['id']}: {e}")
+                logger.warning(
+                    f"Failed to update last_used_at for api_key {row['id']}: {e}"
+                )
 
             return {
                 "user_id": row["user_id"],
@@ -340,6 +356,7 @@ async def revoke_api_key(db_pool: asyncpg.Pool, key_id: int, user_id: int) -> bo
 # ────────────────────────────────────────────────────────────────────────────
 # User Management
 # ────────────────────────────────────────────────────────────────────────────
+
 
 async def register_user(
     db_pool: asyncpg.Pool,
@@ -581,6 +598,7 @@ async def list_user_api_keys(db_pool: asyncpg.Pool, user_id: int) -> List[Dict]:
 # FastAPI Dependencies
 # ────────────────────────────────────────────────────────────────────────────
 
+
 async def _get_current_user_impl(
     db_pool: asyncpg.Pool,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
@@ -682,10 +700,12 @@ def get_current_user(db_pool: asyncpg.Pool):
     Returns:
         An async dependency function
     """
+
     async def _wrapper(
         credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     ) -> Dict:
         return await _get_current_user_impl(db_pool, credentials)
+
     return _wrapper
 
 
@@ -705,6 +725,7 @@ async def get_current_user_from_request(
             return user
     """
     from .db import db as _db
+
     pool = getattr(request.app.state, "pool", None)
     if pool is None:
         pool = _db.pool
@@ -730,6 +751,7 @@ async def get_optional_user_from_request(
         return None
 
     from .db import db as _db
+
     pool = getattr(request.app.state, "pool", None)
     if pool is None:
         pool = _db.pool

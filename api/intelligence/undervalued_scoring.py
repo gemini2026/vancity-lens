@@ -89,7 +89,8 @@ async def compute_comp_averages(
     averages = {}
 
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch("""
+        rows = await conn.fetch(
+            """
             SELECT
                 neighborhood,
                 AVG(price_per_lot_sqft) AS avg_price,
@@ -101,7 +102,10 @@ async def compute_comp_averages(
               AND neighborhood IS NOT NULL
             GROUP BY neighborhood
             HAVING COUNT(*) >= $2
-        """, cutoff, MIN_COMPARABLES)
+        """,
+            cutoff,
+            MIN_COMPARABLES,
+        )
 
         for row in rows:
             averages[row["neighborhood"]] = {
@@ -171,7 +175,8 @@ async def generate_undervalued_alerts(
                 ]
                 if AlertEngine.match_rules(signal, rule_objs):
                     try:
-                        await conn.execute("""
+                        await conn.execute(
+                            """
                             INSERT INTO alerts (
                                 watchlist_id, signal_id, alert_type,
                                 headline, summary, severity, created_at
@@ -186,10 +191,19 @@ async def generate_undervalued_alerts(
                     except Exception as e:
                         alerts_failed += 1
                         last_error = e
-                        logger.warning("Error creating undervalued alert (%s): %s", type(e).__name__, e, exc_info=True)
+                        logger.warning(
+                            "Error creating undervalued alert (%s): %s",
+                            type(e).__name__,
+                            e,
+                            exc_info=True,
+                        )
 
         if alerts_failed > 0 and alerts_created == 0:
-            logger.error("All %d alert creation attempts failed (last: %s)", alerts_failed, type(last_error).__name__ if 'last_error' in locals() else 'Unknown')
+            logger.error(
+                "All %d alert creation attempts failed (last: %s)",
+                alerts_failed,
+                type(last_error).__name__ if "last_error" in locals() else "Unknown",
+            )
 
     return alerts_created
 
@@ -215,7 +229,8 @@ async def score_parcels(
     try:
         async with db_pool.acquire() as conn:
             # Get parcels with entitlements and assessed values
-            parcels = await conn.fetch("""
+            parcels = await conn.fetch(
+                """
                 SELECT
                     p.pid, p.geo_local_area AS neighborhood,
                     p.assessed_value, p.lot_area_sqm,
@@ -228,7 +243,9 @@ async def score_parcels(
                   AND p.geo_local_area IS NOT NULL
                 ORDER BY p.pid
                 LIMIT $1
-            """, limit)
+            """,
+                limit,
+            )
 
             for parcel in parcels:
                 try:
@@ -256,41 +273,54 @@ async def score_parcels(
                     flagged = is_undervalued(discount)
 
                     # Check for active application
-                    active_app = await conn.fetchrow("""
+                    active_app = await conn.fetchrow(
+                        """
                         SELECT 1 FROM supply_pipeline
                         WHERE parcel_pid = $1
                           AND pipeline_stage NOT IN ('completed', 'withdrawn')
                         LIMIT 1
-                    """, parcel["pid"])
+                    """,
+                        parcel["pid"],
+                    )
                     has_active = active_app is not None
 
                     # Check for contamination
-                    contam = await conn.fetchrow("""
+                    contam = await conn.fetchrow(
+                        """
                         SELECT 1 FROM contaminated_sites
                         WHERE associated_pid = $1
                         LIMIT 1
-                    """, parcel["pid"])
+                    """,
+                        parcel["pid"],
+                    )
                     has_contam = contam is not None
 
                     # Check for heritage
-                    heritage = await conn.fetchrow("""
+                    heritage = await conn.fetchrow(
+                        """
                         SELECT 1 FROM heritage_sites
                         WHERE pid = $1
                         LIMIT 1
-                    """, parcel["pid"])
+                    """,
+                        parcel["pid"],
+                    )
                     has_heritage = heritage is not None
 
                     caveats = build_caveats(has_contam, has_heritage, comp_count, None)
 
                     # Check if previously flagged (repeat signal)
-                    prev = await conn.fetchrow("""
+                    prev = await conn.fetchrow(
+                        """
                         SELECT 1 FROM undervalued_scores
                         WHERE pid = $1 AND is_undervalued = TRUE
                         LIMIT 1
-                    """, parcel["pid"])
+                    """,
+                        parcel["pid"],
+                    )
                     repeat = prev is not None
 
-                    await conn.execute("""
+                    await conn.execute(
+                        """
                         INSERT INTO undervalued_scores (
                             pid, neighborhood, assessed_value, implied_value,
                             buildable_sqft, avg_comp_per_bsf, comp_count,
@@ -299,10 +329,20 @@ async def score_parcels(
                             has_heritage, caveats
                         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
                     """,
-                        parcel["pid"], neighborhood, assessed, implied,
-                        round(buildable, 1), round(avg_comp, 2), comp_count,
-                        discount, flagged, repeat,
-                        has_active, has_contam, has_heritage, caveats,
+                        parcel["pid"],
+                        neighborhood,
+                        assessed,
+                        implied,
+                        round(buildable, 1),
+                        round(avg_comp, 2),
+                        comp_count,
+                        discount,
+                        flagged,
+                        repeat,
+                        has_active,
+                        has_contam,
+                        has_heritage,
+                        caveats,
                     )
 
                     stats["parcels_scored"] += 1
@@ -310,30 +350,44 @@ async def score_parcels(
                         stats["undervalued_count"] += 1
 
                     # Look up TOD tier via spatial join with toa_buffers
-                    tier_row = await conn.fetchrow("""
+                    tier_row = await conn.fetchrow(
+                        """
                         SELECT MIN(tb.tier) AS tier
                         FROM toa_buffers tb
                         JOIN parcels pp ON pp.pid = $1
                         WHERE ST_Intersects(pp.geom, tb.geom)
-                    """, parcel["pid"])
+                    """,
+                        parcel["pid"],
+                    )
                     parcel_tod_tier = tier_row["tier"] if tier_row else None
 
                     # Collect scored parcel for alert generation
                     lot_area_sqft = float(parcel["lot_area_sqm"] or 0) * 10.7639
-                    scored_list.append({
-                        "pid": parcel["pid"],
-                        "discount_pct": discount or 0,
-                        "lot_area_sqft": round(lot_area_sqft, 1),
-                        "tod_tier": parcel_tod_tier,
-                        "is_undervalued": flagged,
-                        "neighborhood": neighborhood,
-                    })
+                    scored_list.append(
+                        {
+                            "pid": parcel["pid"],
+                            "discount_pct": discount or 0,
+                            "lot_area_sqft": round(lot_area_sqft, 1),
+                            "tod_tier": parcel_tod_tier,
+                            "is_undervalued": flagged,
+                            "neighborhood": neighborhood,
+                        }
+                    )
 
                 except Exception as e:
-                    logger.warning("Error scoring parcel %s (%s): %s", parcel["pid"], type(e).__name__, e)
+                    logger.warning(
+                        "Error scoring parcel %s (%s): %s",
+                        parcel["pid"],
+                        type(e).__name__,
+                        e,
+                    )
                     stats["errors"] += 1
 
-    except (asyncpg.InterfaceError, asyncpg.PostgresConnectionError, asyncio.TimeoutError):
+    except (
+        asyncpg.InterfaceError,
+        asyncpg.PostgresConnectionError,
+        asyncio.TimeoutError,
+    ):
         raise
     except Exception as e:
         logger.error("Scoring batch failed: %s", e, exc_info=True)
@@ -442,10 +496,13 @@ async def get_parcel_undervaluation(
 ) -> Optional[dict]:
     """Get latest undervaluation score for a specific parcel."""
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("""
+        row = await conn.fetchrow(
+            """
             SELECT * FROM undervalued_scores
             WHERE pid = $1
             ORDER BY computed_at DESC
             LIMIT 1
-        """, pid)
+        """,
+            pid,
+        )
         return dict(row) if row else None

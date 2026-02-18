@@ -252,7 +252,9 @@ async def get_signals(
                     effective_date_from = date.today() - timedelta(days=days)
                     effective_date_to = date.today()
                 except ValueError:
-                    raise HTTPException(status_code=400, detail=f"Invalid date_range: {date_range}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid date_range: {date_range}"
+                    )
 
         feed = await get_signal_feed(
             db_pool=db_pool,
@@ -377,7 +379,9 @@ async def get_signal_document_endpoint(request: Request, signal_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving document for signal {signal_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error retrieving document for signal {signal_id}: {e}", exc_info=True
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve signal document: {str(e)}",
@@ -414,7 +418,9 @@ async def get_document_view(request: Request, document_id: int) -> DocumentViewR
             )
 
         if not row:
-            raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Document {document_id} not found"
+            )
 
         return DocumentViewResponse(
             id=row["id"],
@@ -433,7 +439,9 @@ async def get_document_view(request: Request, document_id: int) -> DocumentViewR
         raise
     except Exception as e:
         logger.error(f"Error viewing document {document_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to view document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to view document: {str(e)}"
+        )
 
 
 @router.get(
@@ -459,13 +467,19 @@ async def get_document_page(request: Request, document_id: int):
             )
 
         if not row:
-            raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Document {document_id} not found"
+            )
 
         import html as html_mod
 
         title = html_mod.escape(row["title"] or "Untitled Document")
-        source_type = html_mod.escape((row["source_type"] or "document").replace("_", " ").title())
-        pub_date = html_mod.escape(str(row["published_date"])) if row["published_date"] else ""
+        source_type = html_mod.escape(
+            (row["source_type"] or "document").replace("_", " ").title()
+        )
+        pub_date = (
+            html_mod.escape(str(row["published_date"])) if row["published_date"] else ""
+        )
         raw_text = html_mod.escape(row["raw_text"] or "No content available.")
         source_url = html_mod.escape(row["source_url"] or "")
         url_status = row["url_status"] or "unchecked"
@@ -473,6 +487,7 @@ async def get_document_page(request: Request, document_id: int):
 
         # Only render clickable links for http(s) URLs to prevent javascript: XSS
         import urllib.parse as urlparse_mod
+
         raw_url = row["source_url"] or ""
         url_is_safe = urlparse_mod.urlparse(raw_url).scheme in ("http", "https")
 
@@ -545,7 +560,9 @@ async def get_document_page(request: Request, document_id: int):
         raise
     except Exception as e:
         logger.error(f"Error rendering document page {document_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to render document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to render document: {str(e)}"
+        )
 
 
 @router.get(
@@ -557,7 +574,9 @@ async def get_document_page(request: Request, document_id: int):
         "whether chunking, embedding, and signal extraction have completed."
     ),
 )
-async def get_document_status(request: Request, document_id: int) -> DocumentStatusResponse:
+async def get_document_status(
+    request: Request, document_id: int
+) -> DocumentStatusResponse:
     """
     Poll document processing status (RAG-011).
 
@@ -580,7 +599,9 @@ async def get_document_status(request: Request, document_id: int) -> DocumentSta
             )
 
         if not row:
-            raise HTTPException(status_code=404, detail=f"Document {document_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Document {document_id} not found"
+            )
 
         # Determine status
         if row["processed_at"]:
@@ -607,7 +628,9 @@ async def get_document_status(request: Request, document_id: int) -> DocumentSta
         raise
     except Exception as e:
         logger.error(f"Error getting document status {document_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get document status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get document status: {str(e)}"
+        )
 
 
 @router.get(
@@ -717,9 +740,7 @@ async def get_all_neighborhoods(request: Request) -> list[str]:
 # ── Admin Endpoints ───────────────────────────────────────────────────
 
 
-async def _background_scrape_task(
-    db_pool: asyncpg.Pool, source: str, days_back: int
-):
+async def _background_scrape_task(db_pool: asyncpg.Pool, source: str, days_back: int):
     """
     Background task for document scraping.
 
@@ -736,19 +757,19 @@ async def _background_scrape_task(
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
 
-        if source in ('council', 'all'):
+        if source in ("council", "all"):
             logger.info("Scraping council minutes...")
             await scrape_council(db_pool, start_date, end_date)
 
-        if source in ('rezoning', 'all'):
+        if source in ("rezoning", "all"):
             logger.info("Scraping rezoning applications...")
             await scrape_rezoning(db_pool)
 
-        if source in ('dpb', 'all'):
+        if source in ("dpb", "all"):
             logger.info("Scraping DPB minutes...")
             await scrape_dpb(db_pool)
 
-        if source in ('news', 'all'):
+        if source in ("news", "all"):
             logger.info("Scraping news feeds...")
             await scrape_news_feeds(db_pool, days_back=days_back)
 
@@ -780,7 +801,7 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
                 ORDER BY scraped_at DESC
                 LIMIT $1
                 """,
-                batch_size
+                batch_size,
             )
 
         if not doc_ids:
@@ -792,7 +813,9 @@ async def _background_process_task(db_pool: asyncpg.Pool, batch_size: int):
         # Process documents concurrently; vendor calls are concurrency-limited globally
         async def _process_one(doc_id: int):
             try:
-                logger.info(f"Doc {doc_id}: skipping local embedding (K2 handles ingestion)")
+                logger.info(
+                    f"Doc {doc_id}: skipping local embedding (K2 handles ingestion)"
+                )
 
                 signals_stored = await process_document(db_pool, doc_id, anthropic_key)
                 logger.info(f"Doc {doc_id}: {signals_stored} signals extracted")
@@ -1025,12 +1048,17 @@ async def _background_ingest_url_process(db_pool: asyncpg.Pool, document_id: int
 
         from .extractor import process_document
 
-        logger.info(f"Ingested doc {document_id}: skipping local embedding (K2 handles ingestion)")
+        logger.info(
+            f"Ingested doc {document_id}: skipping local embedding (K2 handles ingestion)"
+        )
 
         signals_stored = await process_document(db_pool, document_id, anthropic_key)
         logger.info(f"Ingested doc {document_id}: {signals_stored} signals extracted")
     except Exception as e:
-        logger.error(f"Background processing failed for document {document_id}: {e}", exc_info=True)
+        logger.error(
+            f"Background processing failed for document {document_id}: {e}",
+            exc_info=True,
+        )
 
 
 @router.post(
@@ -1167,7 +1195,9 @@ async def admin_url_health_check(
     request: Request,
     background_tasks: BackgroundTasks,
     limit: int = Query(100, ge=1, le=1000, description="Max URLs to check"),
-    recheck_hours: int = Query(24, ge=1, le=720, description="Skip URLs checked within this window"),
+    recheck_hours: int = Query(
+        24, ge=1, le=720, description="Skip URLs checked within this window"
+    ),
 ):
     """Trigger URL health checking for document source URLs."""
     try:
@@ -1191,7 +1221,9 @@ async def admin_url_health_check(
         raise
     except Exception as e:
         logger.error(f"Error initiating URL health check: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start URL health check: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to start URL health check: {str(e)}"
+        )
 
 
 @router.get(
@@ -1290,10 +1322,26 @@ async def admin_update_search_config(
                 "SELECT vector_weight, text_weight, rrf_k, rerank_enabled FROM search_config ORDER BY id DESC LIMIT 1"
             )
 
-            vw = body.vector_weight if body.vector_weight is not None else (float(current["vector_weight"]) if current else 0.5)
-            tw = body.text_weight if body.text_weight is not None else (float(current["text_weight"]) if current else 0.5)
-            rk = body.rrf_k if body.rrf_k is not None else (current["rrf_k"] if current else 60)
-            re = body.rerank_enabled if body.rerank_enabled is not None else (current["rerank_enabled"] if current else True)
+            vw = (
+                body.vector_weight
+                if body.vector_weight is not None
+                else (float(current["vector_weight"]) if current else 0.5)
+            )
+            tw = (
+                body.text_weight
+                if body.text_weight is not None
+                else (float(current["text_weight"]) if current else 0.5)
+            )
+            rk = (
+                body.rrf_k
+                if body.rrf_k is not None
+                else (current["rrf_k"] if current else 60)
+            )
+            re = (
+                body.rerank_enabled
+                if body.rerank_enabled is not None
+                else (current["rerank_enabled"] if current else True)
+            )
 
             row = await conn.fetchrow(
                 """
@@ -1303,11 +1351,16 @@ async def admin_update_search_config(
                 WHERE id = (SELECT id FROM search_config ORDER BY id DESC LIMIT 1)
                 RETURNING vector_weight, text_weight, rrf_k, rerank_enabled, updated_at
                 """,
-                vw, tw, rk, re,
+                vw,
+                tw,
+                rk,
+                re,
             )
 
         if not row:
-            raise HTTPException(status_code=500, detail="No search config row to update")
+            raise HTTPException(
+                status_code=500, detail="No search config row to update"
+            )
 
         logger.info(f"Search config updated: vw={vw}, tw={tw}, rrf_k={rk}, rerank={re}")
 
@@ -1370,9 +1423,7 @@ async def admin_scheduler_trigger(
     try:
         db_pool = get_db_pool(request)
 
-        background_tasks.add_task(
-            _background_scrape_task, db_pool, scraper_name, 7
-        )
+        background_tasks.add_task(_background_scrape_task, db_pool, scraper_name, 7)
 
         return {
             "status": "triggered",
@@ -1380,7 +1431,9 @@ async def admin_scheduler_trigger(
         }
     except Exception as e:
         logger.error(f"Error triggering scraper {scraper_name}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to trigger scraper: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to trigger scraper: {str(e)}"
+        )
 
 
 @router.get(
@@ -1408,7 +1461,8 @@ async def admin_scheduler_history(
                     WHERE scraper_name = $1
                     ORDER BY started_at DESC LIMIT $2
                     """,
-                    scraper_name, limit,
+                    scraper_name,
+                    limit,
                 )
             else:
                 rows = await conn.fetch(
@@ -1422,6 +1476,7 @@ async def admin_scheduler_history(
                 )
 
         import json as json_mod
+
         runs = []
         for row in rows:
             errors_raw = row["errors"]
@@ -1430,16 +1485,22 @@ async def admin_scheduler_history(
                     errors_raw = json_mod.loads(errors_raw)
                 except Exception:
                     errors_raw = [errors_raw] if errors_raw else []
-            runs.append({
-                "scraper_name": row["scraper_name"],
-                "started_at": row["started_at"].isoformat() if row["started_at"] else None,
-                "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
-                "status": row["status"],
-                "documents_found": row["documents_found"],
-                "documents_new": row["documents_new"],
-                "documents_skipped": row["documents_skipped"],
-                "errors": errors_raw or [],
-            })
+            runs.append(
+                {
+                    "scraper_name": row["scraper_name"],
+                    "started_at": row["started_at"].isoformat()
+                    if row["started_at"]
+                    else None,
+                    "completed_at": row["completed_at"].isoformat()
+                    if row["completed_at"]
+                    else None,
+                    "status": row["status"],
+                    "documents_found": row["documents_found"],
+                    "documents_new": row["documents_new"],
+                    "documents_skipped": row["documents_skipped"],
+                    "errors": errors_raw or [],
+                }
+            )
 
         return {"runs": runs, "count": len(runs)}
 
@@ -1473,6 +1534,7 @@ async def admin_trigger_opendata_scrape(
         async def _run_opendata_scrapers(pool):
             import aiohttp
             from .scraper_opendata import run_all_scrapers
+
             async with aiohttp.ClientSession() as session:
                 results = await run_all_scrapers(session, pool)
                 logger.info("Open data scraping results: %s", results)
@@ -1481,7 +1543,14 @@ async def admin_trigger_opendata_scrape(
 
         return {
             "status": "open data scraping started",
-            "sources": ["vpd_crime", "cov_parks", "translink_transit", "development", "cov_permits", "cov_property_tax"],
+            "sources": [
+                "vpd_crime",
+                "cov_parks",
+                "translink_transit",
+                "development",
+                "cov_permits",
+                "cov_property_tax",
+            ],
         }
     except HTTPException:
         raise
@@ -1504,6 +1573,7 @@ async def list_neighborhood_scorecards(request: Request):
     with summary scores and top/bottom categories.
     """
     from api.intelligence.neighborhoods import get_all_neighborhood_summaries
+
     db_pool = get_db_pool(request)
     summaries = await get_all_neighborhood_summaries(db_pool)
     return summaries
@@ -1560,7 +1630,9 @@ async def get_neighborhood_investment_metrics_endpoint(slug: str, request: Reque
     Returns supply pipeline count, proposed units, average approval timeline,
     supply pressure, and development momentum.
     """
-    from api.intelligence.neighborhood_investment import get_neighborhood_investment_metrics
+    from api.intelligence.neighborhood_investment import (
+        get_neighborhood_investment_metrics,
+    )
 
     db_pool = get_db_pool(request)
     async with db_pool.acquire() as conn:
@@ -1581,7 +1653,7 @@ async def get_neighborhood_investment_metrics_endpoint(slug: str, request: Reque
 )
 async def post_create_session(
     request: Request,
-    user_label: str = Query("default", description="User label for analytics")
+    user_label: str = Query("default", description="User label for analytics"),
 ) -> ChatSession:
     """
     Create a new chat session.
@@ -1624,10 +1696,7 @@ async def get_list_sessions(
     try:
         db_pool = get_db_pool(request)
         session_list = await list_sessions(
-            db_pool,
-            user_label=user_label,
-            limit=limit,
-            offset=offset
+            db_pool, user_label=user_label, limit=limit, offset=offset
         )
         logger.info(
             f"Listed {len(session_list.sessions)} sessions for user '{user_label}'"
@@ -1662,8 +1731,7 @@ async def get_session_details(
 
         if not session:
             raise HTTPException(
-                status_code=404,
-                detail=f"Session '{session_id}' not found"
+                status_code=404, detail=f"Session '{session_id}' not found"
             )
 
         logger.info(f"Retrieved session details: {session_id}")
@@ -1701,17 +1769,20 @@ async def get_session_messages(
 
         if history is None:
             raise HTTPException(
-                status_code=404,
-                detail=f"Session '{session_id}' not found"
+                status_code=404, detail=f"Session '{session_id}' not found"
             )
 
-        logger.info(f"Retrieved {len(history.messages)} messages for session {session_id}")
+        logger.info(
+            f"Retrieved {len(history.messages)} messages for session {session_id}"
+        )
         return history
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving session history {session_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error retrieving session history {session_id}: {e}", exc_info=True
+        )
         raise HTTPException(
             status_code=500,
             detail="Failed to retrieve session history",
@@ -1739,14 +1810,11 @@ async def delete_chat_session(
         if not success:
             raise HTTPException(
                 status_code=404,
-                detail=f"Session '{session_id}' not found or already deleted"
+                detail=f"Session '{session_id}' not found or already deleted",
             )
 
         logger.info(f"Deleted session: {session_id}")
-        return {
-            "status": "deleted",
-            "session_id": session_id
-        }
+        return {"status": "deleted", "session_id": session_id}
 
     except HTTPException:
         raise
@@ -1759,6 +1827,7 @@ async def delete_chat_session(
 
 
 # ── Materialized View Endpoints (VCL-79 / PERF-011) ─────────────────
+
 
 @router.get(
     "/neighborhoods/rankings",

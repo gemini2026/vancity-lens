@@ -16,7 +16,10 @@ from fpdf import FPDF
 from pydantic import BaseModel, Field
 import asyncpg
 
-from .due_diligence_evidence import DueDiligenceEvidenceResponse, build_due_diligence_evidence
+from .due_diligence_evidence import (
+    DueDiligenceEvidenceResponse,
+    build_due_diligence_evidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +31,15 @@ logger = logging.getLogger(__name__)
 
 class ProFormaScenario(BaseModel):
     """Financial projection for a single scenario (conservative/moderate/aggressive)."""
+
     scenario: str = Field(..., description="conservative, moderate, or aggressive")
     gross_revenue: int = Field(..., description="Gross revenue in dollars")
     net_revenue: int = Field(..., description="Net revenue after absorption discount")
     hard_costs: int = Field(..., description="Hard construction costs in dollars")
     soft_costs: int = Field(..., description="Soft costs (permits, design, etc.)")
-    hidden_costs: int = Field(..., description="Hidden costs (studies, conditions, etc.)")
+    hidden_costs: int = Field(
+        ..., description="Hidden costs (studies, conditions, etc.)"
+    )
     developer_profit: int = Field(..., description="Developer profit amount")
     total_cost: int = Field(..., description="Total project cost")
     noi: int = Field(..., description="Net operating income")
@@ -43,6 +49,7 @@ class ProFormaScenario(BaseModel):
 
 class RiskFlag(BaseModel):
     """A single risk assessment item with color coding."""
+
     category: str = Field(..., description="e.g., 'Zoning', 'Community', 'Financial'")
     description: str = Field(..., description="Risk description")
     severity: str = Field(..., description="low, medium, high, or critical")
@@ -51,6 +58,7 @@ class RiskFlag(BaseModel):
 
 class ComparableSale(BaseModel):
     """A single comparable sale record."""
+
     address: str = Field(..., description="Property address")
     sale_price: int = Field(..., description="Sale price in dollars")
     price_per_sqft: Decimal = Field(..., description="Price per buildable sqft")
@@ -61,6 +69,7 @@ class ComparableSale(BaseModel):
 
 class ParcelReport(BaseModel):
     """Complete parcel report data."""
+
     pid: str = Field(..., description="BC Land Title PID")
     civic_address: Optional[str] = None
     current_zoning: Optional[str] = None
@@ -77,8 +86,12 @@ class ParcelReport(BaseModel):
     assessed_value: Optional[int] = None
     asking_price: Optional[int] = None
     value_delta: Optional[int] = None
-    heritage_designation: Optional[str] = Field(None, description="Heritage category A/B/C if designated")
-    contamination_status: Optional[str] = Field(None, description="Contamination status if parcel is listed")
+    heritage_designation: Optional[str] = Field(
+        None, description="Heritage category A/B/C if designated"
+    )
+    contamination_status: Optional[str] = Field(
+        None, description="Contamination status if parcel is listed"
+    )
     pro_forma_scenarios: List[ProFormaScenario] = Field(default_factory=list)
     risk_flags: List[RiskFlag] = Field(default_factory=list)
     comparables: List[ComparableSale] = Field(default_factory=list)
@@ -141,8 +154,16 @@ class ReportGenerator:
         try:
             await self._build_environmental_section(pdf, parcel_data, db_pool)
         except Exception as e:
-            logger.error("Failed to build %s section for %s: %s", "Environmental", pid, e, exc_info=True)
-            self._render_unavailable_section(pdf, "Environmental", "Environmental data source", str(e))
+            logger.error(
+                "Failed to build %s section for %s: %s",
+                "Environmental",
+                pid,
+                e,
+                exc_info=True,
+            )
+            self._render_unavailable_section(
+                pdf, "Environmental", "Environmental data source", str(e)
+            )
 
         self._build_heritage_section(pdf, parcel_data)
         self._build_before_after_section(pdf, parcel_data)
@@ -150,28 +171,60 @@ class ReportGenerator:
         try:
             await self._build_nearby_development(pdf, parcel_data, db_pool)
         except Exception as e:
-            logger.error("Failed to build %s section for %s: %s", "Nearby Development", pid, e, exc_info=True)
-            self._render_unavailable_section(pdf, "Nearby Development", "Development pipeline data source", str(e))
+            logger.error(
+                "Failed to build %s section for %s: %s",
+                "Nearby Development",
+                pid,
+                e,
+                exc_info=True,
+            )
+            self._render_unavailable_section(
+                pdf, "Nearby Development", "Development pipeline data source", str(e)
+            )
 
         try:
             await self._build_market_context(pdf, db_pool)
         except Exception as e:
-            logger.error("Failed to build %s section for %s: %s", "Market Context", pid, e, exc_info=True)
-            self._render_unavailable_section(pdf, "Market Context", "CMHC housing data source", str(e))
+            logger.error(
+                "Failed to build %s section for %s: %s",
+                "Market Context",
+                pid,
+                e,
+                exc_info=True,
+            )
+            self._render_unavailable_section(
+                pdf, "Market Context", "CMHC housing data source", str(e)
+            )
 
         try:
             await self._build_demographic_profile(pdf, parcel_data, db_pool)
         except Exception as e:
-            logger.error("Failed to build %s section for %s: %s", "Demographic Profile", pid, e, exc_info=True)
-            self._render_unavailable_section(pdf, "Demographic Profile", "StatsCan demographics data source", str(e))
+            logger.error(
+                "Failed to build %s section for %s: %s",
+                "Demographic Profile",
+                pid,
+                e,
+                exc_info=True,
+            )
+            self._render_unavailable_section(
+                pdf, "Demographic Profile", "StatsCan demographics data source", str(e)
+            )
 
         self._build_red_flags_summary(pdf, parcel_data)
 
         try:
             await self._build_data_currency(pdf, db_pool)
         except Exception as e:
-            logger.error("Failed to build %s section for %s: %s", "Data Currency", pid, e, exc_info=True)
-            self._render_unavailable_section(pdf, "Data Currency", "Data currency tracking source", str(e))
+            logger.error(
+                "Failed to build %s section for %s: %s",
+                "Data Currency",
+                pid,
+                e,
+                exc_info=True,
+            )
+            self._render_unavailable_section(
+                pdf, "Data Currency", "Data currency tracking source", str(e)
+            )
 
         self._build_pro_forma(pdf, parcel_data)
         self._build_hbu_section(pdf, parcel_data)
@@ -229,11 +282,16 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError) as e:
+            except (
+                asyncpg.exceptions.UndefinedTableError,
+                asyncpg.exceptions.UndefinedColumnError,
+            ) as e:
                 logger.warning("Entitlement table/column not found for %s: %s", pid, e)
                 entitlement_row = None
             except asyncpg.PostgresError as e:
-                logger.error("Failed to fetch entitlement data for %s: %s", pid, e, exc_info=True)
+                logger.error(
+                    "Failed to fetch entitlement data for %s: %s", pid, e, exc_info=True
+                )
                 entitlement_row = None
 
             # Build report data
@@ -250,20 +308,14 @@ class ReportGenerator:
                     if entitlement_row and entitlement_row["entitled_fsr"]
                     else Decimal("1"),
                 ),
-                coordinates=(
-                    row["coordinates"][0], row["coordinates"][1]
-                )
+                coordinates=(row["coordinates"][0], row["coordinates"][1])
                 if row.get("coordinates")
                 else None,
                 current_storeys=(
-                    entitlement_row["current_storeys"]
-                    if entitlement_row
-                    else None
+                    entitlement_row["current_storeys"] if entitlement_row else None
                 ),
                 entitled_storeys=(
-                    entitlement_row["entitled_storeys"]
-                    if entitlement_row
-                    else None
+                    entitlement_row["entitled_storeys"] if entitlement_row else None
                 ),
                 current_fsr=(
                     Decimal(str(entitlement_row["current_fsr"]))
@@ -276,24 +328,16 @@ class ReportGenerator:
                     else None
                 ),
                 estimated_land_value=(
-                    entitlement_row["estimated_land_value"]
-                    if entitlement_row
-                    else None
+                    entitlement_row["estimated_land_value"] if entitlement_row else None
                 ),
                 assessed_value=(
-                    entitlement_row["assessed_value"]
-                    if entitlement_row
-                    else None
+                    entitlement_row["assessed_value"] if entitlement_row else None
                 ),
                 asking_price=(
-                    entitlement_row["asking_price"]
-                    if entitlement_row
-                    else None
+                    entitlement_row["asking_price"] if entitlement_row else None
                 ),
                 value_delta=(
-                    entitlement_row["value_delta"]
-                    if entitlement_row
-                    else None
+                    entitlement_row["value_delta"] if entitlement_row else None
                 ),
             )
 
@@ -314,7 +358,10 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+            except (
+                asyncpg.exceptions.UndefinedTableError,
+                asyncpg.exceptions.UndefinedColumnError,
+            ):
                 # Optional table in some local/dev schemas.
                 scenarios = []
             data.pro_forma_scenarios = [
@@ -345,7 +392,10 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+            except (
+                asyncpg.exceptions.UndefinedTableError,
+                asyncpg.exceptions.UndefinedColumnError,
+            ):
                 risks = []
             data.risk_flags = [
                 RiskFlag(
@@ -370,7 +420,10 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+            except (
+                asyncpg.exceptions.UndefinedTableError,
+                asyncpg.exceptions.UndefinedColumnError,
+            ):
                 comps = []
             data.comparables = [
                 ComparableSale(
@@ -395,15 +448,25 @@ class ReportGenerator:
                     """,
                     pid,
                 )
-            except (asyncpg.exceptions.UndefinedTableError, asyncpg.exceptions.UndefinedColumnError):
+            except (
+                asyncpg.exceptions.UndefinedTableError,
+                asyncpg.exceptions.UndefinedColumnError,
+            ):
                 sources = []
             data.sources = [s["source_url"] for s in sources if s.get("source_url")]
 
             # Due diligence evidence (optional; must not break report generation)
             try:
-                data.due_diligence_evidence = await build_due_diligence_evidence(conn, pid)
+                data.due_diligence_evidence = await build_due_diligence_evidence(
+                    conn, pid
+                )
             except Exception as e:
-                logger.error("Failed to build due diligence evidence for %s: %s", pid, e, exc_info=True)
+                logger.error(
+                    "Failed to build due diligence evidence for %s: %s",
+                    pid,
+                    e,
+                    exc_info=True,
+                )
                 data.due_diligence_evidence = None
 
             # Heritage designation check (~30m from parcel centroid, matching entitlement.py)
@@ -462,9 +525,12 @@ class ReportGenerator:
         """Compute buildable square footage from FSR."""
         return lot_area_sqm * entitled_fsr * Decimal("10.7639")
 
-    def _render_unavailable_section(self, pdf: FPDF, section_name: str, source_name: str, error: str = ""):
+    def _render_unavailable_section(
+        self, pdf: FPDF, section_name: str, source_name: str, error: str = ""
+    ):
         """Render a graceful degradation message when a section's data is unavailable."""
         from datetime import datetime, timezone
+
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         msg = f"Data unavailable -- {source_name} error at {timestamp}"
         if error:
@@ -488,12 +554,23 @@ class ReportGenerator:
 
         # Divider
         pdf.set_draw_color(200, 200, 200)
-        pdf.line(self.left_margin, pdf.get_y() + 2, self.page_width - self.right_margin, pdf.get_y() + 2)
+        pdf.line(
+            self.left_margin,
+            pdf.get_y() + 2,
+            self.page_width - self.right_margin,
+            pdf.get_y() + 2,
+        )
         pdf.ln(8)
 
         # Generated date
         pdf.set_font("Helvetica", "", 9)
-        pdf.cell(0, 4, f"Generated: {parcel_data.generated_at.strftime('%B %d, %Y')}", ln=True, align="R")
+        pdf.cell(
+            0,
+            4,
+            f"Generated: {parcel_data.generated_at.strftime('%B %d, %Y')}",
+            ln=True,
+            align="R",
+        )
         pdf.ln(3)
 
     def _build_parcel_overview(self, pdf: FPDF, parcel_data: ParcelReport):
@@ -502,7 +579,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Parcel Overview", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 10)
@@ -529,7 +611,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(40, 6, "Lot Area:")
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(0, 6, f"{parcel_data.lot_area_sqm:.0f} sqm ({parcel_data.lot_area_sqft:.0f} sqft)", ln=True)
+        pdf.cell(
+            0,
+            6,
+            f"{parcel_data.lot_area_sqm:.0f} sqm ({parcel_data.lot_area_sqft:.0f} sqft)",
+            ln=True,
+        )
 
         # Proposed zoning if available
         if parcel_data.proposed_zoning:
@@ -560,23 +647,27 @@ class ReportGenerator:
         if heritage:
             severity_map = {"A": "high", "B": "medium", "C": "low"}
             severity = severity_map.get(heritage, "medium")
-            flags.append({
-                "flag_name": "Heritage Designation",
-                "severity": severity,
-                "detail": f"Property has heritage designation category {heritage}. "
-                         f"Development may require heritage conservation approval."
-            })
+            flags.append(
+                {
+                    "flag_name": "Heritage Designation",
+                    "severity": severity,
+                    "detail": f"Property has heritage designation category {heritage}. "
+                    f"Development may require heritage conservation approval.",
+                }
+            )
 
         # Contamination risk
         contamination = getattr(data, "contamination_status", None)
         if contamination and contamination not in ("Not Listed", "None", None):
             severity = "high" if "Active" in contamination else "medium"
-            flags.append({
-                "flag_name": "Environmental Contamination",
-                "severity": severity,
-                "detail": f"Site contamination status: {contamination}. "
-                         f"May require environmental remediation."
-            })
+            flags.append(
+                {
+                    "flag_name": "Environmental Contamination",
+                    "severity": severity,
+                    "detail": f"Site contamination status: {contamination}. "
+                    f"May require environmental remediation.",
+                }
+            )
 
         # Assessed value anomaly (outlier detection)
         assessed = getattr(data, "assessed_value", None)
@@ -587,23 +678,29 @@ class ReportGenerator:
             z_score = abs((assessed - median) / std_dev) if std_dev > 0 else 0
             if z_score > 2:  # More than 2 standard deviations
                 severity = "medium"
-                flags.append({
-                    "flag_name": "Assessed Value Anomaly",
-                    "severity": severity,
-                    "detail": f"Assessed value (${assessed:,}) is {z_score:.1f} standard deviations "
-                             f"from neighbourhood median (${median:,}). Verify assessment accuracy."
-                })
+                flags.append(
+                    {
+                        "flag_name": "Assessed Value Anomaly",
+                        "severity": severity,
+                        "detail": f"Assessed value (${assessed:,}) is {z_score:.1f} standard deviations "
+                        f"from neighbourhood median (${median:,}). Verify assessment accuracy.",
+                    }
+                )
 
         # Data currency warnings
         data_currency = getattr(data, "data_currency", [])
         if isinstance(data_currency, list):
             for warning in data_currency:
                 if isinstance(warning, dict):
-                    flags.append({
-                        "flag_name": warning.get("source", "Data Currency"),
-                        "severity": "low",
-                        "detail": warning.get("message", "Data may be stale. Verify current status.")
-                    })
+                    flags.append(
+                        {
+                            "flag_name": warning.get("source", "Data Currency"),
+                            "severity": "low",
+                            "detail": warning.get(
+                                "message", "Data may be stale. Verify current status."
+                            ),
+                        }
+                    )
 
         return flags
 
@@ -622,9 +719,11 @@ class ReportGenerator:
             pdf.set_font("Helvetica", "B", 10)
             pdf.set_fill_color(200, 220, 255)
             pdf.cell(
-                0, 8,
+                0,
+                8,
                 "  Current zoning already exceeds Bill 47 entitlement",
-                fill=True, ln=True,
+                fill=True,
+                ln=True,
             )
             pdf.ln(3)
             return
@@ -634,8 +733,10 @@ class ReportGenerator:
         pdf.cell(0, 8, "Before / After Bill 47", ln=True)
         pdf.set_draw_color(100, 100, 100)
         pdf.line(
-            self.left_margin, pdf.get_y(),
-            self.page_width - self.right_margin, pdf.get_y(),
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
         )
         pdf.ln(4)
 
@@ -729,8 +830,10 @@ class ReportGenerator:
         pdf.cell(0, 8, "Highest & Best Use Analysis", ln=True)
         pdf.set_draw_color(100, 100, 100)
         pdf.line(
-            self.left_margin, pdf.get_y(),
-            self.page_width - self.right_margin, pdf.get_y(),
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
         )
         pdf.ln(4)
 
@@ -752,7 +855,9 @@ class ReportGenerator:
             f"{analysis.get('max_height_storeys', '?')} storeys",
             f"{analysis.get('max_fsr', '?')}",
             f"~{analysis.get('estimated_units', '?')}",
-            f"{int(analysis.get('buildable_sqft', 0)):,}" if analysis.get("buildable_sqft") else "?",
+            f"{int(analysis.get('buildable_sqft', 0)):,}"
+            if analysis.get("buildable_sqft")
+            else "?",
         ]
 
         pdf.set_font("Helvetica", "B", 8)
@@ -808,7 +913,9 @@ class ReportGenerator:
         if sources:
             pdf.set_font("Helvetica", "", 7)
             pdf.set_text_color(120, 120, 120)
-            source_titles = [s.get("title", "") for s in sources[:5] if isinstance(s, dict)]
+            source_titles = [
+                s.get("title", "") for s in sources[:5] if isinstance(s, dict)
+            ]
             source_text = "Sources: " + ", ".join(source_titles)
             pdf.cell(0, 4, source_text[:120], ln=True)
             pdf.set_text_color(0, 0, 0)
@@ -821,7 +928,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Entitlement Analysis", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 10)
@@ -834,14 +946,24 @@ class ReportGenerator:
         pdf.cell(10, 5, "")  # Indent
         pdf.cell(35, 5, "Current:")
         if parcel_data.current_storeys and parcel_data.current_fsr:
-            pdf.cell(0, 5, f"{parcel_data.current_storeys} storeys, {parcel_data.current_fsr} FSR", ln=True)
+            pdf.cell(
+                0,
+                5,
+                f"{parcel_data.current_storeys} storeys, {parcel_data.current_fsr} FSR",
+                ln=True,
+            )
         else:
             pdf.cell(0, 5, "N/A", ln=True)
 
         pdf.cell(10, 5, "")  # Indent
         pdf.cell(35, 5, "Entitled:")
         if parcel_data.entitled_storeys and parcel_data.entitled_fsr:
-            pdf.cell(0, 5, f"{parcel_data.entitled_storeys} storeys, {parcel_data.entitled_fsr} FSR", ln=True)
+            pdf.cell(
+                0,
+                5,
+                f"{parcel_data.entitled_storeys} storeys, {parcel_data.entitled_fsr} FSR",
+                ln=True,
+            )
         else:
             pdf.cell(0, 5, "N/A", ln=True)
 
@@ -862,7 +984,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Pro Forma Summary (Three Scenarios)", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         # Table header
@@ -895,7 +1022,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Risk Assessment", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 9)
@@ -907,7 +1039,9 @@ class ReportGenerator:
             "low": (200, 255, 200),
         }
 
-        for risk in parcel_data.risk_flags[:8]:  # Limit to 8 risks to avoid page overflow
+        for risk in parcel_data.risk_flags[
+            :8
+        ]:  # Limit to 8 risks to avoid page overflow
             color = severity_colors.get(risk.severity, (200, 200, 200))
             pdf.set_fill_color(*color)
 
@@ -941,7 +1075,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Comparable Sales", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         # Table header
@@ -971,7 +1110,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Due Diligence Checklist", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 9)
@@ -1066,7 +1210,10 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 9)
         pdf.cell(0, 5, "Utilities (proximity evidence):", ln=True)
         pdf.set_font("Helvetica", "", 9)
-        for label, ue in [("Water", evidence.utilities.water), ("Sewer", evidence.utilities.sewer)]:
+        for label, ue in [
+            ("Water", evidence.utilities.water),
+            ("Sewer", evidence.utilities.sewer),
+        ]:
             if ue.status == "ok" and ue.nearest_distance_m is not None:
                 src = _wrap_url(ue.source.url) if ue.source else ""
                 _mc(f"- {label}: nearest line ~{ue.nearest_distance_m}m. Source: {src}")
@@ -1084,7 +1231,9 @@ class ReportGenerator:
             src = _wrap_url(enc.source.url) if enc.source else ""
             _mc(f"- Easements intersecting parcel: {enc.easement_count}. Source: {src}")
             if enc.easements:
-                sample = ", ".join(_trunc(e.easement_type, 40) for e in enc.easements[:3])
+                sample = ", ".join(
+                    _trunc(e.easement_type, 40) for e in enc.easements[:3]
+                )
                 _mc(f"- Sample easements: {sample}")
             if enc.note:
                 _mc(f"- Note: {_trunc(enc.note)}")
@@ -1116,7 +1265,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Executive Summary", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 10)
@@ -1145,10 +1299,14 @@ class ReportGenerator:
                 )
 
         if parcel_data.buildable_sqft:
-            parts.append(f"Maximum buildable area is {parcel_data.buildable_sqft:,.0f} sqft.")
+            parts.append(
+                f"Maximum buildable area is {parcel_data.buildable_sqft:,.0f} sqft."
+            )
 
         if parcel_data.estimated_land_value:
-            parts.append(f"Estimated land value is ${parcel_data.estimated_land_value:,}.")
+            parts.append(
+                f"Estimated land value is ${parcel_data.estimated_land_value:,}."
+            )
 
         if parcel_data.assessed_value:
             parts.append(f"BC Assessment value is ${parcel_data.assessed_value:,}.")
@@ -1163,9 +1321,15 @@ class ReportGenerator:
         red_flags = self._collect_red_flags(parcel_data)
         risk_count = len(parcel_data.risk_flags) + len(red_flags)
         if risk_count > 0:
-            high_risks = sum(1 for r in parcel_data.risk_flags if r.severity in ("high", "critical"))
-            high_risks += sum(1 for f in red_flags if f.get("severity") in ("high", "critical"))
-            risk_detail = f", including {high_risks} high/critical" if high_risks else ""
+            high_risks = sum(
+                1 for r in parcel_data.risk_flags if r.severity in ("high", "critical")
+            )
+            high_risks += sum(
+                1 for f in red_flags if f.get("severity") in ("high", "critical")
+            )
+            risk_detail = (
+                f", including {high_risks} high/critical" if high_risks else ""
+            )
             parts.append(
                 f"{risk_count} risk factor{'s' if risk_count != 1 else ''} identified{risk_detail}."
             )
@@ -1207,11 +1371,14 @@ class ReportGenerator:
                 final_summary = llm_text
                 logger.info(
                     "LLM-enhanced executive summary generated (model=%s, %d words, %.1fs)",
-                    model, word_count, latency
+                    model,
+                    word_count,
+                    latency,
                 )
             else:
                 logger.warning(
-                    "LLM summary too long (%d words), falling back to template", word_count
+                    "LLM summary too long (%d words), falling back to template",
+                    word_count,
                 )
         except Exception as e:
             logger.warning("LLM enhancement failed, using template summary: %s", e)
@@ -1228,7 +1395,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Title & Ownership", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 10)
@@ -1256,9 +1428,11 @@ class ReportGenerator:
         pdf.set_fill_color(240, 240, 255)
         pdf.set_font("Helvetica", "I", 9)
         pdf.cell(
-            0, 8,
+            0,
+            8,
             "  Full LTSA title search (ownership, encumbrances, charges) available in Pro tier",
-            fill=True, ln=True,
+            fill=True,
+            ln=True,
         )
         pdf.ln(4)
 
@@ -1272,13 +1446,19 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Environmental Assessment", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         sites = []
         try:
             async with db_pool.acquire() as conn:
-                sites = await conn.fetch("""
+                sites = await conn.fetch(
+                    """
                     SELECT cs.site_name, cs.address, cs.classification, cs.status,
                            cs.contamination_type, cs.date_reported,
                            ST_Distance(
@@ -1292,21 +1472,33 @@ class ReportGenerator:
                       AND ST_DWithin(cs.geom::geography, p.geom::geography, 500)
                     ORDER BY distance_m ASC
                     LIMIT 10
-                """, parcel_data.pid)
+                """,
+                    parcel_data.pid,
+                )
         except Exception as e:
-            logger.debug("Environmental section query failed (table may not exist): %s", e)
+            logger.debug(
+                "Environmental section query failed (table may not exist): %s", e
+            )
 
         pdf.set_font("Helvetica", "", 10)
 
         if not sites:
             pdf.set_fill_color(200, 255, 200)
-            pdf.cell(0, 6, "  No contaminated sites found within 500m radius", fill=True, ln=True)
+            pdf.cell(
+                0,
+                6,
+                "  No contaminated sites found within 500m radius",
+                fill=True,
+                ln=True,
+            )
         else:
             pdf.set_fill_color(255, 230, 200)
             pdf.cell(
-                0, 6,
+                0,
+                6,
                 f"  {len(sites)} contaminated site{'s' if len(sites) != 1 else ''} found within 500m",
-                fill=True, ln=True,
+                fill=True,
+                ln=True,
             )
             pdf.ln(2)
 
@@ -1331,7 +1523,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Heritage Designation", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         heritage = getattr(parcel_data, "heritage_designation", None)
@@ -1353,7 +1550,9 @@ class ReportGenerator:
             else:
                 pdf.set_fill_color(255, 255, 200)
 
-            pdf.cell(0, 6, f"  Heritage Designation Category: {heritage}", fill=True, ln=True)
+            pdf.cell(
+                0, 6, f"  Heritage Designation Category: {heritage}", fill=True, ln=True
+            )
             pdf.ln(2)
 
             pdf.set_font("Helvetica", "", 9)
@@ -1362,9 +1561,14 @@ class ReportGenerator:
             significance = {
                 "A": "Primary significance - highest level of heritage protection",
                 "B": "Significant heritage value - moderate protection requirements",
-                "C": "Contextual or character value - limited protection"
+                "C": "Contextual or character value - limited protection",
             }
-            pdf.cell(0, 5, f"Significance: {significance.get(heritage, 'See city heritage registry')}", ln=True)
+            pdf.cell(
+                0,
+                5,
+                f"Significance: {significance.get(heritage, 'See city heritage registry')}",
+                ln=True,
+            )
             pdf.ln(2)
 
             # Development implications
@@ -1377,20 +1581,20 @@ class ReportGenerator:
                     "- Heritage alteration permit required for all exterior changes",
                     "- Demolition generally prohibited; facade retention likely mandatory",
                     "- Development timelines extended 6-12 months for heritage review",
-                    "- Material and design specifications must match historical character"
+                    "- Material and design specifications must match historical character",
                 ],
                 "B": [
                     "- Heritage alteration permit required for significant changes",
                     "- Partial facade retention may be required",
                     "- Heritage review adds 3-6 months to approval timeline",
-                    "- Some flexibility in materials and design approach"
+                    "- Some flexibility in materials and design approach",
                 ],
                 "C": [
                     "- Heritage considerations apply but more flexible",
                     "- Focus on contextual fit rather than preservation",
                     "- Minor timeline impact (1-3 months)",
-                    "- Opportunities for density bonusing with heritage features"
-                ]
+                    "- Opportunities for density bonusing with heritage features",
+                ],
             }
 
             for line in implications.get(heritage, []):
@@ -1406,7 +1610,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Market Context (Vancouver CMA)", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         metrics = {}
@@ -1423,7 +1632,10 @@ class ReportGenerator:
                 for row in rows:
                     key = row["metric"]
                     if key not in metrics:
-                        metrics[key] = {"value": row["value"], "ref_date": row["ref_date"]}
+                        metrics[key] = {
+                            "value": row["value"],
+                            "ref_date": row["ref_date"],
+                        }
         except Exception as e:
             logger.debug("Market context query failed (table may not exist): %s", e)
 
@@ -1449,7 +1661,12 @@ class ReportGenerator:
 
         pdf.ln(2)
         pdf.set_font("Helvetica", "I", 8)
-        pdf.cell(0, 4, "Note: CSD-level data; may not reflect micro-market conditions.", ln=True)
+        pdf.cell(
+            0,
+            4,
+            "Note: CSD-level data; may not reflect micro-market conditions.",
+            ln=True,
+        )
         pdf.ln(4)
 
     async def _build_demographic_profile(
@@ -1462,18 +1679,26 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Demographic Profile", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         demo = None
         boundary_note = None
         try:
             async with db_pool.acquire() as conn:
-                lookup = await conn.fetchrow("""
+                lookup = await conn.fetchrow(
+                    """
                     SELECT census_tract, distance_to_tract_boundary_m
                     FROM parcel_census_lookup
                     WHERE pid = $1
-                """, parcel_data.pid)
+                """,
+                    parcel_data.pid,
+                )
 
                 if lookup and lookup["census_tract"]:
                     census_tract = lookup["census_tract"]
@@ -1487,7 +1712,8 @@ class ReportGenerator:
                             f"of census tract boundary. Adjacent tract data may also be relevant."
                         )
 
-                    demo = await conn.fetchrow("""
+                    demo = await conn.fetchrow(
+                        """
                         SELECT population, population_5yr_growth, median_household_income,
                                avg_household_size, owner_pct, renter_pct,
                                dominant_dwelling_type, total_dwellings, median_age,
@@ -1496,9 +1722,13 @@ class ReportGenerator:
                         WHERE census_tract = $1
                         ORDER BY census_year DESC
                         LIMIT 1
-                    """, census_tract)
+                    """,
+                        census_tract,
+                    )
         except Exception as e:
-            logger.debug("Demographic profile query failed (table may not exist): %s", e)
+            logger.debug(
+                "Demographic profile query failed (table may not exist): %s", e
+            )
 
         pdf.set_font("Helvetica", "", 10)
 
@@ -1507,13 +1737,44 @@ class ReportGenerator:
             pdf.cell(0, 6, "Demographic data source unavailable", ln=True)
         else:
             fields = [
-                ("Census Year", str(demo["census_year"]) if demo["census_year"] else "N/A"),
-                ("Population", f"{demo['population']:,}" if demo["population"] else "N/A"),
-                ("5-Year Growth", f"{demo['population_5yr_growth']:.1f}%" if demo["population_5yr_growth"] is not None else "N/A"),
-                ("Median Income", f"${demo['median_household_income']:,}" if demo["median_household_income"] else "N/A"),
-                ("Avg Household Size", f"{demo['avg_household_size']:.1f}" if demo["avg_household_size"] is not None else "N/A"),
-                ("Owner-Occupied", f"{demo['owner_pct']:.1f}%" if demo["owner_pct"] is not None else "N/A"),
-                ("Renter-Occupied", f"{demo['renter_pct']:.1f}%" if demo["renter_pct"] is not None else "N/A"),
+                (
+                    "Census Year",
+                    str(demo["census_year"]) if demo["census_year"] else "N/A",
+                ),
+                (
+                    "Population",
+                    f"{demo['population']:,}" if demo["population"] else "N/A",
+                ),
+                (
+                    "5-Year Growth",
+                    f"{demo['population_5yr_growth']:.1f}%"
+                    if demo["population_5yr_growth"] is not None
+                    else "N/A",
+                ),
+                (
+                    "Median Income",
+                    f"${demo['median_household_income']:,}"
+                    if demo["median_household_income"]
+                    else "N/A",
+                ),
+                (
+                    "Avg Household Size",
+                    f"{demo['avg_household_size']:.1f}"
+                    if demo["avg_household_size"] is not None
+                    else "N/A",
+                ),
+                (
+                    "Owner-Occupied",
+                    f"{demo['owner_pct']:.1f}%"
+                    if demo["owner_pct"] is not None
+                    else "N/A",
+                ),
+                (
+                    "Renter-Occupied",
+                    f"{demo['renter_pct']:.1f}%"
+                    if demo["renter_pct"] is not None
+                    else "N/A",
+                ),
                 ("Dominant Dwelling", demo["dominant_dwelling_type"] or "N/A"),
             ]
 
@@ -1540,13 +1801,19 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Nearby Development Activity (500m)", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         projects = []
         try:
             async with db_pool.acquire() as conn:
-                projects = await conn.fetch("""
+                projects = await conn.fetch(
+                    """
                     SELECT sp.address, sp.developer, sp.pipeline_stage,
                            sp.proposed_units, sp.proposed_storeys,
                            ST_Distance(
@@ -1561,17 +1828,22 @@ class ReportGenerator:
                       AND ST_DWithin(sp_parcel.geom::geography, subject.geom::geography, 500)
                     ORDER BY distance_m ASC
                     LIMIT 10
-                """, parcel_data.pid)
+                """,
+                    parcel_data.pid,
+                )
         except Exception as e:
             logger.debug("Nearby development query failed (table may not exist): %s", e)
 
         pdf.set_font("Helvetica", "", 10)
 
         if not projects:
-            pdf.cell(0, 6, "No active development applications found within 500m", ln=True)
+            pdf.cell(
+                0, 6, "No active development applications found within 500m", ln=True
+            )
         else:
             pdf.cell(
-                0, 6,
+                0,
+                6,
                 f"{len(projects)} development project{'s' if len(projects) != 1 else ''} within 500m:",
                 ln=True,
             )
@@ -1585,7 +1857,9 @@ class ReportGenerator:
 
             pdf.set_font("Helvetica", "B", 8)
             pdf.set_fill_color(240, 240, 240)
-            for w, h in zip(col_widths, ["Address", "Stage", "Units", "Storeys", "Distance"]):
+            for w, h in zip(
+                col_widths, ["Address", "Stage", "Units", "Storeys", "Distance"]
+            ):
                 pdf.cell(w, 5, h, border=1, fill=True)
             pdf.ln()
 
@@ -1619,7 +1893,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Red Flags Summary", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         pdf.set_font("Helvetica", "", 9)
@@ -1671,17 +1950,40 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Data Currency", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         source_dates = {}
         queries = [
-            ("BC Assessment (Parcels)", "SELECT MAX(updated_at) AS latest FROM parcels"),
-            ("StatsCan Demographics", "SELECT MAX(retrieved_at) AS latest FROM statscan_demographics"),
-            ("CMHC Housing Market", "SELECT MAX(retrieved_at) AS latest FROM cmhc_housing"),
-            ("Contaminated Sites", "SELECT MAX(updated_at) AS latest FROM contaminated_sites"),
-            ("Development Pipeline", "SELECT MAX(updated_at) AS latest FROM supply_pipeline"),
-            ("Intelligence Signals", "SELECT MAX(extracted_at) AS latest FROM intelligence_signals"),
+            (
+                "BC Assessment (Parcels)",
+                "SELECT MAX(updated_at) AS latest FROM parcels",
+            ),
+            (
+                "StatsCan Demographics",
+                "SELECT MAX(retrieved_at) AS latest FROM statscan_demographics",
+            ),
+            (
+                "CMHC Housing Market",
+                "SELECT MAX(retrieved_at) AS latest FROM cmhc_housing",
+            ),
+            (
+                "Contaminated Sites",
+                "SELECT MAX(updated_at) AS latest FROM contaminated_sites",
+            ),
+            (
+                "Development Pipeline",
+                "SELECT MAX(updated_at) AS latest FROM supply_pipeline",
+            ),
+            (
+                "Intelligence Signals",
+                "SELECT MAX(extracted_at) AS latest FROM intelligence_signals",
+            ),
         ]
 
         try:
@@ -1710,7 +2012,12 @@ class ReportGenerator:
 
         pdf.ln(2)
         pdf.set_font("Helvetica", "I", 8)
-        pdf.cell(0, 4, "All data subject to source availability. Verify critical data points independently.", ln=True)
+        pdf.cell(
+            0,
+            4,
+            "All data subject to source availability. Verify critical data points independently.",
+            ln=True,
+        )
         pdf.ln(4)
 
     def _build_sources(self, pdf: FPDF, parcel_data: ParcelReport):
@@ -1723,7 +2030,12 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 8, "Sources & Methodology", ln=True)
         pdf.set_draw_color(100, 100, 100)
-        pdf.line(self.left_margin, pdf.get_y(), self.page_width - self.right_margin, pdf.get_y())
+        pdf.line(
+            self.left_margin,
+            pdf.get_y(),
+            self.page_width - self.right_margin,
+            pdf.get_y(),
+        )
         pdf.ln(4)
 
         # Methodology subsection
@@ -1838,7 +2150,12 @@ class ReportGenerator:
         pdf.cell(0, 7, "VanCity Lens - Confidential", ln=True, align="C")
         pdf.set_draw_color(59, 130, 246)
         pdf.set_line_width(0.5)
-        pdf.line(self.left_margin, pdf.get_y() + 2, self.page_width - self.right_margin, pdf.get_y() + 2)
+        pdf.line(
+            self.left_margin,
+            pdf.get_y() + 2,
+            self.page_width - self.right_margin,
+            pdf.get_y() + 2,
+        )
         pdf.ln(8)
 
         # Executive Summary
@@ -1846,11 +2163,13 @@ class ReportGenerator:
         pdf.cell(0, 8, "1. Executive Summary", ln=True)
         pdf.set_font("Helvetica", "", 10)
         addr = parcel_data.civic_address or parcel_data.pid
-        pdf.multi_cell(0, 5,
+        pdf.multi_cell(
+            0,
+            5,
             f"Subject property at {addr} (PID: {parcel_data.pid}) is located in Vancouver, BC. "
             f"The property is zoned {parcel_data.current_zoning or 'N/A'} with a lot area of "
             f"{parcel_data.lot_area_sqm:.0f} sqm ({parcel_data.lot_area_sqft:.0f} sqft). "
-            f"Buildable area under current entitlements is {parcel_data.buildable_sqft:,.0f} sqft."
+            f"Buildable area under current entitlements is {parcel_data.buildable_sqft:,.0f} sqft.",
         )
         pdf.ln(4)
 
@@ -1860,15 +2179,19 @@ class ReportGenerator:
         pdf.set_font("Helvetica", "", 10)
         if parcel_data.entitled_storeys and parcel_data.current_storeys:
             uplift = parcel_data.entitled_storeys - parcel_data.current_storeys
-            pdf.multi_cell(0, 5,
+            pdf.multi_cell(
+                0,
+                5,
                 f"Bill 47 Transit-Oriented Areas legislation enables density uplift of "
                 f"+{max(0, uplift)} storeys (from {parcel_data.current_storeys} to {parcel_data.entitled_storeys}). "
-                f"This creates significant development potential in a supply-constrained market."
+                f"This creates significant development potential in a supply-constrained market.",
             )
         else:
-            pdf.multi_cell(0, 5,
+            pdf.multi_cell(
+                0,
+                5,
                 "This property is positioned within a Transit-Oriented Area under Bill 47, "
-                "creating potential for density uplift subject to entitlement confirmation."
+                "creating potential for density uplift subject to entitlement confirmation.",
             )
         pdf.ln(4)
 

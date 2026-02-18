@@ -23,33 +23,145 @@ import asyncpg
 logger = logging.getLogger(__name__)
 
 # VSB Open Data API URL for schools data
-VSB_SCHOOLS_API_URL = "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/schools/records"
+VSB_SCHOOLS_API_URL = (
+    "https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/schools/records"
+)
 
 # Vancouver neighborhood bounding boxes (approximate lat/lon ranges)
 # Used to map school coordinates to neighborhoods
 NEIGHBORHOOD_BOUNDS = {
-    "Kitsilano": {"lat_min": 49.26, "lat_max": 49.28, "lon_min": -123.18, "lon_max": -123.14},
-    "Mount Pleasant": {"lat_min": 49.25, "lat_max": 49.27, "lon_min": -123.11, "lon_max": -123.08},
-    "Fairview": {"lat_min": 49.26, "lat_max": 49.27, "lon_min": -123.13, "lon_max": -123.11},
-    "Downtown": {"lat_min": 49.27, "lat_max": 49.30, "lon_min": -123.13, "lon_max": -123.10},
-    "West End": {"lat_min": 49.28, "lat_max": 49.30, "lon_min": -123.15, "lon_max": -123.13},
-    "Strathcona": {"lat_min": 49.27, "lat_max": 49.29, "lon_min": -123.09, "lon_max": -123.08},
-    "Grandview-Woodland": {"lat_min": 49.27, "lat_max": 49.29, "lon_min": -123.08, "lon_max": -123.05},
-    "Hastings-Sunrise": {"lat_min": 49.27, "lat_max": 49.29, "lon_min": -123.04, "lon_max": -123.00},
-    "Renfrew-Collingwood": {"lat_min": 49.23, "lat_max": 49.25, "lon_min": -123.05, "lon_max": -123.02},
-    "Dunbar-Southlands": {"lat_min": 49.23, "lat_max": 49.25, "lon_min": -123.20, "lon_max": -123.17},
-    "Arbutus Ridge": {"lat_min": 49.24, "lat_max": 49.26, "lon_min": -123.17, "lon_max": -123.14},
-    "Kerrisdale": {"lat_min": 49.22, "lat_max": 49.24, "lon_min": -123.17, "lon_max": -123.14},
-    "Marpole": {"lat_min": 49.20, "lat_max": 49.22, "lon_min": -123.13, "lon_max": -123.10},
-    "Oakridge": {"lat_min": 49.22, "lat_max": 49.24, "lon_min": -123.13, "lon_max": -123.10},
-    "South Cambie": {"lat_min": 49.24, "lat_max": 49.26, "lon_min": -123.12, "lon_max": -123.10},
-    "Riley Park": {"lat_min": 49.23, "lat_max": 49.25, "lon_min": -123.10, "lon_max": -123.08},
-    "Killarney": {"lat_min": 49.22, "lat_max": 49.24, "lon_min": -123.04, "lon_max": -123.01},
-    "Victoria-Fraserview": {"lat_min": 49.21, "lat_max": 49.23, "lon_min": -123.06, "lon_max": -123.03},
-    "Sunset": {"lat_min": 49.21, "lat_max": 49.23, "lon_min": -123.09, "lon_max": -123.06},
-    "Kensington-Cedar Cottage": {"lat_min": 49.24, "lat_max": 49.26, "lon_min": -123.08, "lon_max": -123.05},
-    "Shaughnessy": {"lat_min": 49.24, "lat_max": 49.26, "lon_min": -123.15, "lon_max": -123.12},
-    "West Point Grey": {"lat_min": 49.26, "lat_max": 49.27, "lon_min": -123.21, "lon_max": -123.18},
+    "Kitsilano": {
+        "lat_min": 49.26,
+        "lat_max": 49.28,
+        "lon_min": -123.18,
+        "lon_max": -123.14,
+    },
+    "Mount Pleasant": {
+        "lat_min": 49.25,
+        "lat_max": 49.27,
+        "lon_min": -123.11,
+        "lon_max": -123.08,
+    },
+    "Fairview": {
+        "lat_min": 49.26,
+        "lat_max": 49.27,
+        "lon_min": -123.13,
+        "lon_max": -123.11,
+    },
+    "Downtown": {
+        "lat_min": 49.27,
+        "lat_max": 49.30,
+        "lon_min": -123.13,
+        "lon_max": -123.10,
+    },
+    "West End": {
+        "lat_min": 49.28,
+        "lat_max": 49.30,
+        "lon_min": -123.15,
+        "lon_max": -123.13,
+    },
+    "Strathcona": {
+        "lat_min": 49.27,
+        "lat_max": 49.29,
+        "lon_min": -123.09,
+        "lon_max": -123.08,
+    },
+    "Grandview-Woodland": {
+        "lat_min": 49.27,
+        "lat_max": 49.29,
+        "lon_min": -123.08,
+        "lon_max": -123.05,
+    },
+    "Hastings-Sunrise": {
+        "lat_min": 49.27,
+        "lat_max": 49.29,
+        "lon_min": -123.04,
+        "lon_max": -123.00,
+    },
+    "Renfrew-Collingwood": {
+        "lat_min": 49.23,
+        "lat_max": 49.25,
+        "lon_min": -123.05,
+        "lon_max": -123.02,
+    },
+    "Dunbar-Southlands": {
+        "lat_min": 49.23,
+        "lat_max": 49.25,
+        "lon_min": -123.20,
+        "lon_max": -123.17,
+    },
+    "Arbutus Ridge": {
+        "lat_min": 49.24,
+        "lat_max": 49.26,
+        "lon_min": -123.17,
+        "lon_max": -123.14,
+    },
+    "Kerrisdale": {
+        "lat_min": 49.22,
+        "lat_max": 49.24,
+        "lon_min": -123.17,
+        "lon_max": -123.14,
+    },
+    "Marpole": {
+        "lat_min": 49.20,
+        "lat_max": 49.22,
+        "lon_min": -123.13,
+        "lon_max": -123.10,
+    },
+    "Oakridge": {
+        "lat_min": 49.22,
+        "lat_max": 49.24,
+        "lon_min": -123.13,
+        "lon_max": -123.10,
+    },
+    "South Cambie": {
+        "lat_min": 49.24,
+        "lat_max": 49.26,
+        "lon_min": -123.12,
+        "lon_max": -123.10,
+    },
+    "Riley Park": {
+        "lat_min": 49.23,
+        "lat_max": 49.25,
+        "lon_min": -123.10,
+        "lon_max": -123.08,
+    },
+    "Killarney": {
+        "lat_min": 49.22,
+        "lat_max": 49.24,
+        "lon_min": -123.04,
+        "lon_max": -123.01,
+    },
+    "Victoria-Fraserview": {
+        "lat_min": 49.21,
+        "lat_max": 49.23,
+        "lon_min": -123.06,
+        "lon_max": -123.03,
+    },
+    "Sunset": {
+        "lat_min": 49.21,
+        "lat_max": 49.23,
+        "lon_min": -123.09,
+        "lon_max": -123.06,
+    },
+    "Kensington-Cedar Cottage": {
+        "lat_min": 49.24,
+        "lat_max": 49.26,
+        "lon_min": -123.08,
+        "lon_max": -123.05,
+    },
+    "Shaughnessy": {
+        "lat_min": 49.24,
+        "lat_max": 49.26,
+        "lon_min": -123.15,
+        "lon_max": -123.12,
+    },
+    "West Point Grey": {
+        "lat_min": 49.26,
+        "lat_max": 49.27,
+        "lon_min": -123.21,
+        "lon_max": -123.18,
+    },
 }
 
 
@@ -58,13 +170,19 @@ class SchoolData(BaseModel):
 
     name: str = Field(..., description="School name")
     address: str = Field(..., description="School address")
-    school_type: str = Field(..., description="School type: elementary, middle, secondary")
+    school_type: str = Field(
+        ..., description="School type: elementary, middle, secondary"
+    )
     enrollment: Optional[int] = Field(None, description="Current enrollment")
     capacity: Optional[int] = Field(None, description="Maximum capacity")
-    student_teacher_ratio: Optional[float] = Field(None, description="Student-to-teacher ratio")
+    student_teacher_ratio: Optional[float] = Field(
+        None, description="Student-to-teacher ratio"
+    )
     latitude: Optional[float] = Field(None, description="School latitude")
     longitude: Optional[float] = Field(None, description="School longitude")
-    neighborhood: Optional[str] = Field(None, description="Mapped Vancouver neighborhood")
+    neighborhood: Optional[str] = Field(
+        None, description="Mapped Vancouver neighborhood"
+    )
 
     class Config:
         """Pydantic config."""
@@ -210,7 +328,9 @@ class VSBSchoolScraper:
                             except ValueError:
                                 pass
 
-                    address = record.get("address") or record.get("street_address") or ""
+                    address = (
+                        record.get("address") or record.get("street_address") or ""
+                    )
                     name = record.get("name") or record.get("school_name") or ""
 
                     if not name or not address:
@@ -240,7 +360,9 @@ class VSBSchoolScraper:
                     logger.warning(f"Error parsing school record: {e}")
                     continue
 
-            logger.info(f"Successfully parsed {len(schools)} schools from {len(records)} records")
+            logger.info(
+                f"Successfully parsed {len(schools)} schools from {len(records)} records"
+            )
             return schools
 
         except Exception as e:
@@ -294,9 +416,9 @@ class VSBSchoolScraper:
         return "Unknown"
 
     @staticmethod
-    def _compute_quality_metrics(schools_by_neighborhood: Dict[str, List[SchoolData]]) -> Dict[
-        str, SchoolMetrics
-    ]:
+    def _compute_quality_metrics(
+        schools_by_neighborhood: Dict[str, List[SchoolData]],
+    ) -> Dict[str, SchoolMetrics]:
         """
         Compute school quality metrics per neighborhood.
 
@@ -325,7 +447,9 @@ class VSBSchoolScraper:
 
             # Calculate average student-teacher ratio
             avg_str = None
-            str_values = [s.student_teacher_ratio for s in schools if s.student_teacher_ratio]
+            str_values = [
+                s.student_teacher_ratio for s in schools if s.student_teacher_ratio
+            ]
             if str_values:
                 avg_str = round(sum(str_values) / len(str_values), 2)
 
@@ -352,7 +476,9 @@ class VSBSchoolScraper:
 
     @staticmethod
     def _compute_quality_score(
-        capacity_util: Optional[float], student_teacher_ratio: Optional[float], school_count: int
+        capacity_util: Optional[float],
+        student_teacher_ratio: Optional[float],
+        school_count: int,
     ) -> Optional[float]:
         """
         Compute school quality score (0-10).
@@ -386,9 +512,13 @@ class VSBSchoolScraper:
             if student_teacher_ratio <= 15:
                 str_score = 10
             elif student_teacher_ratio <= 25:
-                str_score = 10 - ((student_teacher_ratio - 15) / 10) * 5  # 15-25 maps to 10-5
+                str_score = (
+                    10 - ((student_teacher_ratio - 15) / 10) * 5
+                )  # 15-25 maps to 10-5
             else:
-                str_score = max(0, 5 - ((student_teacher_ratio - 25) / 10))  # 25+ maps to 5-0
+                str_score = max(
+                    0, 5 - ((student_teacher_ratio - 25) / 10)
+                )  # 25+ maps to 5-0
             score_components.append(str_score)
 
         # School diversity bonus: neighborhoods with multiple school types
@@ -402,7 +532,9 @@ class VSBSchoolScraper:
         quality_score = sum(score_components) / len(score_components)
         return round(max(0.0, min(10.0, quality_score)), 1)
 
-    async def save_to_db(self, db_pool: asyncpg.Pool, schools: List[SchoolData]) -> Dict:
+    async def save_to_db(
+        self, db_pool: asyncpg.Pool, schools: List[SchoolData]
+    ) -> Dict:
         """
         Save school data to database and compute neighborhood metrics.
 

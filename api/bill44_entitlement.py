@@ -34,14 +34,26 @@ _TRANSIT_BONUS_UNITS = 1  # secondary suite doesn't count toward cap
 
 # ── Models ──────────────────────────────────────────────────────
 
+
 class Bill44Result(BaseModel):
     """Result of Bill 44 small-scale multi-unit housing analysis."""
-    is_eligible: bool = Field(..., description="Whether the parcel's zoning is eligible for Bill 44")
-    zone_category: Optional[str] = Field(None, description="'single_family', 'duplex', or None")
+
+    is_eligible: bool = Field(
+        ..., description="Whether the parcel's zoning is eligible for Bill 44"
+    )
+    zone_category: Optional[str] = Field(
+        None, description="'single_family', 'duplex', or None"
+    )
     max_units: int = Field(0, description="Maximum units allowed under Bill 44")
-    lot_size_category: Optional[str] = Field(None, description="'small', 'medium', or 'large'")
-    transit_bonus: bool = Field(False, description="True if near frequent transit (extra unit)")
-    transit_bonus_units: int = Field(0, description="Additional units from transit proximity")
+    lot_size_category: Optional[str] = Field(
+        None, description="'small', 'medium', or 'large'"
+    )
+    transit_bonus: bool = Field(
+        False, description="True if near frequent transit (extra unit)"
+    )
+    transit_bonus_units: int = Field(
+        0, description="Additional units from transit proximity"
+    )
     effective_max_units: int = Field(0, description="max_units + transit_bonus_units")
     current_zoning: Optional[str] = Field(None, description="Current zoning district")
     notes: Optional[str] = Field(None, description="Explanatory notes")
@@ -69,6 +81,7 @@ SQL_NEAREST_TRANSIT_DISTANCE = """
 
 
 # ── Engine ──────────────────────────────────────────────────────
+
 
 def _determine_lot_category(lot_area_sqm: Decimal) -> tuple[str, int]:
     """Determine lot size category and base max units."""

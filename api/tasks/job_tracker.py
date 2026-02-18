@@ -23,8 +23,10 @@ logger = logging.getLogger(__name__)
 # Job Status Enum
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class JobStatus(str, Enum):
     """Enum for background job status states."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -35,6 +37,7 @@ class JobStatus(str, Enum):
 # ────────────────────────────────────────────────────────────────────────────
 # Pydantic Models
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class JobInfo(BaseModel):
     """Response model for job information."""
@@ -51,7 +54,9 @@ class JobInfo(BaseModel):
     retries: int = Field(0, description="Number of retries attempted")
     created_at: datetime = Field(..., description="Job creation timestamp")
     started_at: Optional[datetime] = Field(None, description="Job start timestamp")
-    completed_at: Optional[datetime] = Field(None, description="Job completion timestamp")
+    completed_at: Optional[datetime] = Field(
+        None, description="Job completion timestamp"
+    )
 
     class Config:
         from_attributes = True
@@ -60,6 +65,7 @@ class JobInfo(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 # JobTracker Class
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class JobTracker:
     """
@@ -110,7 +116,7 @@ class JobTracker:
 
         logger.info(
             f"Created job {job_id} of type {job_type}",
-            extra={"job_id": job_id, "job_type": job_type}
+            extra={"job_id": job_id, "job_type": job_type},
         )
         return job_id
 
@@ -182,13 +188,13 @@ class JobTracker:
             if result == "UPDATE 0":
                 logger.warning(
                     f"Job {job_id} not found for status update",
-                    extra={"job_id": job_id, "status": status}
+                    extra={"job_id": job_id, "status": status},
                 )
                 raise ValueError(f"Job {job_id} not found")
 
         logger.debug(
             f"Updated job {job_id} status to {status}",
-            extra={"job_id": job_id, "status": status, "progress": progress}
+            extra={"job_id": job_id, "status": status, "progress": progress},
         )
 
     @staticmethod
@@ -205,8 +211,7 @@ class JobTracker:
         """
         async with db_pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM background_jobs WHERE id = $1",
-                job_id
+                "SELECT * FROM background_jobs WHERE id = $1", job_id
             )
 
         if not row:
@@ -295,6 +300,6 @@ class JobTracker:
 
         logger.info(
             f"Cleaned up {deleted_count} old jobs (older than {days} days)",
-            extra={"deleted_count": deleted_count, "days": days}
+            extra={"deleted_count": deleted_count, "days": days},
         )
         return deleted_count

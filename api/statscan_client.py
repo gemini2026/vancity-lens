@@ -37,8 +37,8 @@ logger = logging.getLogger(__name__)
 WDS_BASE = "https://www150.statcan.gc.ca/t1/tbl/en"
 
 # Table IDs (without hyphens for API)
-TABLE_DEMOGRAPHICS = "98100035"     # Census tract demographics
-TABLE_POPULATION = "17100142"       # Population estimates
+TABLE_DEMOGRAPHICS = "98100035"  # Census tract demographics
+TABLE_POPULATION = "17100142"  # Population estimates
 TABLE_BUILDING_PERMITS = "34100327"  # Building permits
 
 # Vancouver CMA code for StatsCan
@@ -64,6 +64,7 @@ VALID_PCT_RANGE = (0.0, 100.0)
 
 class ValidationError(Exception):
     """Raised when data fails validation rules."""
+
     pass
 
 
@@ -106,11 +107,15 @@ class StatsCanclient:
             await asyncio.sleep(RATE_LIMIT_DELAY - elapsed)
         self._last_request = asyncio.get_event_loop().time()
 
-    async def _fetch_json(self, url: str, params: Optional[dict] = None) -> Optional[dict]:
+    async def _fetch_json(
+        self, url: str, params: Optional[dict] = None
+    ) -> Optional[dict]:
         await self._rate_limit()
         try:
             async with self.session.get(
-                url, headers=HEADERS, params=params,
+                url,
+                headers=HEADERS,
+                params=params,
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
                 if resp.status == 200:
@@ -125,7 +130,8 @@ class StatsCanclient:
         await self._rate_limit()
         try:
             async with self.session.get(
-                url, headers={**HEADERS, "Accept": "text/csv"},
+                url,
+                headers={**HEADERS, "Accept": "text/csv"},
                 timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
                 if resp.status == 200:
@@ -155,7 +161,11 @@ class StatsCanclient:
         results = []
         try:
             # StatsCan WDS returns nested structure
-            rows = data if isinstance(data, list) else data.get("data", data.get("rows", []))
+            rows = (
+                data
+                if isinstance(data, list)
+                else data.get("data", data.get("rows", []))
+            )
             for row in rows:
                 if isinstance(row, dict):
                     row_geo = str(row.get("GEO", row.get("geo_code", "")))
@@ -164,21 +174,23 @@ class StatsCanclient:
                         if pop_val is not None:
                             pop = int(float(pop_val))
                             if validate_population(pop):
-                                results.append({
-                                    "geo_code": geo_code,
-                                    "geo_name": row.get("GEO", ""),
-                                    "ref_date": str(row.get("REF_DATE", row.get("ref_date", ""))),
-                                    "population": pop,
-                                    "raw_data": row,
-                                })
+                                results.append(
+                                    {
+                                        "geo_code": geo_code,
+                                        "geo_name": row.get("GEO", ""),
+                                        "ref_date": str(
+                                            row.get("REF_DATE", row.get("ref_date", ""))
+                                        ),
+                                        "population": pop,
+                                        "raw_data": row,
+                                    }
+                                )
         except (ValueError, TypeError, KeyError) as e:
             logger.error("Error parsing population data: %s", e)
 
         return results
 
-    async def get_building_permits(
-        self, geo_code: str = VANCOUVER_CMA
-    ) -> List[dict]:
+    async def get_building_permits(self, geo_code: str = VANCOUVER_CMA) -> List[dict]:
         """
         Fetch building permit data for a CMA.
         Table 34-10-0327-01.
@@ -194,20 +206,34 @@ class StatsCanclient:
 
         results = []
         try:
-            rows = data if isinstance(data, list) else data.get("data", data.get("rows", []))
+            rows = (
+                data
+                if isinstance(data, list)
+                else data.get("data", data.get("rows", []))
+            )
             for row in rows:
                 if isinstance(row, dict):
                     row_geo = str(row.get("GEO", row.get("geo_code", "")))
                     if geo_code in row_geo or "Vancouver" in str(row.get("GEO", "")):
-                        results.append({
-                            "geo_code": geo_code,
-                            "geo_name": row.get("GEO", ""),
-                            "ref_date": str(row.get("REF_DATE", row.get("ref_date", ""))),
-                            "permit_type": row.get("Type of building", row.get("type", "total")),
-                            "num_permits": _safe_int(row.get("VALUE", row.get("value"))),
-                            "value_thousands": _safe_decimal(row.get("VALUE", row.get("value"))),
-                            "raw_data": row,
-                        })
+                        results.append(
+                            {
+                                "geo_code": geo_code,
+                                "geo_name": row.get("GEO", ""),
+                                "ref_date": str(
+                                    row.get("REF_DATE", row.get("ref_date", ""))
+                                ),
+                                "permit_type": row.get(
+                                    "Type of building", row.get("type", "total")
+                                ),
+                                "num_permits": _safe_int(
+                                    row.get("VALUE", row.get("value"))
+                                ),
+                                "value_thousands": _safe_decimal(
+                                    row.get("VALUE", row.get("value"))
+                                ),
+                                "raw_data": row,
+                            }
+                        )
         except (ValueError, TypeError, KeyError) as e:
             logger.error("Error parsing building permits data: %s", e)
 
@@ -355,5 +381,7 @@ async def scrape_and_store(
     stats["documents_new"] = pop_stats["stored"] + permit_stats["stored"]
     stats["errors"] = pop_stats["errors"] + permit_stats["errors"]
 
-    logger.info("StatsCan ingestion complete: pop=%s, permits=%s", pop_stats, permit_stats)
+    logger.info(
+        "StatsCan ingestion complete: pop=%s, permits=%s", pop_stats, permit_stats
+    )
     return stats

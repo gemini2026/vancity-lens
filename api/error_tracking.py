@@ -78,8 +78,7 @@ def init_error_tracking() -> None:
 
     except ImportError:
         logger.warning(
-            "sentry-sdk not installed. Install with: "
-            "pip install sentry-sdk[fastapi]"
+            "sentry-sdk not installed. Install with: pip install sentry-sdk[fastapi]"
         )
         _sentry_initialized = False
 
@@ -135,11 +134,12 @@ def _before_send_hook(event: dict[str, Any], hint: dict[str, Any]) -> Optional[d
                     if f"{param}=" in query.lower():
                         # Simple redaction (just replace the value)
                         import re
+
                         query = re.sub(
                             rf"({param}=)[^&]*",
                             r"\1[REDACTED]",
                             query,
-                            flags=re.IGNORECASE
+                            flags=re.IGNORECASE,
                         )
                 request["query_string"] = query
 
@@ -150,11 +150,12 @@ def _before_send_hook(event: dict[str, Any], hint: dict[str, Any]) -> Optional[d
             for pattern in sensitive_patterns:
                 if pattern.lower() in url.lower():
                     import re
+
                     url = re.sub(
                         rf"{pattern}[^&]*",
                         pattern + "[REDACTED]",
                         url,
-                        flags=re.IGNORECASE
+                        flags=re.IGNORECASE,
                     )
             request["url"] = url
 
@@ -164,7 +165,9 @@ def _before_send_hook(event: dict[str, Any], hint: dict[str, Any]) -> Optional[d
             if "value" in exception:
                 # Don't log full exception messages that might contain secrets
                 value = str(exception["value"])
-                if any(s in value.lower() for s in ["password", "token", "key", "secret"]):
+                if any(
+                    s in value.lower() for s in ["password", "token", "key", "secret"]
+                ):
                     exception["value"] = "[REDACTED - contains sensitive data]"
 
     return event
@@ -228,6 +231,7 @@ def set_context(name: str, context: dict[str, Any]) -> None:
 
     try:
         import sentry_sdk
+
         sentry_sdk.set_context(name, context)
 
     except ImportError:
@@ -262,6 +266,7 @@ def add_breadcrumb(
 
     try:
         import sentry_sdk
+
         sentry_sdk.add_breadcrumb(
             message=message,
             category=category,
@@ -290,6 +295,7 @@ def get_sentry_middleware():
 
     try:
         from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
         return SentryAsgiMiddleware
 
     except ImportError:

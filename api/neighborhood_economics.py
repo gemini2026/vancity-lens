@@ -20,14 +20,12 @@ NEIGHBORHOOD_MULTIPLIERS: dict[str, Decimal] = {
     "Arbutus-Ridge": Decimal("1.10"),
     "South Cambie": Decimal("1.10"),
     "Fairview": Decimal("1.10"),
-
     # Central / Transit-rich
     "Mount Pleasant": Decimal("1.10"),
     "Riley Park": Decimal("1.05"),
     "Cambie": Decimal("1.05"),
     "Oakridge": Decimal("1.05"),
     "Marpole": Decimal("1.00"),
-
     # East side
     "Grandview-Woodland": Decimal("1.00"),
     "Strathcona": Decimal("0.95"),
@@ -38,7 +36,6 @@ NEIGHBORHOOD_MULTIPLIERS: dict[str, Decimal] = {
     "Victoria-Fraserview": Decimal("0.90"),
     "Sunset": Decimal("0.90"),
     "Knight": Decimal("0.90"),
-
     # South / Value
     "South Vancouver": Decimal("0.85"),
     "Musqueam": Decimal("0.95"),
@@ -109,13 +106,13 @@ SOFT_SOIL_ZONES: list[str] = [
     "False Creek",
     "Olympic Village",
     "Southeast False Creek",
-    "Mount Pleasant",       # southern portion near False Creek
-    "Strathcona",           # eastern False Creek flats
-    "Marpole",              # Fraser River delta soils
-    "South Vancouver",      # Fraser River delta
+    "Mount Pleasant",  # southern portion near False Creek
+    "Strathcona",  # eastern False Creek flats
+    "Marpole",  # Fraser River delta soils
+    "South Vancouver",  # Fraser River delta
     "Victoria-Fraserview",  # Fraser River floodplain
-    "Killarney",            # delta edge
-    "Sunset",               # delta fringe
+    "Killarney",  # delta edge
+    "Sunset",  # delta fringe
 ]
 
 
@@ -123,28 +120,28 @@ SOFT_SOIL_ZONES: list[str] = [
 # Used by V3 pro forma to create Bull / Base / Bear scenarios
 SCENARIO_FACTORS = {
     "bull": {
-        "absorption_discount": Decimal("0.00"),    # No presale discount
-        "hard_cost_inflation": Decimal("0.00"),     # No cost escalation
-        "contingency": Decimal("0.00"),             # No contingency
-        "marketing_sales": Decimal("0.00"),         # No marketing cost
+        "absorption_discount": Decimal("0.00"),  # No presale discount
+        "hard_cost_inflation": Decimal("0.00"),  # No cost escalation
+        "contingency": Decimal("0.00"),  # No contingency
+        "marketing_sales": Decimal("0.00"),  # No marketing cost
         "hidden_cost_multiplier": Decimal("0.00"),  # Ignore hidden costs
-        "timeline_extension_months": 0,              # No delays
+        "timeline_extension_months": 0,  # No delays
     },
     "base": {
-        "absorption_discount": Decimal("0.05"),    # 5% presale discount
-        "hard_cost_inflation": Decimal("0.05"),     # 5% cost escalation
-        "contingency": Decimal("0.07"),             # 7% contingency
-        "marketing_sales": Decimal("0.03"),         # 3% marketing
+        "absorption_discount": Decimal("0.05"),  # 5% presale discount
+        "hard_cost_inflation": Decimal("0.05"),  # 5% cost escalation
+        "contingency": Decimal("0.07"),  # 7% contingency
+        "marketing_sales": Decimal("0.03"),  # 3% marketing
         "hidden_cost_multiplier": Decimal("1.00"),  # Full hidden costs
-        "timeline_extension_months": 6,              # +6 months
+        "timeline_extension_months": 6,  # +6 months
     },
     "bear": {
-        "absorption_discount": Decimal("0.10"),    # 10% presale discount
-        "hard_cost_inflation": Decimal("0.10"),     # 10% cost escalation
-        "contingency": Decimal("0.07"),             # 7% contingency (same as base)
-        "marketing_sales": Decimal("0.03"),         # 3% marketing (same as base)
+        "absorption_discount": Decimal("0.10"),  # 10% presale discount
+        "hard_cost_inflation": Decimal("0.10"),  # 10% cost escalation
+        "contingency": Decimal("0.07"),  # 7% contingency (same as base)
+        "marketing_sales": Decimal("0.03"),  # 3% marketing (same as base)
         "hidden_cost_multiplier": Decimal("1.00"),  # Full hidden costs
-        "timeline_extension_months": 12,             # +12 months
+        "timeline_extension_months": 12,  # +12 months
     },
 }
 

@@ -40,9 +40,15 @@ class EntitlementConfidenceScorer:
         view_cone_penalty = -20.0 if is_view_cone else 0.0
         heritage_penalty = -25.0 if is_heritage else (-10.0 if near_heritage else 0.0)
         cd1_penalty = -15.0 if is_cd1 else 0.0
-        opposition_penalty = min(-1.0 * opposition_score, -15.0) if opposition_score > 2 else 0.0
+        opposition_penalty = (
+            min(-1.0 * opposition_score, -15.0) if opposition_score > 2 else 0.0
+        )
         lot_assembly_penalty = -10.0 if lot_too_small else 0.0
-        recent_denial_penalty = min(-5.0 * recent_denials_nearby, -15.0) if recent_denials_nearby > 0 else 0.0
+        recent_denial_penalty = (
+            min(-5.0 * recent_denials_nearby, -15.0)
+            if recent_denials_nearby > 0
+            else 0.0
+        )
 
         precedent_bonus = 5.0 if has_precedent_approvals else 0.0
 

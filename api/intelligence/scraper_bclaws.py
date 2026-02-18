@@ -43,7 +43,9 @@ SEARCH_TERMS = [
 ]
 
 # Document URL template
-DOC_URL_TEMPLATE = "https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/{doc_id}"
+DOC_URL_TEMPLATE = (
+    "https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/{doc_id}"
+)
 
 HEADERS = {
     "User-Agent": "VanCityLensBot/0.1 (real-estate-intelligence)",
@@ -74,7 +76,9 @@ class BCLawsScraper:
         """Fetch URL with rate limiting and error handling."""
         await self._rate_limit()
         try:
-            async with self.session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            async with self.session.get(
+                url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
                 if resp.status == 200:
                     return await resp.text()
                 logger.warning("BC Laws fetch %s returned %d", url, resp.status)
@@ -98,12 +102,18 @@ class BCLawsScraper:
                 title_el = doc.find("CIVIX_DOCUMENT_TITLE")
                 if doc_id_el is not None and doc_id_el.text:
                     doc_id = doc_id_el.text.strip()
-                    title = title_el.text.strip() if title_el is not None and title_el.text else doc_id
-                    results.append({
-                        "doc_id": doc_id,
-                        "title": title,
-                        "url": DOC_URL_TEMPLATE.format(doc_id=doc_id),
-                    })
+                    title = (
+                        title_el.text.strip()
+                        if title_el is not None and title_el.text
+                        else doc_id
+                    )
+                    results.append(
+                        {
+                            "doc_id": doc_id,
+                            "title": title,
+                            "url": DOC_URL_TEMPLATE.format(doc_id=doc_id),
+                        }
+                    )
                     if len(results) >= max_results:
                         break
         except ElementTree.ParseError as e:
@@ -121,14 +131,17 @@ class BCLawsScraper:
         # BC Laws pages have content in <div class="content"> or similar
         # Simple extraction — strip tags for raw text storage
         import re
-        text = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL)
-        text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.DOTALL)
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
+
+        text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL)
+        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
 
         # Trim to reasonable size (BC Laws docs can be huge)
         if len(text) > 100_000:
-            text = text[:100_000] + "\n\n[Truncated — full text available at source URL]"
+            text = (
+                text[:100_000] + "\n\n[Truncated — full text available at source URL]"
+            )
 
         return text
 
@@ -142,8 +155,11 @@ class BCLawsScraper:
                     all_docs[doc["doc_id"]] = doc
             logger.debug("BC Laws search '%s': found %d docs", term, len(docs))
 
-        logger.info("BC Laws discovery: %d unique documents from %d search terms",
-                     len(all_docs), len(SEARCH_TERMS))
+        logger.info(
+            "BC Laws discovery: %d unique documents from %d search terms",
+            len(all_docs),
+            len(SEARCH_TERMS),
+        )
         return list(all_docs.values())
 
 
@@ -204,6 +220,7 @@ async def scrape_and_store(
                     }
 
                     import json
+
                     result = await conn.fetchrow(
                         SQL_INSERT_DOC,
                         SOURCE_TYPE,
@@ -221,7 +238,9 @@ async def scrape_and_store(
                         stats["documents_skipped"] += 1
 
                 except Exception as e:
-                    logger.error("Error storing BC Laws doc %s: %s", doc.get("url", "?"), e)
+                    logger.error(
+                        "Error storing BC Laws doc %s: %s", doc.get("url", "?"), e
+                    )
                     stats["errors"] += 1
 
     logger.info("BC Laws scraper complete: %s", stats)

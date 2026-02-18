@@ -16,6 +16,7 @@ def _get_pool(request: Request):
     pool = getattr(request.app.state, "pool", None)
     if not pool:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=500, detail="Database connection not available")
     return pool
 

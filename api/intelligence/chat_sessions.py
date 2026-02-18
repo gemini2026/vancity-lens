@@ -27,8 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 async def create_session(
-    db_pool: asyncpg.Pool,
-    user_label: str = "default"
+    db_pool: asyncpg.Pool, user_label: str = "default"
 ) -> ChatSession:
     """
     Create a new chat session.
@@ -45,23 +44,24 @@ async def create_session(
 
     try:
         async with db_pool.acquire() as conn:
-            result = await conn.fetchrow("""
+            result = await conn.fetchrow(
+                """
                 INSERT INTO chat_sessions (session_id, user_label, created_at)
                 VALUES ($1, $2, $3)
                 RETURNING id, session_id, user_label, created_at
             """,
                 session_id,
                 user_label,
-                created_at
+                created_at,
             )
 
         return ChatSession(
-            id=result['id'],
-            session_id=str(result['session_id']),
-            user_label=result['user_label'],
-            created_at=result['created_at'],
+            id=result["id"],
+            session_id=str(result["session_id"]),
+            user_label=result["user_label"],
+            created_at=result["created_at"],
             message_count=0,
-            last_message_at=None
+            last_message_at=None,
         )
 
     except Exception as e:
@@ -69,10 +69,7 @@ async def create_session(
         raise
 
 
-async def get_session(
-    db_pool: asyncpg.Pool,
-    session_id: str
-) -> Optional[ChatSession]:
+async def get_session(db_pool: asyncpg.Pool, session_id: str) -> Optional[ChatSession]:
     """
     Get a session by ID with message count and last message timestamp.
 
@@ -91,7 +88,8 @@ async def get_session(
 
     try:
         async with db_pool.acquire() as conn:
-            result = await conn.fetchrow("""
+            result = await conn.fetchrow(
+                """
                 SELECT
                     cs.id,
                     cs.session_id,
@@ -104,19 +102,19 @@ async def get_session(
                 WHERE cs.session_id = $1
                 GROUP BY cs.id, cs.session_id, cs.user_label, cs.created_at
             """,
-                session_uuid
+                session_uuid,
             )
 
         if not result:
             return None
 
         return ChatSession(
-            id=result['id'],
-            session_id=str(result['session_id']),
-            user_label=result['user_label'],
-            created_at=result['created_at'],
-            message_count=result['message_count'] or 0,
-            last_message_at=result['last_message_at']
+            id=result["id"],
+            session_id=str(result["session_id"]),
+            user_label=result["user_label"],
+            created_at=result["created_at"],
+            message_count=result["message_count"] or 0,
+            last_message_at=result["last_message_at"],
         )
 
     except Exception as e:
@@ -125,10 +123,7 @@ async def get_session(
 
 
 async def list_sessions(
-    db_pool: asyncpg.Pool,
-    user_label: str,
-    limit: int = 20,
-    offset: int = 0
+    db_pool: asyncpg.Pool, user_label: str, limit: int = 20, offset: int = 0
 ) -> ChatSessionList:
     """
     List all sessions for a user with pagination.
@@ -151,12 +146,12 @@ async def list_sessions(
         async with db_pool.acquire() as conn:
             # Get total count
             count_result = await conn.fetchval(
-                "SELECT COUNT(*) FROM chat_sessions WHERE user_label = $1",
-                user_label
+                "SELECT COUNT(*) FROM chat_sessions WHERE user_label = $1", user_label
             )
 
             # Get paginated results
-            rows = await conn.fetch("""
+            rows = await conn.fetch(
+                """
                 SELECT
                     cs.id,
                     cs.session_id,
@@ -173,17 +168,17 @@ async def list_sessions(
             """,
                 user_label,
                 limit,
-                offset
+                offset,
             )
 
         sessions = [
             ChatSession(
-                id=row['id'],
-                session_id=str(row['session_id']),
-                user_label=row['user_label'],
-                created_at=row['created_at'],
-                message_count=row['message_count'] or 0,
-                last_message_at=row['last_message_at']
+                id=row["id"],
+                session_id=str(row["session_id"]),
+                user_label=row["user_label"],
+                created_at=row["created_at"],
+                message_count=row["message_count"] or 0,
+                last_message_at=row["last_message_at"],
             )
             for row in rows
         ]
@@ -191,9 +186,7 @@ async def list_sessions(
         has_more = (offset + limit) < count_result
 
         return ChatSessionList(
-            sessions=sessions,
-            total_count=count_result,
-            has_more=has_more
+            sessions=sessions, total_count=count_result, has_more=has_more
         )
 
     except Exception as e:
@@ -202,9 +195,7 @@ async def list_sessions(
 
 
 async def get_session_history(
-    db_pool: asyncpg.Pool,
-    session_id: str,
-    limit: int = 50
+    db_pool: asyncpg.Pool, session_id: str, limit: int = 50
 ) -> Optional[ChatMessageHistory]:
     """
     Get the full message history for a session.
@@ -230,15 +221,15 @@ async def get_session_history(
         async with db_pool.acquire() as conn:
             # Verify session exists
             session_exists = await conn.fetchval(
-                "SELECT id FROM chat_sessions WHERE session_id = $1",
-                session_uuid
+                "SELECT id FROM chat_sessions WHERE session_id = $1", session_uuid
             )
 
             if not session_exists:
                 return None
 
             # Get messages ordered by creation (oldest first for context building)
-            rows = await conn.fetch("""
+            rows = await conn.fetch(
+                """
                 SELECT
                     id,
                     role,
@@ -252,25 +243,22 @@ async def get_session_history(
                 LIMIT $2
             """,
                 session_uuid,
-                limit
+                limit,
             )
 
         messages = [
             ChatHistoryMessage(
-                id=row['id'],
-                role=row['role'],
-                content=row['content'],
-                source_chunks=row['source_chunks'] or [],
-                source_signals=row['source_signals'] or [],
-                created_at=row['created_at']
+                id=row["id"],
+                role=row["role"],
+                content=row["content"],
+                source_chunks=row["source_chunks"] or [],
+                source_signals=row["source_signals"] or [],
+                created_at=row["created_at"],
             )
             for row in rows
         ]
 
-        return ChatMessageHistory(
-            session_id=session_id,
-            messages=messages
-        )
+        return ChatMessageHistory(session_id=session_id, messages=messages)
 
     except Exception as e:
         logger.error(f"Error retrieving history for session {session_id}: {e}")
@@ -278,9 +266,7 @@ async def get_session_history(
 
 
 async def delete_session(
-    db_pool: asyncpg.Pool,
-    session_id: str,
-    soft_delete: bool = False
+    db_pool: asyncpg.Pool, session_id: str, soft_delete: bool = False
 ) -> bool:
     """
     Delete a chat session and all its messages.
@@ -303,14 +289,12 @@ async def delete_session(
         async with db_pool.acquire() as conn:
             # Delete messages first (they reference the session)
             await conn.execute(
-                "DELETE FROM chat_messages WHERE session_id = $1",
-                session_uuid
+                "DELETE FROM chat_messages WHERE session_id = $1", session_uuid
             )
 
             # Delete session
             result = await conn.execute(
-                "DELETE FROM chat_sessions WHERE session_id = $1",
-                session_uuid
+                "DELETE FROM chat_sessions WHERE session_id = $1", session_uuid
             )
 
         # Check if anything was deleted
@@ -322,9 +306,7 @@ async def delete_session(
 
 
 async def build_context_window(
-    db_pool: asyncpg.Pool,
-    session_id: str,
-    max_messages: int = 10
+    db_pool: asyncpg.Pool, session_id: str, max_messages: int = 10
 ) -> str:
     """
     Build a formatted context window from recent conversation history.
@@ -352,7 +334,8 @@ async def build_context_window(
 
     try:
         async with db_pool.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await conn.fetch(
+                """
                 SELECT
                     role,
                     content,
@@ -363,7 +346,7 @@ async def build_context_window(
                 LIMIT $2
             """,
                 session_uuid,
-                max_messages
+                max_messages,
             )
 
         if not rows:
@@ -372,13 +355,10 @@ async def build_context_window(
         # Reverse to get chronological order (oldest first)
         rows = list(reversed(rows))
 
-        context_parts = [
-            "## CONVERSATION HISTORY:\n",
-            "Recent messages for context:\n"
-        ]
+        context_parts = ["## CONVERSATION HISTORY:\n", "Recent messages for context:\n"]
 
         for row in rows:
-            role = row['role'].upper()
+            role = row["role"].upper()
             context_parts.append(f"\n**{role}:** {row['content']}\n")
 
         context_parts.append("\n---\n")

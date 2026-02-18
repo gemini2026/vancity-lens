@@ -84,7 +84,14 @@ async def check_document_urls(
     Returns:
         Stats dict with counts of alive, dead, redirect, timeout, errors
     """
-    stats = {"checked": 0, "alive": 0, "dead": 0, "redirect": 0, "timeout": 0, "errors": 0}
+    stats = {
+        "checked": 0,
+        "alive": 0,
+        "dead": 0,
+        "redirect": 0,
+        "timeout": 0,
+        "errors": 0,
+    }
 
     async with db_pool.acquire() as conn:
         rows = await conn.fetch(

@@ -35,17 +35,17 @@ MARKET_DATA_DATE = "2025-Q4"
 # When multiple sources provide conflicting data for the same field,
 # the higher-precedence source wins. Higher number = higher priority.
 SOURCE_PRECEDENCE = {
-    "BC Assessment Authority": 100,   # Government authority — highest
+    "BC Assessment Authority": 100,  # Government authority — highest
     "BC Assessment via Vancouver Open Data": 90,  # BCA data via CoV portal
     "Bill 47 — Housing Statutes (TOA) Amendment Act, 2023": 85,  # Legislation
-    "TransLink GTFS": 80,            # Official transit data
+    "TransLink GTFS": 80,  # Official transit data
     "City of Vancouver Open Data": 70,  # CoV datasets
-    "Vancouver Open Data": 70,        # Alias
+    "Vancouver Open Data": 70,  # Alias
     "CMHC Housing Market Indicators": 60,
     "Statistics Canada Census API": 60,
     "BC Ministry of Environment": 55,
-    "REW.ca Listings": 40,           # Commercial listing — lower trust
-    "VanCity Lens Model": 30,        # Our own calculations — lowest
+    "REW.ca Listings": 40,  # Commercial listing — lower trust
+    "VanCity Lens Model": 30,  # Our own calculations — lowest
 }
 
 
@@ -81,9 +81,10 @@ def resolve_source_conflict(
         )
     return winner
 
+
 # DV-HBU-005: Storey-to-metres conversion constants
 _GROUND_FLOOR_HEIGHT_M = Decimal("3.5")  # commercial ground floor
-_UPPER_FLOOR_HEIGHT_M = Decimal("3.0")   # residential upper floors
+_UPPER_FLOOR_HEIGHT_M = Decimal("3.0")  # residential upper floors
 
 
 def _storeys_to_metres(storeys: int) -> Decimal:
@@ -100,6 +101,7 @@ def validate_pid_format(pid: str) -> str:
     if not _PID_PATTERN.match(pid):
         raise InvalidPIDFormatError(pid)
     return pid
+
 
 # ── SQL Queries ──────────────────────────────────────────────
 
@@ -170,6 +172,7 @@ SQL_MARKET_BENCHMARK = """
 
 # ── Engine ───────────────────────────────────────────────────
 
+
 async def compute_entitlement(
     conn: asyncpg.Connection,
     pid: str,
@@ -189,21 +192,25 @@ async def compute_entitlement(
     if parcel["lot_area_sqm"]:
         lot_sqft = float(parcel["lot_area_sqm"]) * 10.7639
         if lot_sqft <= 0 or lot_sqft > 500_000:
-            data_warnings.append(DataQualityWarning(
-                code="LOT_AREA_ANOMALY",
-                message=f"Lot area {lot_sqft:,.0f} SF is outside expected range (0–500,000 SF). Possible data error.",
-                field="lot_area_sqm",
-            ))
+            data_warnings.append(
+                DataQualityWarning(
+                    code="LOT_AREA_ANOMALY",
+                    message=f"Lot area {lot_sqft:,.0f} SF is outside expected range (0–500,000 SF). Possible data error.",
+                    field="lot_area_sqm",
+                )
+            )
 
     # DV-HBU-003: FSR range check (0.1–15.0)
     if parcel["current_fsr"] is not None:
         fsr_val = float(parcel["current_fsr"])
         if fsr_val < 0.1 or fsr_val > 15.0:
-            data_warnings.append(DataQualityWarning(
-                code="FSR_ANOMALY",
-                message=f"Current FSR {fsr_val} is outside expected range (0.1–15.0). Flagged as anomalous.",
-                field="current_fsr",
-            ))
+            data_warnings.append(
+                DataQualityWarning(
+                    code="FSR_ANOMALY",
+                    message=f"Current FSR {fsr_val} is outside expected range (0.1–15.0). Flagged as anomalous.",
+                    field="current_fsr",
+                )
+            )
 
     # DV-HBU-006: BC Assessment staleness (>18 months)
     # BC Assessment rolls are typically dated July 1 of the prior year
@@ -217,11 +224,13 @@ async def compute_entitlement(
     _ASSESSMENT_YEAR = 2024
     months_old = (now.year - _ASSESSMENT_YEAR) * 12 + now.month - 7  # July roll date
     if months_old > 18:
-        data_warnings.append(DataQualityWarning(
-            code="ASSESSMENT_STALE",
-            message=f"BC Assessment data is from the {_ASSESSMENT_YEAR} roll year ({months_old} months old). Values may not reflect current market.",
-            field="assessed_value",
-        ))
+        data_warnings.append(
+            DataQualityWarning(
+                code="ASSESSMENT_STALE",
+                message=f"BC Assessment data is from the {_ASSESSMENT_YEAR} roll year ({months_old} months old). Values may not reflect current market.",
+                field="assessed_value",
+            )
+        )
 
     # 2. Run spatial intersection against TOA buffers
     rows = await conn.fetch(SQL_ENTITLEMENTS, pid)
@@ -239,19 +248,23 @@ async def compute_entitlement(
     if heritage_row:
         heritage_category = heritage_row["category"]
         if heritage_category == "A":
-            data_warnings.append(DataQualityWarning(
-                code="HERITAGE_CATEGORY_A",
-                message=f"Heritage Category A designation: '{heritage_row['name']}'. "
-                        "Demolition restricted; development requires Heritage Commission approval.",
-                field="heritage_site",
-            ))
+            data_warnings.append(
+                DataQualityWarning(
+                    code="HERITAGE_CATEGORY_A",
+                    message=f"Heritage Category A designation: '{heritage_row['name']}'. "
+                    "Demolition restricted; development requires Heritage Commission approval.",
+                    field="heritage_site",
+                )
+            )
         else:
-            data_warnings.append(DataQualityWarning(
-                code=f"HERITAGE_CATEGORY_{heritage_category}",
-                message=f"Heritage Category {heritage_category} designation: '{heritage_row['name']}'. "
-                        "Additional review required; development subject to heritage regulations.",
-                field="heritage_site",
-            ))
+            data_warnings.append(
+                DataQualityWarning(
+                    code=f"HERITAGE_CATEGORY_{heritage_category}",
+                    message=f"Heritage Category {heritage_category} designation: '{heritage_row['name']}'. "
+                    "Additional review required; development subject to heritage regulations.",
+                    field="heritage_site",
+                )
+            )
 
     # 2d. F01-B: Market benchmark lookup for neighbourhood-specific pricing
     neighbourhood = parcel.get("geo_local_area") or ""
@@ -262,12 +275,14 @@ async def compute_entitlement(
     else:
         price_per_sqft = Decimal("800")
         market_data_date = MARKET_DATA_DATE
-        data_warnings.append(DataQualityWarning(
-            code="market_data_default",
-            message=f"No neighbourhood-specific market data for '{neighbourhood}'. Using default $800/sqft.",
-            severity="medium",
-            field="price_per_sqft",
-        ))
+        data_warnings.append(
+            DataQualityWarning(
+                code="market_data_default",
+                message=f"No neighbourhood-specific market data for '{neighbourhood}'. Using default $800/sqft.",
+                severity="medium",
+                field="price_per_sqft",
+            )
+        )
 
     # 3. Build entitlement objects
     #    CRITICAL: Bill 47 sets MINIMUM density floors, not replacements.
@@ -399,24 +414,29 @@ async def compute_entitlement(
 
     # Staleness warnings (DV-F01-006, DV-F01-007)
     from datetime import date as date_cls
+
     current_year = date_cls.today().year
     assessed_year = parcel.get("assessed_year")
     if assessed_year and assessed_year < current_year - 1:
-        data_warnings.append(DataQualityWarning(
-            code="STALE_ASSESSMENT",
-            field="assessed_value",
-            message=f"Assessment data is from {assessed_year} -- may not reflect current values",
-        ))
+        data_warnings.append(
+            DataQualityWarning(
+                code="STALE_ASSESSMENT",
+                field="assessed_value",
+                message=f"Assessment data is from {assessed_year} -- may not reflect current values",
+            )
+        )
 
     if market_data_date:
         try:
             md = date_cls.fromisoformat(str(market_data_date))
             if (date_cls.today() - md).days > 365:
-                data_warnings.append(DataQualityWarning(
-                    code="STALE_MARKET_DATA",
-                    field="market_data",
-                    message=f"Cost data may be outdated -- last updated {market_data_date}",
-                ))
+                data_warnings.append(
+                    DataQualityWarning(
+                        code="STALE_MARKET_DATA",
+                        field="market_data",
+                        message=f"Cost data may be outdated -- last updated {market_data_date}",
+                    )
+                )
         except ValueError:
             pass  # Non-ISO date format (e.g. "2025-Q4") — skip staleness check
 
@@ -469,96 +489,112 @@ def _build_sources(pid: str, parcel, best, value_estimate) -> SourceAttribution:
     sources = []
 
     # PID — link to the exact parcel record in Vancouver Open Data
-    sources.append(DataSource(
-        field="pid",
-        label="Parcel ID (PID)",
-        value=pid,
-        origin="Vancouver Open Data",
-        confidence="verified",
-        url=f"https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/table/?refine.site_id={clean_pid}",
-        note=f"BC Land Title PID sourced from City of Vancouver parcel fabric (site_id: {clean_pid})",
-    ))
+    sources.append(
+        DataSource(
+            field="pid",
+            label="Parcel ID (PID)",
+            value=pid,
+            origin="Vancouver Open Data",
+            confidence="verified",
+            url=f"https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/table/?refine.site_id={clean_pid}",
+            note=f"BC Land Title PID sourced from City of Vancouver parcel fabric (site_id: {clean_pid})",
+        )
+    )
 
     # Address — link to Google Maps for visual confirmation
     if addr:
-        sources.append(DataSource(
-            field="civic_address",
-            label="Civic Address",
-            value=addr,
-            origin="Vancouver Open Data",
-            confidence="verified",
-            url=f"https://www.google.com/maps/search/{addr_encoded}+Vancouver+BC",
-        ))
+        sources.append(
+            DataSource(
+                field="civic_address",
+                label="Civic Address",
+                value=addr,
+                origin="Vancouver Open Data",
+                confidence="verified",
+                url=f"https://www.google.com/maps/search/{addr_encoded}+Vancouver+BC",
+            )
+        )
 
     # Zoning — link to the City of Vancouver zoning map
     if parcel["current_zoning"]:
-        sources.append(DataSource(
-            field="current_zoning",
-            label="Current Zoning",
-            value=parcel["current_zoning"],
-            origin="Vancouver Open Data",
-            confidence="verified",
-            url=f"https://maps.vancouver.ca/van-zoning/?search={addr_encoded}",
-            note="Zoning assigned via spatial join of parcel centroid to City of Vancouver zoning polygons",
-        ))
+        sources.append(
+            DataSource(
+                field="current_zoning",
+                label="Current Zoning",
+                value=parcel["current_zoning"],
+                origin="Vancouver Open Data",
+                confidence="verified",
+                url=f"https://maps.vancouver.ca/van-zoning/?search={addr_encoded}",
+                note="Zoning assigned via spatial join of parcel centroid to City of Vancouver zoning polygons",
+            )
+        )
 
     # Bill 47 Entitlement — link to the specific legislation section
     if best:
-        sources.append(DataSource(
-            field="entitlement",
-            label=f"Tier {best.tier.value} Entitlement ({best.entitled_storeys} storeys, FSR {best.entitled_fsr})",
-            value=f"{best.distance_m:.0f}m from {best.station_name}",
-            origin="Bill 47 — Housing Statutes (TOA) Amendment Act, 2023",
-            confidence="calculated",
-            url="https://www.bclaws.gov.bc.ca/civix/document/id/bills/billsprevious/4th42nd:gov47-1",
-            note=f"Distance calculated via PostGIS geodesic ST_Distance (WGS84 geography) from parcel centroid to station. "
-                 f"Tier {best.tier.value}: {best.tier.value == 1 and '0-200m' or best.tier.value == 2 and '200-400m' or '400-800m'} radius per Bill 47 s.481.1",
-        ))
+        sources.append(
+            DataSource(
+                field="entitlement",
+                label=f"Tier {best.tier.value} Entitlement ({best.entitled_storeys} storeys, FSR {best.entitled_fsr})",
+                value=f"{best.distance_m:.0f}m from {best.station_name}",
+                origin="Bill 47 — Housing Statutes (TOA) Amendment Act, 2023",
+                confidence="calculated",
+                url="https://www.bclaws.gov.bc.ca/civix/document/id/bills/billsprevious/4th42nd:gov47-1",
+                note=f"Distance calculated via PostGIS geodesic ST_Distance (WGS84 geography) from parcel centroid to station. "
+                f"Tier {best.tier.value}: {best.tier.value == 1 and '0-200m' or best.tier.value == 2 and '200-400m' or '400-800m'} radius per Bill 47 s.481.1",
+            )
+        )
 
     # Station — link to Google Maps for the specific station
     if best:
         station_encoded = best.station_name.replace(" ", "+")
-        sources.append(DataSource(
-            field="station",
-            label=f"Station: {best.station_name}",
-            value="TransLink SkyTrain",
-            origin="TransLink GTFS",
-            confidence="verified",
-            url=f"https://www.google.com/maps/search/{station_encoded}+SkyTrain+Station+Vancouver",
-            note="Station coordinates from TransLink's official GTFS static feed",
-        ))
+        sources.append(
+            DataSource(
+                field="station",
+                label=f"Station: {best.station_name}",
+                value="TransLink SkyTrain",
+                origin="TransLink GTFS",
+                confidence="verified",
+                url=f"https://www.google.com/maps/search/{station_encoded}+SkyTrain+Station+Vancouver",
+                note="Station coordinates from TransLink's official GTFS static feed",
+            )
+        )
 
     # Lot area — link to parcel map view showing the polygon
     if parcel["lot_area_sqm"]:
-        sources.append(DataSource(
-            field="lot_area_sqm",
-            label="Lot Area",
-            value=f"{parcel['lot_area_sqm']:,.1f} sqm ({float(parcel['lot_area_sqm']) * 10.7639:,.0f} sqft)",
-            origin="Calculated from Vancouver Open Data geometry",
-            confidence="calculated",
-            url=f"https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/map/?refine.site_id={clean_pid}",
-            note="Area calculated via PostGIS ST_Area(ST_Transform(geom, 3005)) from official parcel polygon",
-        ))
+        sources.append(
+            DataSource(
+                field="lot_area_sqm",
+                label="Lot Area",
+                value=f"{parcel['lot_area_sqm']:,.1f} sqm ({float(parcel['lot_area_sqm']) * 10.7639:,.0f} sqft)",
+                origin="Calculated from Vancouver Open Data geometry",
+                confidence="calculated",
+                url=f"https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/map/?refine.site_id={clean_pid}",
+                note="Area calculated via PostGIS ST_Area(ST_Transform(geom, 3005)) from official parcel polygon",
+            )
+        )
 
     # Assessed value — link to the specific tax record in Vancouver Open Data
     if parcel["assessed_value"]:
-        sources.append(DataSource(
-            field="assessed_value",
-            label="Assessed Value",
-            value=f"${parcel['assessed_value']:,}",
-            origin="BC Assessment via Vancouver Open Data",
-            confidence="estimated",
-            url=f"https://opendata.vancouver.ca/explore/dataset/property-tax-report/table/?refine.pid={pid}",
-            note="Assessed value from Vancouver Open Data property-tax-report dataset (sourced from BC Assessment). "
-                 "Click to see the specific tax record for this PID.",
-        ))
+        sources.append(
+            DataSource(
+                field="assessed_value",
+                label="Assessed Value",
+                value=f"${parcel['assessed_value']:,}",
+                origin="BC Assessment via Vancouver Open Data",
+                confidence="estimated",
+                url=f"https://opendata.vancouver.ca/explore/dataset/property-tax-report/table/?refine.pid={pid}",
+                note="Assessed value from Vancouver Open Data property-tax-report dataset (sourced from BC Assessment). "
+                "Click to see the specific tax record for this PID.",
+            )
+        )
 
     # Asking price — Google search scoped to REW.ca for the address
     if value_estimate and value_estimate.asking_price:
         # Try direct REW.ca URL if column exists; otherwise use Google search
         rew_url = None
         try:
-            rew_url = parcel.get("rew_url") if hasattr(parcel, "get") else parcel["rew_url"]
+            rew_url = (
+                parcel.get("rew_url") if hasattr(parcel, "get") else parcel["rew_url"]
+            )
         except (KeyError, TypeError):
             pass
         if rew_url:
@@ -567,39 +603,45 @@ def _build_sources(pid: str, parcel, best, value_estimate) -> SourceAttribution:
         else:
             verify_url = f"https://www.google.com/search?q=site%3Arew.ca+{addr_encoded}+Vancouver+BC"
             verify_note = "Google search scoped to REW.ca for this address. Click to find the listing."
-        sources.append(DataSource(
-            field="asking_price",
-            label="Asking Price",
-            value=f"${value_estimate.asking_price:,}",
-            origin="REW.ca Listings",
-            confidence="estimated",
-            url=verify_url,
-            note=verify_note,
-        ))
+        sources.append(
+            DataSource(
+                field="asking_price",
+                label="Asking Price",
+                value=f"${value_estimate.asking_price:,}",
+                origin="REW.ca Listings",
+                confidence="estimated",
+                url=verify_url,
+                note=verify_note,
+            )
+        )
 
     # Estimated land value — our calculation (no external verify link)
     if value_estimate:
-        sources.append(DataSource(
-            field="estimated_land_value",
-            label="Entitled Land Value (Est.)",
-            value=f"${value_estimate.estimated_land_value:,}",
-            origin="VanCity Lens Model",
-            confidence="calculated",
-            url=None,
-            note=f"Formula: lot_area ({parcel['lot_area_sqm']:,.1f} sqm) x entitled_FSR ({value_estimate.entitled_fsr}) "
-                 f"x 10.7639 (sqm-sqft) x ${value_estimate.price_per_sqft_assumption}/sqft = ${value_estimate.estimated_land_value:,}.",
-        ))
+        sources.append(
+            DataSource(
+                field="estimated_land_value",
+                label="Entitled Land Value (Est.)",
+                value=f"${value_estimate.estimated_land_value:,}",
+                origin="VanCity Lens Model",
+                confidence="calculated",
+                url=None,
+                note=f"Formula: lot_area ({parcel['lot_area_sqm']:,.1f} sqm) x entitled_FSR ({value_estimate.entitled_fsr}) "
+                f"x 10.7639 (sqm-sqft) x ${value_estimate.price_per_sqft_assumption}/sqft = ${value_estimate.estimated_land_value:,}.",
+            )
+        )
 
     # BC Assessment official lookup — direct link with address pre-filled
-    sources.append(DataSource(
-        field="bc_assessment_lookup",
-        label="BC Assessment — Official Lookup",
-        value="Click to verify assessed value",
-        origin="BC Assessment Authority",
-        confidence="verified",
-        url=f"https://www.bcassessment.ca/Property/Search/GetByAddress?addr={addr_encoded or pid}+Vancouver",
-        note="Opens BC Assessment's official property search to verify the government-assessed value.",
-    ))
+    sources.append(
+        DataSource(
+            field="bc_assessment_lookup",
+            label="BC Assessment — Official Lookup",
+            value="Click to verify assessed value",
+            origin="BC Assessment Authority",
+            confidence="verified",
+            url=f"https://www.bcassessment.ca/Property/Search/GetByAddress?addr={addr_encoded or pid}+Vancouver",
+            note="Opens BC Assessment's official property search to verify the government-assessed value.",
+        )
+    )
 
     return SourceAttribution(
         sources=sources,
@@ -609,6 +651,7 @@ def _build_sources(pid: str, parcel, best, value_estimate) -> SourceAttribution:
 
 class ParcelNotFoundError(Exception):
     """Raised when a PID doesn't exist in our parcel fabric."""
+
     def __init__(self, pid: str):
         self.pid = pid
         super().__init__(f"Parcel {pid} not found")
@@ -616,6 +659,7 @@ class ParcelNotFoundError(Exception):
 
 class InvalidPIDFormatError(Exception):
     """DV-HBU-001: Raised when a PID doesn't match the 9-digit NNN-NNN-NNN format."""
+
     def __init__(self, pid: str):
         self.pid = pid
         super().__init__(

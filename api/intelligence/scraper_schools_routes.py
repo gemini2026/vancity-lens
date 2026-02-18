@@ -282,7 +282,9 @@ async def get_all_school_metrics() -> Dict[str, Any]:
                     avg_capacity_utilization=row["avg_capacity_utilization"],
                     avg_student_teacher_ratio=row["avg_student_teacher_ratio"],
                     quality_score=row["quality_score"],
-                    period_start=str(row["period_start"]) if row["period_start"] else "",
+                    period_start=str(row["period_start"])
+                    if row["period_start"]
+                    else "",
                     period_end=str(row["period_end"]) if row["period_end"] else "",
                 )
             )

@@ -36,7 +36,10 @@ async def create_share_link(body: ShareLinkCreate, request: Request):
         """INSERT INTO share_links (pid, user_id, label, expires_at)
            VALUES ($1, $2, $3, NOW() + make_interval(days => $4))
            RETURNING token, pid, label, expires_at""",
-        body.pid, user["id"] if user else None, body.label, body.expires_days,
+        body.pid,
+        user["id"] if user else None,
+        body.label,
+        body.expires_days,
     )
     base_url = str(request.base_url).rstrip("/")
     return ShareLinkResponse(

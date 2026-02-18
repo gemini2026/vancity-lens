@@ -37,6 +37,7 @@ COMPRESSIBLE_TYPES = {
 
 # ── Compression Middleware ────────────────────────────────────────────────
 
+
 class CompressionMiddleware:
     """
     ASGI middleware that compresses responses using gzip.
@@ -133,11 +134,13 @@ class _CachedResponder:
             if self.stream_response or more_body:
                 # Streaming response or continuation - send immediately
                 if body:
-                    await self.send({
-                        "type": "http.response.body",
-                        "body": body,
-                        "more_body": more_body,
-                    })
+                    await self.send(
+                        {
+                            "type": "http.response.body",
+                            "body": body,
+                            "more_body": more_body,
+                        }
+                    )
             else:
                 # Final body chunk - decide on compression
                 self.body_parts.append(body)
@@ -151,31 +154,39 @@ class _CachedResponder:
                     new_headers = self._get_compressed_headers()
 
                     # Send response start with new headers
-                    await self.send({
-                        "type": "http.response.start",
-                        "status": self.status_code,
-                        "headers": new_headers,
-                    })
+                    await self.send(
+                        {
+                            "type": "http.response.start",
+                            "status": self.status_code,
+                            "headers": new_headers,
+                        }
+                    )
 
                     # Send compressed body
-                    await self.send({
-                        "type": "http.response.body",
-                        "body": compressed_body,
-                        "more_body": False,
-                    })
+                    await self.send(
+                        {
+                            "type": "http.response.body",
+                            "body": compressed_body,
+                            "more_body": False,
+                        }
+                    )
                 else:
                     # Send uncompressed but with Vary header
-                    await self.send({
-                        "type": "http.response.start",
-                        "status": self.status_code,
-                        "headers": self._get_uncompressed_headers(),
-                    })
+                    await self.send(
+                        {
+                            "type": "http.response.start",
+                            "status": self.status_code,
+                            "headers": self._get_uncompressed_headers(),
+                        }
+                    )
 
-                    await self.send({
-                        "type": "http.response.body",
-                        "body": full_body,
-                        "more_body": False,
-                    })
+                    await self.send(
+                        {
+                            "type": "http.response.body",
+                            "body": full_body,
+                            "more_body": False,
+                        }
+                    )
 
     def _should_compress(self) -> bool:
         """Check if response should be compressed."""
@@ -202,7 +213,9 @@ class _CachedResponder:
     def _compress_body(self, body: bytes) -> bytes:
         """Compress body using gzip."""
         buf = io.BytesIO()
-        with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=COMPRESSION_LEVEL) as gz:
+        with gzip.GzipFile(
+            fileobj=buf, mode="wb", compresslevel=COMPRESSION_LEVEL
+        ) as gz:
             gz.write(body)
         return buf.getvalue()
 
@@ -263,7 +276,4 @@ class _CachedResponder:
 
     def _get_original_headers(self) -> list[tuple[bytes, bytes]]:
         """Build response headers for uncompressed response."""
-        return [
-            (name.encode(), value.encode())
-            for name, value in self.headers.items()
-        ]
+        return [(name.encode(), value.encode()) for name, value in self.headers.items()]

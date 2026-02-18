@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 # Enums
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class SubscriptionTier(str, Enum):
     """Available subscription tiers."""
+
     FREE = "free"
     STARTER = "starter"
     PROFESSIONAL = "professional"
@@ -30,6 +32,7 @@ class SubscriptionTier(str, Enum):
 
 class SubscriptionStatus(str, Enum):
     """Subscription status states."""
+
     ACTIVE = "active"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
@@ -40,8 +43,10 @@ class SubscriptionStatus(str, Enum):
 # Pydantic Models
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TierInfo(BaseModel):
     """Information about a subscription tier."""
+
     id: int
     name: str
     display_name: str
@@ -62,12 +67,14 @@ class TierInfo(BaseModel):
         """Parse features from JSON string if needed (DB stores as TEXT)."""
         if isinstance(data, dict) and isinstance(data.get("features"), str):
             import json
+
             data["features"] = json.loads(data["features"])
         return data
 
 
 class UserSubscription(BaseModel):
     """User's current subscription."""
+
     id: int
     user_id: int
     tier_id: int
@@ -87,6 +94,7 @@ class UserSubscription(BaseModel):
 
 class UsageStats(BaseModel):
     """Usage statistics for a specific date."""
+
     user_id: int
     usage_date: str
     api_calls: int
@@ -100,6 +108,7 @@ class UsageStats(BaseModel):
 
 class UsageLimits(BaseModel):
     """Usage limits for a subscription tier."""
+
     max_watchlists: Optional[int]
     max_api_calls_daily: Optional[int]
     max_signals_per_query: Optional[int]
@@ -107,6 +116,7 @@ class UsageLimits(BaseModel):
 
 class SubscriptionStatusResponse(BaseModel):
     """Complete subscription status for a user."""
+
     subscription: UserSubscription
     tier: TierInfo
     usage_today: UsageStats
@@ -118,6 +128,7 @@ class SubscriptionStatusResponse(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 # Subscription Manager
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class SubscriptionManager:
     """Manages subscription tiers, user subscriptions, and usage tracking."""
@@ -716,6 +727,7 @@ class SubscriptionManager:
 # ────────────────────────────────────────────────────────────────────────────
 # FastAPI Dependencies
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def require_tier(min_tier: str):
     """

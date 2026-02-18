@@ -31,6 +31,7 @@ def _check_docling():
         return _docling_available
     try:
         import importlib.util
+
         _docling_available = importlib.util.find_spec("docling") is not None
         logger.info("docling available for document parsing")
     except ImportError:
@@ -40,6 +41,7 @@ def _check_docling():
 
 
 # ── Primary: docling-based parsing ────────────────────────────
+
 
 def parse_pdf_with_docling(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
     """
@@ -62,7 +64,7 @@ def parse_pdf_with_docling(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
         from docling.document_converter import DocumentConverter
 
         # Write bytes to a temp file (docling needs a file path)
-        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
             tmp.write(pdf_bytes)
             tmp_path = tmp.name
 
@@ -77,14 +79,14 @@ def parse_pdf_with_docling(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
             # Count tables
             tables_found = 0
             try:
-                tables_found = len(doc.tables) if hasattr(doc, 'tables') else 0
+                tables_found = len(doc.tables) if hasattr(doc, "tables") else 0
             except Exception:
                 pass
 
             # Estimate page count from the document
             page_count = 0
             try:
-                page_count = len(doc.pages) if hasattr(doc, 'pages') else 0
+                page_count = len(doc.pages) if hasattr(doc, "pages") else 0
             except Exception:
                 pass
 
@@ -94,10 +96,10 @@ def parse_pdf_with_docling(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
             )
 
             return {
-                'text': markdown_text,
-                'page_count': page_count,
-                'tables_found': tables_found,
-                'parser': 'docling',
+                "text": markdown_text,
+                "page_count": page_count,
+                "tables_found": tables_found,
+                "parser": "docling",
             }
 
         finally:
@@ -115,7 +117,9 @@ def parse_pdf_with_docling(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
         return None
 
 
-def parse_html_with_docling(html_content: str, source_url: str = "") -> Optional[Dict[str, Any]]:
+def parse_html_with_docling(
+    html_content: str, source_url: str = ""
+) -> Optional[Dict[str, Any]]:
     """
     Parse HTML content using docling for clean text extraction.
 
@@ -130,7 +134,7 @@ def parse_html_with_docling(html_content: str, source_url: str = "") -> Optional
         from docling.document_converter import DocumentConverter
 
         # Write HTML to temp file
-        with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w') as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w") as tmp:
             tmp.write(html_content)
             tmp_path = tmp.name
 
@@ -144,10 +148,10 @@ def parse_html_with_docling(html_content: str, source_url: str = "") -> Optional
             logger.info(f"docling parsed HTML: {len(markdown_text)} chars")
 
             return {
-                'text': markdown_text,
-                'page_count': 1,
-                'tables_found': 0,
-                'parser': 'docling',
+                "text": markdown_text,
+                "page_count": 1,
+                "tables_found": 0,
+                "parser": "docling",
             }
 
         finally:
@@ -165,6 +169,7 @@ def parse_html_with_docling(html_content: str, source_url: str = "") -> Optional
 
 
 # ── Fallback: pdfplumber-based parsing ────────────────────────
+
 
 def parse_pdf_with_pdfplumber(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
     """
@@ -195,15 +200,17 @@ def parse_pdf_with_pdfplumber(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
                 except Exception as e:
                     logger.warning(f"pdfplumber error on page {page_num}: {e}")
 
-            full_text = '\n\n'.join(text_parts)
+            full_text = "\n\n".join(text_parts)
 
-        logger.info(f"pdfplumber parsed PDF: {len(full_text)} chars, {page_count} pages")
+        logger.info(
+            f"pdfplumber parsed PDF: {len(full_text)} chars, {page_count} pages"
+        )
 
         return {
-            'text': full_text,
-            'page_count': page_count,
-            'tables_found': 0,
-            'parser': 'pdfplumber',
+            "text": full_text,
+            "page_count": page_count,
+            "tables_found": 0,
+            "parser": "pdfplumber",
         }
 
     except ImportError:
@@ -215,6 +222,7 @@ def parse_pdf_with_pdfplumber(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
 
 
 # ── Unified parser interface ──────────────────────────────────
+
 
 def parse_pdf(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
     """
@@ -231,7 +239,7 @@ def parse_pdf(pdf_bytes: bytes) -> Optional[Dict[str, Any]]:
     """
     if _check_docling():
         result = parse_pdf_with_docling(pdf_bytes)
-        if result and result.get('text'):
+        if result and result.get("text"):
             return result
         logger.warning("docling returned empty result, trying pdfplumber")
 
@@ -253,31 +261,33 @@ def parse_html(html_content: str, source_url: str = "") -> Optional[Dict[str, An
     """
     if _check_docling():
         result = parse_html_with_docling(html_content, source_url)
-        if result and result.get('text'):
+        if result and result.get("text"):
             return result
 
     # Fallback: BeautifulSoup
     try:
         from bs4 import BeautifulSoup
-        soup = BeautifulSoup(html_content, 'html.parser')
+
+        soup = BeautifulSoup(html_content, "html.parser")
 
         # Remove script and style elements
-        for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
 
-        text = soup.get_text(separator='\n', strip=True)
+        text = soup.get_text(separator="\n", strip=True)
 
         # Clean up multiple blank lines
         import re
-        text = re.sub(r'\n{3,}', '\n\n', text)
+
+        text = re.sub(r"\n{3,}", "\n\n", text)
 
         logger.info(f"BeautifulSoup parsed HTML: {len(text)} chars")
 
         return {
-            'text': text,
-            'page_count': 1,
-            'tables_found': 0,
-            'parser': 'beautifulsoup',
+            "text": text,
+            "page_count": 1,
+            "tables_found": 0,
+            "parser": "beautifulsoup",
         }
 
     except Exception as e:

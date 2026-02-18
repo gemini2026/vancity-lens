@@ -1,4 +1,5 @@
 """LLM-powered extraction pipeline for regulatory changes."""
+
 from __future__ import annotations
 
 import json
@@ -39,7 +40,7 @@ class ChangeRecord(BaseModel):
             return " ".join(words[:197]) + "..."
         return v
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def set_review_flag(self):
         self.requires_manual_review = self.nlp_confidence_score < 0.85
         return self

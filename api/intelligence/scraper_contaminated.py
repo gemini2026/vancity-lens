@@ -75,16 +75,22 @@ class ContaminatedSitesScraper:
             await asyncio.sleep(RATE_LIMIT_DELAY - elapsed)
         self._last_request = asyncio.get_event_loop().time()
 
-    async def _fetch_json(self, url: str, params: Optional[dict] = None) -> Optional[dict]:
+    async def _fetch_json(
+        self, url: str, params: Optional[dict] = None
+    ) -> Optional[dict]:
         await self._rate_limit()
         try:
             async with self.session.get(
-                url, headers=HEADERS, params=params,
+                url,
+                headers=HEADERS,
+                params=params,
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
                 if resp.status == 200:
                     return await resp.json()
-                logger.warning("Contaminated sites fetch %s returned %d", url, resp.status)
+                logger.warning(
+                    "Contaminated sites fetch %s returned %d", url, resp.status
+                )
                 return None
         except Exception as e:
             logger.error("Contaminated sites fetch error %s: %s", url, e)
@@ -94,7 +100,8 @@ class ContaminatedSitesScraper:
         await self._rate_limit()
         try:
             async with self.session.get(
-                url, headers=HEADERS,
+                url,
+                headers=HEADERS,
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
                 if resp.status == 200:
@@ -142,8 +149,10 @@ class ContaminatedSitesScraper:
 
         # Filter to Vancouver bounding box if coordinates available
         if lat and lng:
-            if not (VANCOUVER_BBOX["min_lat"] <= float(lat) <= VANCOUVER_BBOX["max_lat"] and
-                    VANCOUVER_BBOX["min_lng"] <= float(lng) <= VANCOUVER_BBOX["max_lng"]):
+            if not (
+                VANCOUVER_BBOX["min_lat"] <= float(lat) <= VANCOUVER_BBOX["max_lat"]
+                and VANCOUVER_BBOX["min_lng"] <= float(lng) <= VANCOUVER_BBOX["max_lng"]
+            ):
                 return None
 
         return {
@@ -153,7 +162,9 @@ class ContaminatedSitesScraper:
             "city": item.get("city", "Vancouver"),
             "latitude": float(lat) if lat else None,
             "longitude": float(lng) if lng else None,
-            "classification": item.get("classification") or item.get("site_class") or "",
+            "classification": item.get("classification")
+            or item.get("site_class")
+            or "",
             "status": item.get("status") or item.get("site_status") or "",
             "contamination_type": item.get("contamination_type") or "",
             "date_reported": item.get("date_reported") or item.get("reported_date"),
@@ -270,8 +281,11 @@ async def scrape_and_store(
                         stats["documents_new"] += 1
 
                 except Exception as e:
-                    logger.error("Error storing contaminated site %s: %s",
-                                 site.get("site_id", "?"), e)
+                    logger.error(
+                        "Error storing contaminated site %s: %s",
+                        site.get("site_id", "?"),
+                        e,
+                    )
                     stats["errors"] += 1
 
             # Match sites to nearest parcels

@@ -113,6 +113,7 @@ Be thorough. Extract multiple signals if the chunk contains multiple actionable 
 # EXTRACTION FUNCTION
 # ──────────────────────────────────────────────────────────────────────────
 
+
 async def extract_signals_from_chunk(
     chunk_text: str,
     document_context: dict,
@@ -135,10 +136,10 @@ async def extract_signals_from_chunk(
         return []
 
     user_message = f"""Document Context:
-- Source Type: {document_context.get('source_type', 'Unknown')}
-- Title: {document_context.get('title', 'Unknown')}
-- Meeting Date: {document_context.get('meeting_date', 'Unknown')}
-- Source URL: {document_context.get('source_url', 'Unknown')}
+- Source Type: {document_context.get("source_type", "Unknown")}
+- Title: {document_context.get("title", "Unknown")}
+- Meeting Date: {document_context.get("meeting_date", "Unknown")}
+- Source URL: {document_context.get("source_url", "Unknown")}
 
 Document Chunk:
 {chunk_text}
@@ -179,16 +180,25 @@ Extract all real estate intelligence signals from this chunk. Return valid JSON 
                     signal = ExtractedSignal(**signal_dict)
                     signals.append(signal)
                 except Exception as e:
-                    logger.warning("Failed to parse signal object: %s. Data: %s", e, signal_dict)
+                    logger.warning(
+                        "Failed to parse signal object: %s. Data: %s", e, signal_dict
+                    )
                     continue
 
-            logger.info("Extracted %d signals from chunk in %.1fs (model=%s)", len(signals), latency, model_used)
+            logger.info(
+                "Extracted %d signals from chunk in %.1fs (model=%s)",
+                len(signals),
+                latency,
+                model_used,
+            )
             return signals
 
         except json.JSONDecodeError as e:
-            logger.error("Failed to parse LLM JSON response (attempt %d): %s", attempt + 1, e)
+            logger.error(
+                "Failed to parse LLM JSON response (attempt %d): %s", attempt + 1, e
+            )
             if attempt < max_retries - 1:
-                wait_time = backoff_factor ** attempt
+                wait_time = backoff_factor**attempt
                 await asyncio.sleep(wait_time)
             else:
                 logger.error("Max retries exceeded for JSON parsing")
@@ -196,7 +206,7 @@ Extract all real estate intelligence signals from this chunk. Return valid JSON 
         except Exception as e:
             logger.error("Extraction error (attempt %d): %s", attempt + 1, e)
             if attempt < max_retries - 1:
-                wait_time = backoff_factor ** attempt
+                wait_time = backoff_factor**attempt
                 await asyncio.sleep(wait_time)
             else:
                 logger.error("Max retries exceeded")
@@ -208,7 +218,10 @@ Extract all real estate intelligence signals from this chunk. Return valid JSON 
 # GEOCODING FUNCTION
 # ──────────────────────────────────────────────────────────────────────────
 
-async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple[float, float]]:
+
+async def geocode_address(
+    db_pool: asyncpg.Pool, address: str
+) -> Optional[Tuple[float, float]]:
     """Geocode a Vancouver address using local parcel data or API.
 
     First tries to fuzzy match against the parcels table, then falls back
@@ -247,7 +260,9 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
                     continue
 
                 # Simple character-level similarity
-                similarity = SequenceMatcher(None, address.lower(), parcel_address.lower()).ratio()
+                similarity = SequenceMatcher(
+                    None, address.lower(), parcel_address.lower()
+                ).ratio()
 
                 if similarity > best_score and similarity > 0.7:  # require 70% match
                     best_score = similarity
@@ -257,16 +272,24 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
                 # Extract coordinates from geometry (PostGIS point)
                 geom = best_match["geom"]
                 if geom:
-                    logger.info(f"Found parcel match for '{address}' with {best_score:.2%} similarity")
+                    logger.info(
+                        f"Found parcel match for '{address}' with {best_score:.2%} similarity"
+                    )
                     # geom is already a point with (lon, lat), return as (lat, lon)
                     # Note: PostGIS uses (lon, lat) internally, but we return (lat, lon)
                     # This depends on how the geometry is stored. Typically:
                     try:
                         # PostGIS point geometry
-                        lon, lat = geom["coordinates"] if isinstance(geom, dict) else (geom.x, geom.y)
+                        lon, lat = (
+                            geom["coordinates"]
+                            if isinstance(geom, dict)
+                            else (geom.x, geom.y)
+                        )
                         return (lat, lon)
                     except (KeyError, AttributeError, TypeError):
-                        logger.warning(f"Could not extract coordinates from geometry: {geom}")
+                        logger.warning(
+                            f"Could not extract coordinates from geometry: {geom}"
+                        )
 
     except Exception as e:
         logger.warning(f"Error querying parcels table: {e}")
@@ -281,7 +304,9 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
 
             logger.debug(f"Calling BC geocoder API for address: {address}")
 
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with session.get(
+                url, params=params, timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     features = data.get("features", [])
@@ -292,7 +317,9 @@ async def geocode_address(db_pool: asyncpg.Pool, address: str) -> Optional[Tuple
                         coords = feature.get("geometry", {}).get("coordinates", [])
                         if coords and len(coords) >= 2:
                             lon, lat = coords[0], coords[1]
-                            logger.info(f"Geocoded '{address}' via BC API: ({lat}, {lon})")
+                            logger.info(
+                                f"Geocoded '{address}' via BC API: ({lat}, {lon})"
+                            )
                             return (lat, lon)
 
                     logger.debug(f"BC geocoder returned no features for '{address}'")
@@ -386,7 +413,9 @@ async def process_document(
             "source_type": doc["source_type"],
             "source_url": doc["source_url"],
             "title": doc["title"],
-            "meeting_date": doc["meeting_date"].isoformat() if doc["meeting_date"] else None,
+            "meeting_date": doc["meeting_date"].isoformat()
+            if doc["meeting_date"]
+            else None,
         }
 
         # Extract signals from each chunk
@@ -415,7 +444,9 @@ async def process_document(
             extracted_signals_by_chunk[chunk_id] = signals
             total_signals += len(signals)
 
-        logger.info(f"Extracted {total_signals} total signals from document {document_id}")
+        logger.info(
+            f"Extracted {total_signals} total signals from document {document_id}"
+        )
 
         # Store signals in database
         async with db_pool.acquire() as conn:
@@ -484,13 +515,20 @@ async def process_document(
                             signal.severity.value,
                             signal.confidence,
                             signal.event_date,
-                            geom if geom else "SRID=4326;POINT(0 0)",  # default point if geocoding failed
-                            os.environ.get("GEMINI_MODEL", os.environ.get("ANTHROPIC_MODEL", "gemini-2.5-flash")),
+                            geom
+                            if geom
+                            else "SRID=4326;POINT(0 0)",  # default point if geocoding failed
+                            os.environ.get(
+                                "GEMINI_MODEL",
+                                os.environ.get("ANTHROPIC_MODEL", "gemini-2.5-flash"),
+                            ),
                             datetime.now(timezone.utc),
                             review_status,
                         )
 
-                        logger.debug(f"Stored signal: {signal.signal_type} at {signal.addresses}")
+                        logger.debug(
+                            f"Stored signal: {signal.signal_type} at {signal.addresses}"
+                        )
 
                     except Exception as e:
                         logger.error(f"Error storing signal: {e}")
@@ -503,7 +541,9 @@ async def process_document(
                 document_id,
             )
 
-            logger.info(f"Document {document_id} processing complete. {total_signals} signals stored.")
+            logger.info(
+                f"Document {document_id} processing complete. {total_signals} signals stored."
+            )
 
         return total_signals
 
@@ -515,6 +555,7 @@ async def process_document(
 # ──────────────────────────────────────────────────────────────────────────
 # BATCH PROCESSING
 # ──────────────────────────────────────────────────────────────────────────
+
 
 async def process_all_unprocessed(
     db_pool: asyncpg.Pool,

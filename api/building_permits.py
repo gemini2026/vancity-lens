@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 # ── Enums ────────────────────────────────────────────────────
 
+
 class PermitType(str, Enum):
     NEW_BUILDING = "new_build"
     RENOVATION = "renovation"
@@ -31,8 +32,10 @@ class PermitStatus(str, Enum):
 
 # ── Models ───────────────────────────────────────────────────
 
+
 class BuildingPermit(BaseModel):
     """Represents a single building permit record."""
+
     permit_number: str
     address: str
     permit_type: PermitType
@@ -47,6 +50,7 @@ class BuildingPermit(BaseModel):
 
 class CompetingSupplyResult(BaseModel):
     """Analysis of competing supply in an area."""
+
     total_permits: int = Field(ge=0)
     new_build_permits: int = Field(ge=0)
     pipeline_units: int = Field(ge=0)
@@ -103,6 +107,7 @@ SQL_PERMITS_BY_RADIUS = """
 
 
 # ── BuildingPermitAnalyzer ────────────────────────────────────
+
 
 class BuildingPermitAnalyzer:
     """Analyzes building permits and competing supply dynamics."""
@@ -194,9 +199,7 @@ class BuildingPermitAnalyzer:
             pipeline_units,
             existing_units,
         )
-        avg_units = (
-            pipeline_units / total_permits if total_permits > 0 else 0.0
-        )
+        avg_units = pipeline_units / total_permits if total_permits > 0 else 0.0
 
         return CompetingSupplyResult(
             total_permits=total_permits,
@@ -221,8 +224,10 @@ class BuildingPermitAnalyzer:
             Total estimated units in pipeline
         """
         pipeline = [
-            p for p in permits
-            if p.status in (PermitStatus.APPLIED, PermitStatus.APPROVED, PermitStatus.ISSUED)
+            p
+            for p in permits
+            if p.status
+            in (PermitStatus.APPLIED, PermitStatus.APPROVED, PermitStatus.ISSUED)
         ]
         total = sum(p.units_proposed or 0 for p in pipeline)
         return int(total)

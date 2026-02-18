@@ -56,7 +56,10 @@ def estimate_demolition(
     # If improvement is trivial, minimal demo cost
     if improvement_value and improvement_value < 200_000:
         cost = 50_000
-        return cost, f"Minimal demolition (improvement only ${improvement_value:,}) — est. $50K site clearing"
+        return (
+            cost,
+            f"Minimal demolition (improvement only ${improvement_value:,}) — est. $50K site clearing",
+        )
 
     # Base demolition: assume existing building covers ~40% of lot
     existing_footprint = lot_sqft * 0.4
@@ -72,7 +75,9 @@ def estimate_demolition(
         asbestos_note = " (includes 40% asbestos/hazmat premium for pre-1960 structure)"
     elif year_built and year_built < 1980:
         asbestos_mult = 1.25
-        asbestos_note = " (includes 25% asbestos abatement premium for pre-1980 structure)"
+        asbestos_note = (
+            " (includes 25% asbestos abatement premium for pre-1980 structure)"
+        )
 
     # Scale by lot size — bigger lots have more to demolish
     if lot_sqft > 15_000:
@@ -85,7 +90,10 @@ def estimate_demolition(
     cost = max(150_000, min(cost, 1_200_000))
 
     year_str = f" ({year_built} structure)" if year_built else ""
-    return cost, f"Demolition of existing{year_str}: ~{existing_footprint:,.0f} sqft × ${base_rate}/sqft{asbestos_note}"
+    return (
+        cost,
+        f"Demolition of existing{year_str}: ~{existing_footprint:,.0f} sqft × ${base_rate}/sqft{asbestos_note}",
+    )
 
 
 def estimate_environmental(
@@ -112,24 +120,37 @@ def estimate_environmental(
         return 0, ""
 
     # Gas stations are the worst — underground storage tank remediation
-    is_gas_station = any("GAS" in b.upper() or "FUEL" in b.upper() or "SERVICE STATION" in b.upper()
-                         for b in risk_businesses)
+    is_gas_station = any(
+        "GAS" in b.upper() or "FUEL" in b.upper() or "SERVICE STATION" in b.upper()
+        for b in risk_businesses
+    )
 
     if is_gas_station:
         cost = 500_000
-        return cost, "Environmental remediation (former gas station/fuel site): Phase 1-3 ESA + UST removal + soil remediation — est. $500K"
+        return (
+            cost,
+            "Environmental remediation (former gas station/fuel site): Phase 1-3 ESA + UST removal + soil remediation — est. $500K",
+        )
 
     # Dry cleaners — solvent contamination
-    is_dry_cleaner = any("DRY CLEAN" in b.upper() or "LAUNDRY PLANT" in b.upper()
-                         for b in risk_businesses)
+    is_dry_cleaner = any(
+        "DRY CLEAN" in b.upper() or "LAUNDRY PLANT" in b.upper()
+        for b in risk_businesses
+    )
     if is_dry_cleaner:
         cost = 350_000
-        return cost, "Environmental remediation (former dry cleaner): PERC solvent contamination likely — est. $350K"
+        return (
+            cost,
+            "Environmental remediation (former dry cleaner): PERC solvent contamination likely — est. $350K",
+        )
 
     # Other industrial — moderate risk
     cost = 200_000
     types_str = ", ".join(risk_businesses[:3])
-    return cost, f"Environmental assessment ({types_str}): Phase 1-2 ESA + potential remediation — est. $200K"
+    return (
+        cost,
+        f"Environmental assessment ({types_str}): Phase 1-2 ESA + potential remediation — est. $200K",
+    )
 
 
 def estimate_tenant_displacement(
@@ -150,7 +171,10 @@ def estimate_tenant_displacement(
 
     per_tenant = 40_000
     cost = active_licence_count * per_tenant
-    return cost, f"{active_licence_count} active business licence(s) × $40K displacement/relocation = ${cost:,}"
+    return (
+        cost,
+        f"{active_licence_count} active business licence(s) × $40K displacement/relocation = ${cost:,}",
+    )
 
 
 def estimate_rezoning_cost(
@@ -167,11 +191,19 @@ def estimate_rezoning_cost(
     but some complex cases still require it.
     """
     if is_cd1:
-        return 250_000, "CD-1 zone requires full site-specific rezoning: planning consultant + legal + hearings — est. $250K + 12-24 months"
+        return (
+            250_000,
+            "CD-1 zone requires full site-specific rezoning: planning consultant + legal + hearings — est. $250K + 12-24 months",
+        )
 
     # Check for other complex zoning scenarios
-    if current_zoning and ("CD" in current_zoning.upper() or "FCCDD" in current_zoning.upper()):
-        return 200_000, f"Complex zoning ({current_zoning}) may require rezoning even under Bill 47 — est. $200K"
+    if current_zoning and (
+        "CD" in current_zoning.upper() or "FCCDD" in current_zoning.upper()
+    ):
+        return (
+            200_000,
+            f"Complex zoning ({current_zoning}) may require rezoning even under Bill 47 — est. $200K",
+        )
 
     return 0, ""
 
@@ -196,21 +228,32 @@ def estimate_soft_soil(
 
     # Check if in soft soil zone
     neighborhood_upper = neighborhood.upper().strip()
-    is_soft_soil = any(zone.upper() in neighborhood_upper or neighborhood_upper in zone.upper()
-                       for zone in SOFT_SOIL_ZONES)
+    is_soft_soil = any(
+        zone.upper() in neighborhood_upper or neighborhood_upper in zone.upper()
+        for zone in SOFT_SOIL_ZONES
+    )
 
     if not is_soft_soil:
         return 0, ""
 
     if entitled_storeys >= 20:
         cost = 1_500_000
-        return cost, f"Deep pile foundation required ({neighborhood}, {entitled_storeys} storeys): soft soil + seismic — est. $1.5M"
+        return (
+            cost,
+            f"Deep pile foundation required ({neighborhood}, {entitled_storeys} storeys): soft soil + seismic — est. $1.5M",
+        )
     elif entitled_storeys >= 13:
         cost = 800_000
-        return cost, f"Enhanced foundation ({neighborhood}, {entitled_storeys} storeys): soft soil surcharge — est. $800K"
+        return (
+            cost,
+            f"Enhanced foundation ({neighborhood}, {entitled_storeys} storeys): soft soil surcharge — est. $800K",
+        )
     else:
         cost = 400_000
-        return cost, f"Foundation upgrade ({neighborhood}, {entitled_storeys} storeys): soft soil zone — est. $400K"
+        return (
+            cost,
+            f"Foundation upgrade ({neighborhood}, {entitled_storeys} storeys): soft soil zone — est. $400K",
+        )
 
 
 def calculate_total_hidden_costs(
@@ -231,7 +274,9 @@ def calculate_total_hidden_costs(
     """
     items: list[tuple[str, int, str]] = []
 
-    demo_cost, demo_note = estimate_demolition(improvement_value, year_built, lot_area_sqm, entitled_storeys)
+    demo_cost, demo_note = estimate_demolition(
+        improvement_value, year_built, lot_area_sqm, entitled_storeys
+    )
     if demo_cost > 0:
         items.append(("Demolition", demo_cost, demo_note))
 

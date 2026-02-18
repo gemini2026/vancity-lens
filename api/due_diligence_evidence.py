@@ -163,14 +163,18 @@ async def _utility_evidence_for_type(
             UtilityNearestAsset(
                 asset_id=r.get("asset_id"),
                 line_type=r.get("line_type"),
-                diameter_mm=float(r["diameter_mm"]) if r.get("diameter_mm") is not None else None,
+                diameter_mm=float(r["diameter_mm"])
+                if r.get("diameter_mm") is not None
+                else None,
                 material=r.get("material"),
                 distance_m=float(r["distance_m"]),
             )
         )
 
     nearest_distance_m = nearest_assets[0].distance_m if nearest_assets else None
-    source = EvidenceSource(label=default_source.label, url=source_url or default_source.url)
+    source = EvidenceSource(
+        label=default_source.label, url=source_url or default_source.url
+    )
     return UtilityEvidence(
         status="ok",
         nearest_distance_m=nearest_distance_m,
@@ -179,7 +183,9 @@ async def _utility_evidence_for_type(
     )
 
 
-async def _encumbrances_proxy_evidence(conn: asyncpg.Connection, *, pid: str) -> EncumbrancesEvidence:
+async def _encumbrances_proxy_evidence(
+    conn: asyncpg.Connection, *, pid: str
+) -> EncumbrancesEvidence:
     try:
         has_any = await conn.fetchval("SELECT 1 FROM property_easements LIMIT 1")
     except asyncpg.exceptions.UndefinedTableError:
@@ -190,7 +196,9 @@ async def _encumbrances_proxy_evidence(conn: asyncpg.Connection, *, pid: str) ->
         )
     except Exception as e:
         logger.exception("encumbrances proxy check failed")
-        return EncumbrancesEvidence(status="error", source=DEFAULT_EASEMENTS_SOURCE, note=str(e)[:200])
+        return EncumbrancesEvidence(
+            status="error", source=DEFAULT_EASEMENTS_SOURCE, note=str(e)[:200]
+        )
 
     if not has_any:
         return EncumbrancesEvidence(
@@ -221,7 +229,9 @@ async def _encumbrances_proxy_evidence(conn: asyncpg.Connection, *, pid: str) ->
         )
     except Exception as e:
         logger.exception("encumbrances proxy query failed")
-        return EncumbrancesEvidence(status="error", source=DEFAULT_EASEMENTS_SOURCE, note=str(e)[:200])
+        return EncumbrancesEvidence(
+            status="error", source=DEFAULT_EASEMENTS_SOURCE, note=str(e)[:200]
+        )
 
     easements = [
         EasementEvidenceItem(
@@ -259,7 +269,7 @@ async def _policy_excerpts_evidence(
         t = t.replace('"', "")
         # Quote anything that could be mis-parsed (spaces, hyphens, etc.).
         if any(ch in t for ch in (" ", "-", ":", "/")):
-            return f"\"{t}\""
+            return f'"{t}"'
         return t
 
     terms: list[str] = []
@@ -271,8 +281,8 @@ async def _policy_excerpts_evidence(
     # Generic planning + Bill 47/TOD terms (keep small and high-signal).
     terms.extend(
         [
-            "\"bill 47\"",
-            "\"transit oriented\"",
+            '"bill 47"',
+            '"transit oriented"',
             "zoning",
             "height",
             "fsr",
@@ -378,7 +388,9 @@ async def _policy_excerpts_evidence(
     return PolicyEvidence(status="ok", query=query, excerpts=excerpts)
 
 
-async def build_due_diligence_evidence(conn: asyncpg.Connection, pid: str) -> DueDiligenceEvidenceResponse:
+async def build_due_diligence_evidence(
+    conn: asyncpg.Connection, pid: str
+) -> DueDiligenceEvidenceResponse:
     """
     Build due diligence evidence for a parcel.
 
@@ -413,7 +425,9 @@ async def build_due_diligence_evidence(conn: asyncpg.Connection, pid: str) -> Du
     # Aggregate utilities status
     util_statuses = {utilities_water.status, utilities_sewer.status}
     if util_statuses == {"ok"}:
-        utilities_status: Literal["ok", "partial", "not_loaded", "not_configured", "error"] = "ok"
+        utilities_status: Literal[
+            "ok", "partial", "not_loaded", "not_configured", "error"
+        ] = "ok"
     elif "error" in util_statuses:
         utilities_status = "error"
     elif "ok" in util_statuses:

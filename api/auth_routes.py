@@ -38,6 +38,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 # User Registration & Login
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -102,13 +103,16 @@ async def refresh(request: RefreshTokenRequest) -> Dict:
 # User Profile
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/me",
     response_model=UserResponse,
     summary="Get current user profile",
     description="Retrieve the authenticated user's profile information.",
 )
-async def get_profile(user: Dict = Depends(get_current_user_from_request)) -> UserResponse:
+async def get_profile(
+    user: Dict = Depends(get_current_user_from_request),
+) -> UserResponse:
     """
     Get the current authenticated user's profile.
 
@@ -137,6 +141,7 @@ async def logout(user: Dict = Depends(get_current_user_from_request)):
 # ────────────────────────────────────────────────────────────────────────────
 # API Key Management
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/api-keys",
@@ -171,7 +176,9 @@ async def create_api_key_endpoint(
     summary="List user's API keys",
     description="Get all API keys for the authenticated user (without full key values).",
 )
-async def list_api_keys(user: Dict = Depends(get_current_user_from_request)) -> List[APIKeyResponse]:
+async def list_api_keys(
+    user: Dict = Depends(get_current_user_from_request),
+) -> List[APIKeyResponse]:
     """
     List all API keys for the current user.
 

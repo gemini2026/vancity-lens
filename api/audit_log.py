@@ -37,7 +37,8 @@ async def log_retrieval(
     """
     try:
         async with db_pool.acquire() as conn:
-            row = await conn.fetchrow("""
+            row = await conn.fetchrow(
+                """
                 INSERT INTO external_retrieval_log (
                     source_name, operation, endpoint_url, request_params,
                     response_status, records_returned, records_stored,

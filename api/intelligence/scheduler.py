@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class ScraperStatus(str, Enum):
     """Status of a scraper run."""
+
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILED = "failed"
@@ -210,7 +211,7 @@ class ScraperScheduler:
             "news": "0 */6 * * *",  # every 6 hours
             "opendata": "0 3 * * 1",  # weekly Monday 3am
             "political_risk": "0 2 * * 0",  # weekly Sunday 2am UTC (F05-006)
-            "undervalued": "0 15 * * 1",    # weekly Monday 3pm UTC (8am Pacific)
+            "undervalued": "0 15 * * 1",  # weekly Monday 3pm UTC (8am Pacific)
             "freshness_check": "0 */4 * * *",  # every 4 hours (F02-001/F04-001)
         }
 
@@ -326,6 +327,7 @@ class ScraperScheduler:
             # Record successful ingestion for freshness monitoring (F02-001)
             try:
                 from ..retrieval_logging import record_ingestion_success
+
                 await record_ingestion_success(self.db_pool, name)
             except Exception as freshness_err:
                 logger.debug(
@@ -382,7 +384,9 @@ class ScraperScheduler:
                     result = await self.run_scraper(name)
                     results.append(result)
             except Exception as e:
-                logger.error(f"Error checking/running scraper '{name}': {e}", exc_info=True)
+                logger.error(
+                    f"Error checking/running scraper '{name}': {e}", exc_info=True
+                )
 
         return results
 
@@ -403,8 +407,12 @@ class ScraperScheduler:
             status["scrapers"][name] = {
                 "enabled": schedule.enabled,
                 "cron": schedule.cron_expression,
-                "last_run": schedule.last_run.isoformat() if schedule.last_run else None,
-                "next_run": schedule.next_run.isoformat() if schedule.next_run else None,
+                "last_run": schedule.last_run.isoformat()
+                if schedule.last_run
+                else None,
+                "next_run": schedule.next_run.isoformat()
+                if schedule.next_run
+                else None,
                 "timeout_seconds": schedule.timeout_seconds,
                 "max_retries": schedule.max_retries,
                 "has_function": func is not None,
@@ -514,15 +522,19 @@ class ScraperScheduler:
                         logger.warning(
                             "DATA FRESHNESS SLA BREACH: %s (%s) has NEVER been retrieved "
                             "(expected every %dh)",
-                            source_name, source_id, cadence_h,
+                            source_name,
+                            source_id,
+                            cadence_h,
                         )
-                        stale_sources.append({
-                            "source_id": source_id,
-                            "source_name": source_name,
-                            "expected_cadence_hours": cadence_h,
-                            "hours_since_last": None,
-                            "breach_ratio": None,
-                        })
+                        stale_sources.append(
+                            {
+                                "source_id": source_id,
+                                "source_name": source_name,
+                                "expected_cadence_hours": cadence_h,
+                                "hours_since_last": None,
+                                "breach_ratio": None,
+                            }
+                        )
                         continue
 
                     threshold = cadence_h * 1.5  # 50% grace period
@@ -531,24 +543,33 @@ class ScraperScheduler:
                         logger.warning(
                             "DATA FRESHNESS SLA BREACH: %s (%s) last retrieved %.1fh ago "
                             "(expected every %dh, threshold %.0fh, breach ratio %.2fx)",
-                            source_name, source_id, hours_since,
-                            cadence_h, threshold, breach_ratio,
+                            source_name,
+                            source_id,
+                            hours_since,
+                            cadence_h,
+                            threshold,
+                            breach_ratio,
                         )
-                        stale_sources.append({
-                            "source_id": source_id,
-                            "source_name": source_name,
-                            "expected_cadence_hours": cadence_h,
-                            "hours_since_last": round(hours_since, 1),
-                            "breach_ratio": breach_ratio,
-                        })
+                        stale_sources.append(
+                            {
+                                "source_id": source_id,
+                                "source_name": source_name,
+                                "expected_cadence_hours": cadence_h,
+                                "hours_since_last": round(hours_since, 1),
+                                "breach_ratio": breach_ratio,
+                            }
+                        )
 
             if stale_sources:
                 logger.warning(
                     "Data freshness check: %d/%d sources breaching SLA",
-                    len(stale_sources), len(rows),
+                    len(stale_sources),
+                    len(rows),
                 )
             else:
-                logger.info("Data freshness check: all %d sources within SLA", len(rows))
+                logger.info(
+                    "Data freshness check: all %d sources within SLA", len(rows)
+                )
 
         except Exception as exc:
             logger.error("Failed to check data freshness SLA: %s", exc, exc_info=True)

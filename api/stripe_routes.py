@@ -242,9 +242,7 @@ async def get_portal_url(
         HTTPException 500: Internal server error
     """
     try:
-        portal_url = await StripeService.generate_portal_url(
-            db_pool, user["id"]
-        )
+        portal_url = await StripeService.generate_portal_url(db_pool, user["id"])
 
         return {"portal_url": portal_url}
 

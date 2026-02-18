@@ -2,6 +2,7 @@
 VCL-100: Comparable Sales API Routes
 FastAPI routes for comparable sales queries and market analytics
 """
+
 from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from typing import List, Optional
 import asyncpg
@@ -11,7 +12,7 @@ from api.intelligence.comparable_sales import (
     ComparableSalesService,
     ComparableResult,
     MarketStats,
-    PriceTrend
+    PriceTrend,
 )
 from api.user_auth import get_current_user_from_request
 
@@ -26,6 +27,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
     if pool is None:
         try:
             from api.db import db
+
             pool = db.pool
         except ImportError:
             pass
@@ -72,13 +74,12 @@ async def get_comparables(
             radius_m=radius_m,
             limit=limit,
             same_zoning=same_zoning,
-            months=months
+            months=months,
         )
 
         if result is None:
             raise HTTPException(
-                status_code=404,
-                detail=f"Parcel with PID '{pid}' not found"
+                status_code=404, detail=f"Parcel with PID '{pid}' not found"
             )
 
         return result
@@ -89,14 +90,16 @@ async def get_comparables(
         logger.error(f"Error finding comparables for PID {pid}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while finding comparable sales"
+            detail="Internal server error while finding comparable sales",
         )
 
 
 @router.get("/market/stats/{zoning}", response_model=MarketStats)
 async def get_market_stats(
     zoning: str,
-    neighborhood: Optional[str] = Query(None, description="Optional neighborhood filter"),
+    neighborhood: Optional[str] = Query(
+        None, description="Optional neighborhood filter"
+    ),
     months: int = Query(12, ge=1, le=60, description="Lookback period in months"),
     request: Request = None,
 ) -> MarketStats:
@@ -124,17 +127,14 @@ async def get_market_stats(
 
     try:
         stats = await ComparableSalesService.get_market_stats(
-            pool=pool,
-            zoning=zoning,
-            months=months,
-            neighborhood=neighborhood
+            pool=pool, zoning=zoning, months=months, neighborhood=neighborhood
         )
 
         if stats is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"No comparable sales data found for zoning '{zoning}'" +
-                       (f" in neighborhood '{neighborhood}'" if neighborhood else "")
+                detail=f"No comparable sales data found for zoning '{zoning}'"
+                + (f" in neighborhood '{neighborhood}'" if neighborhood else ""),
             )
 
         return stats
@@ -145,14 +145,16 @@ async def get_market_stats(
         logger.error(f"Error getting market stats for zoning {zoning}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while retrieving market statistics"
+            detail="Internal server error while retrieving market statistics",
         )
 
 
 @router.get("/market/trends/{zoning}", response_model=List[PriceTrend])
 async def get_price_trends(
     zoning: str,
-    neighborhood: Optional[str] = Query(None, description="Optional neighborhood filter"),
+    neighborhood: Optional[str] = Query(
+        None, description="Optional neighborhood filter"
+    ),
     months: int = Query(24, ge=1, le=60, description="Lookback period in months"),
     request: Request = None,
 ) -> List[PriceTrend]:
@@ -180,17 +182,14 @@ async def get_price_trends(
 
     try:
         trends = await ComparableSalesService.get_price_trends(
-            pool=pool,
-            zoning=zoning,
-            months=months,
-            neighborhood=neighborhood
+            pool=pool, zoning=zoning, months=months, neighborhood=neighborhood
         )
 
         if not trends:
             raise HTTPException(
                 status_code=404,
-                detail=f"No price trend data found for zoning '{zoning}'" +
-                       (f" in neighborhood '{neighborhood}'" if neighborhood else "")
+                detail=f"No price trend data found for zoning '{zoning}'"
+                + (f" in neighborhood '{neighborhood}'" if neighborhood else ""),
             )
 
         return trends
@@ -201,7 +200,7 @@ async def get_price_trends(
         logger.error(f"Error getting price trends for zoning {zoning}: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while retrieving price trends"
+            detail="Internal server error while retrieving price trends",
         )
 
 
@@ -209,7 +208,7 @@ async def get_price_trends(
 async def ingest_comparable_sales(
     data: dict,
     request: Request = None,
-    current_user = Depends(get_current_user_from_request)
+    current_user=Depends(get_current_user_from_request),
 ):
     """
     Bulk ingest comparable sales records (Admin only).
@@ -243,11 +242,8 @@ async def ingest_comparable_sales(
     - `total`: Total number of records in request
     """
     # Check admin authorization
-    if not hasattr(current_user, 'is_admin') or not current_user.is_admin:
-        raise HTTPException(
-            status_code=403,
-            detail="Admin authentication required"
-        )
+    if not hasattr(current_user, "is_admin") or not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin authentication required")
 
     pool = get_db_pool(request)
 
@@ -256,20 +252,18 @@ async def ingest_comparable_sales(
 
         if not records:
             raise HTTPException(
-                status_code=400,
-                detail="Request must include 'records' list"
+                status_code=400, detail="Request must include 'records' list"
             )
 
         result = await ComparableSalesService.ingest_sales_data(
-            pool=pool,
-            records=records
+            pool=pool, records=records
         )
 
         return {
             "status": "success",
             "inserted": result["inserted"],
             "failed": result["failed"],
-            "total": result["total"]
+            "total": result["total"],
         }
 
     except HTTPException:
@@ -277,6 +271,5 @@ async def ingest_comparable_sales(
     except Exception as e:
         logger.error(f"Error ingesting comparable sales data: {str(e)}")
         raise HTTPException(
-            status_code=500,
-            detail="Internal server error while ingesting data"
+            status_code=500, detail="Internal server error while ingesting data"
         )

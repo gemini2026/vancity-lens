@@ -105,7 +105,9 @@ class StreamingJSONResponse(StreamingResponse):
             **kwargs,
         )
 
-    async def _stream_items(self, generator: AsyncIterator[Any]) -> AsyncIterator[bytes]:
+    async def _stream_items(
+        self, generator: AsyncIterator[Any]
+    ) -> AsyncIterator[bytes]:
         """
         Stream JSON array with proper formatting.
 

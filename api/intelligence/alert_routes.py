@@ -32,6 +32,7 @@ router = APIRouter(tags=["alerts"])
 # Dependency Injection
 # ────────────────────────────────────────────────────────────────────────────
 
+
 def get_db_pool(request: Request) -> asyncpg.Pool:
     """Get database pool from app state."""
     pool = getattr(request.app.state, "pool", None)
@@ -47,6 +48,7 @@ def get_db_pool(request: Request) -> asyncpg.Pool:
 # ────────────────────────────────────────────────────────────────────────────
 # Watchlist Endpoints
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @router.post(
     "/watchlists",
@@ -310,6 +312,7 @@ async def delete_watchlist(
 # Alert Endpoints
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @router.get(
     "/alerts",
     response_model=list[Alert],
@@ -442,9 +445,7 @@ async def mark_all_alerts_read(
     "/alerts/count",
     response_model=AlertCount,
     summary="Get alert counts",
-    description=(
-        "Get the total and unread alert counts for the authenticated user."
-    ),
+    description=("Get the total and unread alert counts for the authenticated user."),
 )
 async def get_alert_counts(
     request: Request,

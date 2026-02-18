@@ -83,7 +83,9 @@ class AddressNormalizer:
         # Remove unit/suite numbers at start of address
         normalized = re.sub(r"^[#]?\d+[a-z]?\s*", "", query, flags=re.IGNORECASE)
         normalized = re.sub(r"^suite\s+\d+\s*", "", normalized, flags=re.IGNORECASE)
-        normalized = re.sub(r"^unit\s+\d+[a-z]?\s*", "", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(
+            r"^unit\s+\d+[a-z]?\s*", "", normalized, flags=re.IGNORECASE
+        )
 
         # Normalize street suffixes
         words = normalized.split()
@@ -285,7 +287,9 @@ class ParcelSearchService:
                         lot_area_sqm=float(row["lot_area_sqm"]),
                         zoning=row["zoning"],
                         neighborhood=row["neighborhood"],
-                        match_score=max(0.0, 1.0 - (float(row["distance_m"]) / radius_m)),
+                        match_score=max(
+                            0.0, 1.0 - (float(row["distance_m"]) / radius_m)
+                        ),
                     )
                     for row in rows
                 ]
@@ -360,6 +364,7 @@ class ParcelSearchService:
 async def get_search_service() -> ParcelSearchService:
     """Dependency to provide ParcelSearchService from the global db pool."""
     from .db import db
+
     if db.pool is None:
         raise HTTPException(status_code=503, detail="Database not available")
     return ParcelSearchService(db.pool)

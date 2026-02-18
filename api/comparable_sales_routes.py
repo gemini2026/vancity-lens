@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def _resolve_param(value):
     """Resolve FastAPI Query/Path parameter to its actual value for direct calls."""
-    return getattr(value, 'default', value)
+    return getattr(value, "default", value)
 
 
 # ── SQL for real PostGIS comparable sales query ──────────────────
@@ -66,6 +66,7 @@ async def _fetch_real_comparables(
     """
     try:
         from .db import db
+
         async with db.acquire() as conn:
             # Get parcel centroid
             parcel = await conn.fetchrow(SQL_PARCEL_CENTROID, parcel_id)
@@ -74,8 +75,11 @@ async def _fetch_real_comparables(
 
             rows = await conn.fetch(
                 SQL_COMPARABLE_SALES,
-                parcel["lng"], parcel["lat"],
-                radius_m, months_back, max_results * 3,  # fetch extra for filtering
+                parcel["lng"],
+                parcel["lat"],
+                radius_m,
+                months_back,
+                max_results * 3,  # fetch extra for filtering
             )
 
             if not rows:
@@ -103,23 +107,32 @@ async def _fetch_real_comparables(
             return results[:max_results]
 
     except Exception as exc:
-        logger.debug("Real comparable sales query unavailable, falling back to mock: %s", exc)
+        logger.debug(
+            "Real comparable sales query unavailable, falling back to mock: %s", exc
+        )
         return None
 
 
 # Models for comparable sales data
 class ComparableSale(BaseModel):
     """Model representing a single comparable property sale."""
+
     address: str = Field(..., description="Property address")
     price: float = Field(..., gt=0, description="Sale price in CAD")
     sale_date: datetime = Field(..., description="Date of sale")
     sqft: float = Field(..., description="Property size in square feet")
     price_per_sqft: float = Field(..., description="Price per square foot")
-    distance_m: float = Field(..., description="Distance from subject property in meters")
-    property_type: str = Field(..., description="Type of property (residential, condo, townhouse)")
+    distance_m: float = Field(
+        ..., description="Distance from subject property in meters"
+    )
+    property_type: str = Field(
+        ..., description="Type of property (residential, condo, townhouse)"
+    )
     bedrooms: Optional[int] = Field(None, description="Number of bedrooms")
     year_built: Optional[int] = Field(None, description="Year property was built")
-    adjustment_factor: float = Field(default=1.0, description="Adjustment multiplier for comparability")
+    adjustment_factor: float = Field(
+        default=1.0, description="Adjustment multiplier for comparability"
+    )
 
     class Config:
         json_schema_extra = {
@@ -133,18 +146,27 @@ class ComparableSale(BaseModel):
                 "property_type": "residential",
                 "bedrooms": 3,
                 "year_built": 1995,
-                "adjustment_factor": 0.95
+                "adjustment_factor": 0.95,
             }
         }
 
 
 class CompAnalysisResult(BaseModel):
     """Model representing the results of a comparable sales analysis."""
+
     subject_property: str = Field(..., description="Subject property address or ID")
-    comparables: List[ComparableSale] = Field(..., description="List of comparable sales")
-    adjusted_avg_psf: float = Field(..., description="Adjusted average price per square foot")
-    suggested_value_range: dict = Field(..., description="Suggested value range with low, mid, high estimates")
-    confidence: float = Field(..., ge=0, le=1, description="Confidence level (0-1) of the analysis")
+    comparables: List[ComparableSale] = Field(
+        ..., description="List of comparable sales"
+    )
+    adjusted_avg_psf: float = Field(
+        ..., description="Adjusted average price per square foot"
+    )
+    suggested_value_range: dict = Field(
+        ..., description="Suggested value range with low, mid, high estimates"
+    )
+    confidence: float = Field(
+        ..., ge=0, le=1, description="Confidence level (0-1) of the analysis"
+    )
 
     class Config:
         json_schema_extra = {
@@ -155,9 +177,9 @@ class CompAnalysisResult(BaseModel):
                 "suggested_value_range": {
                     "low": 750000.0,
                     "mid": 812500.0,
-                    "high": 875000.0
+                    "high": 875000.0,
                 },
-                "confidence": 0.87
+                "confidence": 0.87,
             }
         }
 
@@ -170,14 +192,16 @@ router = APIRouter(prefix="/api/v1", tags=["comparable-sales"])
     "/parcels/{parcel_id}/comparables",
     response_model=List[ComparableSale],
     summary="Find comparable sales nearby",
-    description="Get comparable property sales within a specified radius of a parcel"
+    description="Get comparable property sales within a specified radius of a parcel",
 )
 async def get_parcel_comparables(
     parcel_id: str = Path(..., description="Parcel ID to find comparables for"),
     radius_m: int = Query(1000, ge=100, le=5000, description="Search radius in meters"),
     max_results: int = Query(10, ge=1, le=50, description="Maximum number of results"),
     property_type: Optional[str] = Query(None, description="Filter by property type"),
-    months_back: int = Query(12, ge=1, le=120, description="Look back this many months for sales"),
+    months_back: int = Query(
+        12, ge=1, le=120, description="Look back this many months for sales"
+    ),
 ) -> List[ComparableSale]:
     """
     Retrieve comparable property sales in the vicinity of a specified parcel.
@@ -221,7 +245,7 @@ async def get_parcel_comparables(
             property_type="residential",
             bedrooms=3,
             year_built=1995,
-            adjustment_factor=0.98
+            adjustment_factor=0.98,
         ),
         ComparableSale(
             address="124 Main St, Vancouver, BC",
@@ -233,7 +257,7 @@ async def get_parcel_comparables(
             property_type="residential",
             bedrooms=3,
             year_built=1998,
-            adjustment_factor=0.96
+            adjustment_factor=0.96,
         ),
     ]
 
@@ -247,14 +271,16 @@ async def get_parcel_comparables(
     "/comparables/search",
     response_model=List[ComparableSale],
     summary="Search comparables by criteria",
-    description="Search for comparable sales using multiple filter criteria"
+    description="Search for comparable sales using multiple filter criteria",
 )
 async def search_comparables(
     min_price: Optional[float] = Query(None, ge=0, description="Minimum sale price"),
     max_price: Optional[float] = Query(None, ge=0, description="Maximum sale price"),
     property_type: Optional[str] = Query(None, description="Property type filter"),
     max_results: int = Query(10, ge=1, le=50, description="Maximum number of results"),
-    months_back: int = Query(12, ge=1, le=120, description="Look back this many months"),
+    months_back: int = Query(
+        12, ge=1, le=120, description="Look back this many months"
+    ),
 ) -> List[ComparableSale]:
     """
     Search for comparable sales using filtering criteria.
@@ -286,7 +312,7 @@ async def search_comparables(
             property_type="residential",
             bedrooms=3,
             year_built=1995,
-            adjustment_factor=0.98
+            adjustment_factor=0.98,
         ),
         ComparableSale(
             address="124 Main St, Vancouver, BC",
@@ -298,7 +324,7 @@ async def search_comparables(
             property_type="residential",
             bedrooms=3,
             year_built=1998,
-            adjustment_factor=0.96
+            adjustment_factor=0.96,
         ),
         ComparableSale(
             address="125 Oak Ave, Vancouver, BC",
@@ -310,7 +336,7 @@ async def search_comparables(
             property_type="residential",
             bedrooms=4,
             year_built=2005,
-            adjustment_factor=0.92
+            adjustment_factor=0.92,
         ),
     ]
 
@@ -335,13 +361,15 @@ async def search_comparables(
     "/comparables/analyze",
     response_model=CompAnalysisResult,
     summary="Run comparable sales analysis",
-    description="Perform a comprehensive comparable sales analysis for a subject property"
+    description="Perform a comprehensive comparable sales analysis for a subject property",
 )
 async def analyze_comparables(
     subject_property: str = Query(..., description="Subject property address or ID"),
     radius_m: int = Query(1000, ge=100, le=5000, description="Search radius in meters"),
     property_type: Optional[str] = Query(None, description="Property type filter"),
-    months_back: int = Query(12, ge=1, le=120, description="Look back this many months"),
+    months_back: int = Query(
+        12, ge=1, le=120, description="Look back this many months"
+    ),
 ) -> CompAnalysisResult:
     """
     Perform a comprehensive comparable sales analysis.
@@ -379,7 +407,7 @@ async def analyze_comparables(
             property_type="residential",
             bedrooms=3,
             year_built=1995,
-            adjustment_factor=0.98
+            adjustment_factor=0.98,
         ),
         ComparableSale(
             address="124 Main St, Vancouver, BC",
@@ -391,7 +419,7 @@ async def analyze_comparables(
             property_type="residential",
             bedrooms=3,
             year_built=1998,
-            adjustment_factor=0.96
+            adjustment_factor=0.96,
         ),
         ComparableSale(
             address="125 Oak Ave, Vancouver, BC",
@@ -403,7 +431,7 @@ async def analyze_comparables(
             property_type="residential",
             bedrooms=4,
             year_built=2005,
-            adjustment_factor=0.92
+            adjustment_factor=0.92,
         ),
     ]
 
@@ -411,7 +439,11 @@ async def analyze_comparables(
         comparables = [c for c in comparables if c.property_type == property_type]
 
     adjusted_psf_values = [c.price_per_sqft * c.adjustment_factor for c in comparables]
-    adjusted_avg_psf = sum(adjusted_psf_values) / len(adjusted_psf_values) if adjusted_psf_values else 0.0
+    adjusted_avg_psf = (
+        sum(adjusted_psf_values) / len(adjusted_psf_values)
+        if adjusted_psf_values
+        else 0.0
+    )
 
     confidence = min(1.0, len(comparables) / 5.0 * 0.8 + 0.2)
 
@@ -427,7 +459,7 @@ async def analyze_comparables(
         suggested_value_range={
             "low": round(low_estimate, 0),
             "mid": round(mid_estimate, 0),
-            "high": round(high_estimate, 0)
+            "high": round(high_estimate, 0),
         },
-        confidence=round(confidence, 2)
+        confidence=round(confidence, 2),
     )

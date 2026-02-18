@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # Document Processing Task
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @celery_app.task(
     bind=True,
     base=DatabaseTask,
@@ -57,7 +58,7 @@ def process_document_task(
     job_id = self.request.id
     logger.info(
         f"Processing document {document_id}",
-        extra={"task_id": job_id, "document_id": document_id}
+        extra={"task_id": job_id, "document_id": document_id},
     )
 
     try:
@@ -86,7 +87,7 @@ def process_document_task(
 
         logger.info(
             f"Document {document_id} processing completed",
-            extra={"task_id": job_id, "result": result}
+            extra={"task_id": job_id, "result": result},
         )
         return result
 
@@ -94,7 +95,7 @@ def process_document_task(
         logger.error(
             f"Document {document_id} processing failed: {exc}",
             exc_info=True,
-            extra={"task_id": job_id, "document_id": document_id}
+            extra={"task_id": job_id, "document_id": document_id},
         )
         raise
 
@@ -102,6 +103,7 @@ def process_document_task(
 # ────────────────────────────────────────────────────────────────────────────
 # Scraper Task
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -138,7 +140,7 @@ def run_scraper_task(
     job_id = self.request.id
     logger.info(
         f"Running scraper: {scraper_name}",
-        extra={"task_id": job_id, "scraper_name": scraper_name}
+        extra={"task_id": job_id, "scraper_name": scraper_name},
     )
 
     try:
@@ -158,7 +160,7 @@ def run_scraper_task(
 
         logger.info(
             f"Scraper {scraper_name} completed",
-            extra={"task_id": job_id, "result": result}
+            extra={"task_id": job_id, "result": result},
         )
         return result
 
@@ -166,7 +168,7 @@ def run_scraper_task(
         logger.error(
             f"Scraper {scraper_name} failed: {exc}",
             exc_info=True,
-            extra={"task_id": job_id, "scraper_name": scraper_name}
+            extra={"task_id": job_id, "scraper_name": scraper_name},
         )
         raise
 
@@ -174,6 +176,7 @@ def run_scraper_task(
 # ────────────────────────────────────────────────────────────────────────────
 # Embeddings Generation Task
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -207,7 +210,7 @@ def generate_embeddings_task(
     job_id = self.request.id
     logger.info(
         f"Generating embeddings for {len(chunk_ids)} chunks",
-        extra={"task_id": job_id, "chunk_count": len(chunk_ids)}
+        extra={"task_id": job_id, "chunk_count": len(chunk_ids)},
     )
 
     try:
@@ -222,7 +225,7 @@ def generate_embeddings_task(
 
         logger.info(
             "Embeddings generation completed",
-            extra={"task_id": job_id, "result": result}
+            extra={"task_id": job_id, "result": result},
         )
         return result
 
@@ -230,7 +233,7 @@ def generate_embeddings_task(
         logger.error(
             f"Embeddings generation failed: {exc}",
             exc_info=True,
-            extra={"task_id": job_id}
+            extra={"task_id": job_id},
         )
         raise
 
@@ -238,6 +241,7 @@ def generate_embeddings_task(
 # ────────────────────────────────────────────────────────────────────────────
 # Email Digest Task
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -274,7 +278,7 @@ def send_digest_email_task(
     job_id = self.request.id
     logger.info(
         f"Sending {digest_type} digest to user {user_id}",
-        extra={"task_id": job_id, "user_id": user_id, "digest_type": digest_type}
+        extra={"task_id": job_id, "user_id": user_id, "digest_type": digest_type},
     )
 
     try:
@@ -288,7 +292,7 @@ def send_digest_email_task(
 
         logger.info(
             f"Digest email sent to user {user_id}",
-            extra={"task_id": job_id, "result": result}
+            extra={"task_id": job_id, "result": result},
         )
         return result
 
@@ -296,7 +300,7 @@ def send_digest_email_task(
         logger.error(
             f"Digest email sending failed: {exc}",
             exc_info=True,
-            extra={"task_id": job_id, "user_id": user_id}
+            extra={"task_id": job_id, "user_id": user_id},
         )
         raise
 
@@ -304,6 +308,7 @@ def send_digest_email_task(
 # ────────────────────────────────────────────────────────────────────────────
 # Opportunity Scanning Task
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -338,7 +343,7 @@ def scan_opportunities_task(
     job_id = self.request.id
     logger.info(
         f"Scanning opportunities for user {user_id}",
-        extra={"task_id": job_id, "user_id": user_id}
+        extra={"task_id": job_id, "user_id": user_id},
     )
 
     try:
@@ -352,16 +357,13 @@ def scan_opportunities_task(
         }
 
         logger.info(
-            "Opportunity scan completed",
-            extra={"task_id": job_id, "result": result}
+            "Opportunity scan completed", extra={"task_id": job_id, "result": result}
         )
         return result
 
     except Exception as exc:
         logger.error(
-            f"Opportunity scan failed: {exc}",
-            exc_info=True,
-            extra={"task_id": job_id}
+            f"Opportunity scan failed: {exc}", exc_info=True, extra={"task_id": job_id}
         )
         raise
 
@@ -369,6 +371,7 @@ def scan_opportunities_task(
 # ────────────────────────────────────────────────────────────────────────────
 # Materialized Views Refresh Task
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @celery_app.task(
     bind=True,
@@ -404,7 +407,7 @@ def refresh_materialized_views_task(
     views = view_names or ["signal_analytics", "parcel_metrics"]
     logger.info(
         f"Refreshing materialized views: {views}",
-        extra={"task_id": job_id, "views": views}
+        extra={"task_id": job_id, "views": views},
     )
 
     try:
@@ -420,7 +423,7 @@ def refresh_materialized_views_task(
 
         logger.info(
             "Materialized views refresh completed",
-            extra={"task_id": job_id, "result": result}
+            extra={"task_id": job_id, "result": result},
         )
         return result
 
@@ -428,7 +431,7 @@ def refresh_materialized_views_task(
         logger.error(
             f"Materialized views refresh failed: {exc}",
             exc_info=True,
-            extra={"task_id": job_id}
+            extra={"task_id": job_id},
         )
         raise
 

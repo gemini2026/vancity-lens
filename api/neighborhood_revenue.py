@@ -314,9 +314,7 @@ class NeighborhoodRevenueAdjuster:
             except Exception:
                 pass
 
-        return REVENUE_PSF_BY_NEIGHBORHOOD.get(
-            normalized, DEFAULT_PSF
-        ).copy()
+        return REVENUE_PSF_BY_NEIGHBORHOOD.get(normalized, DEFAULT_PSF).copy()
 
     async def compute_adjusted_revenue(
         self, base_revenue: float, neighborhood: str

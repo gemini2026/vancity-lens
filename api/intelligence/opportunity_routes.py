@@ -220,7 +220,9 @@ async def delete_profile(
 # ────────────────────────────────────────────────────────────────────────────
 
 
-@router.post("/profiles/{profile_id}/scan", response_model=list[OpportunityMatchResponse])
+@router.post(
+    "/profiles/{profile_id}/scan", response_model=list[OpportunityMatchResponse]
+)
 async def scan_profile(
     profile_id: int,
     request: Request,

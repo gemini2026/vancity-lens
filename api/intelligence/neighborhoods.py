@@ -21,14 +21,14 @@ logger = logging.getLogger(__name__)
 
 # Direction of each metric category: whether higher raw values mean better or worse
 METRIC_DIRECTIONS: dict[str, str] = {
-    "safety": "lower_is_better",       # Crime rate: lower = safer
-    "schools": "higher_is_better",     # School quality: higher = better
-    "transit": "higher_is_better",     # Transit density: more stops = better
-    "parks": "higher_is_better",       # Green space: more = better
-    "development": "higher_is_better", # Active development: more pipeline = better for investment
-    "air_quality": "higher_is_better", # AQI reading: we invert during ingestion so higher = cleaner
-    "affordability": "lower_is_better",# Price per sqft: lower = more affordable
-    "walkability": "higher_is_better", # Walk score: higher = more walkable
+    "safety": "lower_is_better",  # Crime rate: lower = safer
+    "schools": "higher_is_better",  # School quality: higher = better
+    "transit": "higher_is_better",  # Transit density: more stops = better
+    "parks": "higher_is_better",  # Green space: more = better
+    "development": "higher_is_better",  # Active development: more pipeline = better for investment
+    "air_quality": "higher_is_better",  # AQI reading: we invert during ingestion so higher = cleaner
+    "affordability": "lower_is_better",  # Price per sqft: lower = more affordable
+    "walkability": "higher_is_better",  # Walk score: higher = more walkable
 }
 
 # Default scoring weights (must sum to 1.0)
@@ -48,6 +48,7 @@ TREND_THRESHOLD = 0.3
 
 
 # ── Core Functions ────────────────────────────────────────────
+
 
 def normalize_metric(
     value: float,
@@ -196,6 +197,7 @@ def get_top_and_bottom(
 
 # ── Database Operations ───────────────────────────────────────
 
+
 async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
     """Get all neighborhoods with their latest composite scores.
 
@@ -229,14 +231,17 @@ async def get_all_neighborhood_summaries(db_pool) -> list[dict]:
             cat_scores = json.loads(raw) if isinstance(raw, str) else (raw or {})
             top, bottom = get_top_and_bottom(cat_scores) if cat_scores else ("", "")
 
-            summaries.append({
-                "name": row["name"],
-                "slug": row["slug"],
-                "overall_score": float(row["overall_score"]),
-                "rank": row.get("rank") or (i + 1),  # Fallback rank if no scores yet
-                "top_category": top or None,
-                "bottom_category": bottom or None,
-            })
+            summaries.append(
+                {
+                    "name": row["name"],
+                    "slug": row["slug"],
+                    "overall_score": float(row["overall_score"]),
+                    "rank": row.get("rank")
+                    or (i + 1),  # Fallback rank if no scores yet
+                    "top_category": top or None,
+                    "bottom_category": bottom or None,
+                }
+            )
 
         return summaries
 
@@ -250,7 +255,8 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
     """
     async with db_pool.acquire() as conn:
         # Single CTE query: neighborhood + composite + category scores
-        row = await conn.fetchrow("""
+        row = await conn.fetchrow(
+            """
             WITH hood AS (
                 SELECT id, name, slug FROM neighborhoods WHERE slug = $1
             ),
@@ -265,7 +271,9 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
                 lc.overall_score, lc.rank
             FROM hood h
             LEFT JOIN latest_composite lc ON TRUE
-        """, slug)
+        """,
+            slug,
+        )
 
         if not row:
             return None
@@ -274,17 +282,21 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
         hood_name = row["name"]
 
         # Category scores — still need a second query for the DISTINCT ON
-        cat_scores = await conn.fetch("""
+        cat_scores = await conn.fetch(
+            """
             SELECT DISTINCT ON (category)
                 category, score, raw_value, percentile, trend, trend_change
             FROM neighborhood_scores
             WHERE neighborhood_id = $1
             ORDER BY category, period_start DESC
-        """, hood_id)
+        """,
+            hood_id,
+        )
 
         # Signal stats (graceful if table empty)
         try:
-            signal_stats = await conn.fetchrow("""
+            signal_stats = await conn.fetchrow(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE signal_type = 'rezoning_decision') as active_rezonings,
                     COUNT(*) FILTER (WHERE signal_type = 'permit_approval') as recent_permits,
@@ -292,7 +304,9 @@ async def get_neighborhood_scorecard(db_pool, slug: str) -> Optional[dict]:
                 FROM intelligence_signals
                 WHERE neighborhood = $1
                   AND extracted_at > NOW() - INTERVAL '90 days'
-            """, hood_name)
+            """,
+                hood_name,
+            )
         except Exception:
             logger.warning("intelligence_signals query failed for %s", hood_name)
             signal_stats = None
@@ -307,14 +321,18 @@ def _format_scorecard(hood_row, cat_scores, signal_stats) -> dict:
             "name": hood_row["name"],
             "slug": hood_row["slug"],
         },
-        "overall_score": float(hood_row["overall_score"]) if hood_row.get("overall_score") else 0.0,
+        "overall_score": float(hood_row["overall_score"])
+        if hood_row.get("overall_score")
+        else 0.0,
         "rank": hood_row["rank"] if hood_row.get("rank") else None,
         "category_scores": [
             {
                 "category": row["category"],
                 "score": float(row["score"]),
                 "trend": row.get("trend", "stable"),
-                "trend_delta": float(row["trend_change"]) if row.get("trend_change") else 0.0,
+                "trend_delta": float(row["trend_change"])
+                if row.get("trend_change")
+                else 0.0,
             }
             for row in cat_scores
         ],
@@ -334,7 +352,8 @@ async def compare_neighborhoods(db_pool, slugs: list[str]) -> Optional[dict]:
 
     async with db_pool.acquire() as conn:
         # Query 1: All neighborhoods + composite scores in one shot
-        hoods = await conn.fetch("""
+        hoods = await conn.fetch(
+            """
             SELECT
                 n.id, n.name, n.slug,
                 c.overall_score, c.rank
@@ -346,7 +365,9 @@ async def compare_neighborhoods(db_pool, slugs: list[str]) -> Optional[dict]:
                 ORDER BY period_start DESC LIMIT 1
             ) c ON TRUE
             WHERE n.slug = ANY($1)
-        """, slugs)
+        """,
+            slugs,
+        )
 
         if len(hoods) < 2:
             return None
@@ -355,18 +376,22 @@ async def compare_neighborhoods(db_pool, slugs: list[str]) -> Optional[dict]:
         hood_names = [h["name"] for h in hoods]
 
         # Query 2: All category scores for all requested neighborhoods
-        all_cat_scores = await conn.fetch("""
+        all_cat_scores = await conn.fetch(
+            """
             SELECT DISTINCT ON (neighborhood_id, category)
                 neighborhood_id, category, score, raw_value,
                 percentile, trend, trend_change
             FROM neighborhood_scores
             WHERE neighborhood_id = ANY($1)
             ORDER BY neighborhood_id, category, period_start DESC
-        """, hood_ids)
+        """,
+            hood_ids,
+        )
 
         # Query 3: Signal stats for all requested neighborhoods
         try:
-            all_signal_stats = await conn.fetch("""
+            all_signal_stats = await conn.fetch(
+                """
                 SELECT
                     neighborhood,
                     COUNT(*) FILTER (WHERE signal_type = 'rezoning_decision') as active_rezonings,
@@ -376,7 +401,9 @@ async def compare_neighborhoods(db_pool, slugs: list[str]) -> Optional[dict]:
                 WHERE neighborhood = ANY($1)
                   AND extracted_at > NOW() - INTERVAL '90 days'
                 GROUP BY neighborhood
-            """, hood_names)
+            """,
+                hood_names,
+            )
         except Exception:
             logger.warning("intelligence_signals batch query failed")
             all_signal_stats = []

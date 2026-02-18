@@ -17,14 +17,19 @@ from pydantic import BaseModel, Field
 
 class SetbackResult(BaseModel):
     """Setback and site coverage analysis for a parcel."""
+
     zoning_district: str
     # Setback distances (metres)
     front_setback_m: Decimal
     rear_setback_m: Decimal
     side_setback_m: Decimal
     # Site coverage
-    max_site_coverage: Decimal = Field(description="Max building footprint / lot area (0-1)")
-    max_footprint_sqm: Optional[Decimal] = Field(None, description="Max building footprint in sqm")
+    max_site_coverage: Decimal = Field(
+        description="Max building footprint / lot area (0-1)"
+    )
+    max_footprint_sqm: Optional[Decimal] = Field(
+        None, description="Max building footprint in sqm"
+    )
     # Derived areas
     lot_area_sqm: Decimal
     net_site_area_sqm: Optional[Decimal] = Field(
@@ -32,7 +37,8 @@ class SetbackResult(BaseModel):
     )
     # Whether this is from a known zoning rule or defaults
     is_default: bool = Field(
-        default=False, description="True if using default setbacks (zoning not in rules table)"
+        default=False,
+        description="True if using default setbacks (zoning not in rules table)",
     )
 
 
@@ -71,6 +77,7 @@ def _estimate_net_area(
 
     # Estimate width from area and aspect ratio: area = W × (2.5W) = 2.5W²
     import math
+
     w_sq = float(lot_area_sqm) / float(_TYPICAL_ASPECT_RATIO)
     width = Decimal(str(math.sqrt(w_sq)))
     depth = width * _TYPICAL_ASPECT_RATIO

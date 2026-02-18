@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v1", tags=["webhooks"])
 
 class WebhookRegisterRequest(BaseModel):
     """Request body for registering a new webhook."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     url: str = Field(..., min_length=1, description="Delivery URL (http or https)")
@@ -43,6 +44,7 @@ class WebhookRegisterRequest(BaseModel):
 
 class WebhookResponse(BaseModel):
     """Response for a single webhook."""
+
     id: str
     user_id: str
     url: str
@@ -54,6 +56,7 @@ class WebhookResponse(BaseModel):
 
 class DeliveryStatusResponse(BaseModel):
     """Response for webhook delivery status."""
+
     id: str
     webhook_id: str
     event_type: str
@@ -66,6 +69,7 @@ class DeliveryStatusResponse(BaseModel):
 
 class TestEventResponse(BaseModel):
     """Response for test event delivery."""
+
     delivery_ids: list[str]
     message: str
 

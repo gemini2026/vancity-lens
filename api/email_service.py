@@ -55,8 +55,7 @@ def _send_email_sync(to: str, subject: str, html_body: str) -> bool:
     config = _get_smtp_config()
     if config is None:
         logger.warning(
-            "SMTP not configured (SMTP_HOST not set). "
-            "Skipping email to %s.",
+            "SMTP not configured (SMTP_HOST not set). Skipping email to %s.",
             to,
         )
         return False
@@ -231,5 +230,7 @@ async def send_undervalued_alert(to: str, parcels: list[dict]) -> bool:
         return False
 
     html_body = _build_undervalued_html(parcels)
-    subject = f"VanCity Lens: Weekly Undervalued Parcel Alert ({len(parcels)} opportunities)"
+    subject = (
+        f"VanCity Lens: Weekly Undervalued Parcel Alert ({len(parcels)} opportunities)"
+    )
     return await send_email(to, subject, html_body)

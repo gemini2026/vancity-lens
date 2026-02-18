@@ -35,7 +35,10 @@ async def get_neighborhood_detail(neighborhood: str):
     """Get detailed political risk for a specific neighborhood."""
     risk = await get_neighborhood_risk(db.pool, neighborhood)
     if not risk:
-        return {"error": f"No risk data for {neighborhood}", "neighborhood": neighborhood}
+        return {
+            "error": f"No risk data for {neighborhood}",
+            "neighborhood": neighborhood,
+        }
 
     themes, themes_status = await get_opposition_themes(db.pool, neighborhood)
     risk["themes"] = themes

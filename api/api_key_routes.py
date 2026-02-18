@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/v1/api-keys", tags=["api-keys"])
 
 class APIKeyCreateRequest(BaseModel):
     """Request to create a new API key."""
+
     name: str = Field(..., min_length=1, max_length=255)
     scopes: List[str] = Field(default=["read:parcels"])
     rate_limit: int = Field(default=DEFAULT_RATE_LIMIT, ge=1, le=1000)
@@ -35,6 +36,7 @@ class APIKeyCreateRequest(BaseModel):
 
 class APIKeyCreateResponse(BaseModel):
     """Response when creating an API key (includes full key)."""
+
     id: int
     name: str
     key_prefix: str
@@ -50,6 +52,7 @@ class APIKeyCreateResponse(BaseModel):
 
 class APIKeyListResponse(BaseModel):
     """Response for listing API keys (masked, no full key)."""
+
     id: int
     name: str
     key_prefix: str
@@ -66,6 +69,7 @@ class APIKeyListResponse(BaseModel):
 
 class APIKeyUsageResponse(BaseModel):
     """Usage statistics for an API key."""
+
     id: int
     name: str
     key_prefix: str
@@ -78,6 +82,7 @@ class APIKeyUsageResponse(BaseModel):
 
 class APIKeyRotateResponse(BaseModel):
     """Response when rotating an API key."""
+
     id: int
     name: str
     key_prefix: str

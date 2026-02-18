@@ -1,4 +1,5 @@
 """Playwright-based council meeting agenda scraper for vancouver.ca."""
+
 import asyncio
 import logging
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ COUNCIL_URL = "https://vancouver.ca/your-government/council-meetings.aspx"
 
 class AgendaItemType(str, Enum):
     """Classification of council agenda items."""
+
     public_hearing = "public_hearing"
     bylaw = "bylaw"
     regular = "regular"
@@ -21,6 +23,7 @@ class AgendaItemType(str, Enum):
 @dataclass
 class AgendaItem:
     """A single council meeting agenda item."""
+
     title: str
     item_type: AgendaItemType
     pdf_urls: list[str]
@@ -58,7 +61,11 @@ def parse_agenda_items(html: str) -> list[AgendaItem]:
 
         # Classify item type based on title content
         title_lower = title.lower()
-        if "public hearing" in title_lower or "rezone" in title_lower or "rezoning" in title_lower:
+        if (
+            "public hearing" in title_lower
+            or "rezone" in title_lower
+            or "rezoning" in title_lower
+        ):
             item_type = AgendaItemType.public_hearing
         elif "bylaw" in title_lower:
             item_type = AgendaItemType.bylaw
@@ -82,13 +89,15 @@ def parse_agenda_items(html: str) -> list[AgendaItem]:
             # Remove the heading text from description
             description = full_text.replace(title, "").strip()
 
-        items.append(AgendaItem(
-            title=title,
-            item_type=item_type,
-            pdf_urls=pdf_urls,
-            meeting_date=None,  # Would need date parsing logic
-            description=description
-        ))
+        items.append(
+            AgendaItem(
+                title=title,
+                item_type=item_type,
+                pdf_urls=pdf_urls,
+                meeting_date=None,  # Would need date parsing logic
+                description=description,
+            )
+        )
 
     return items
 
@@ -124,7 +133,9 @@ async def scrape_council_agendas(max_pages: int = 3) -> list[AgendaItem]:
 
                 try:
                     # Navigate to council meetings page
-                    await page.goto(COUNCIL_URL, wait_until="domcontentloaded", timeout=30000)
+                    await page.goto(
+                        COUNCIL_URL, wait_until="domcontentloaded", timeout=30000
+                    )
 
                     # Get the HTML content
                     html = await page.content()
@@ -145,15 +156,17 @@ async def scrape_council_agendas(max_pages: int = 3) -> list[AgendaItem]:
             logger.error(f"Attempt {attempt + 1}/{retries} failed: {e}")
             if attempt == retries - 1:
                 raise
-            await asyncio.sleep(2 ** attempt)
+            await asyncio.sleep(2**attempt)
         except Exception as e:
             # Catch Playwright-specific errors (e.g. playwright._impl._errors.TimeoutError)
             # which do NOT inherit from builtins.TimeoutError
             if "Timeout" in type(e).__name__ or "playwright" in type(e).__module__:
-                logger.error(f"Attempt {attempt + 1}/{retries} failed (playwright): {e}")
+                logger.error(
+                    f"Attempt {attempt + 1}/{retries} failed (playwright): {e}"
+                )
                 if attempt == retries - 1:
                     raise
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
             else:
                 raise
 

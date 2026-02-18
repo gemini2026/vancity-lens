@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class WebhookEvent(str, Enum):
     """Supported webhook events."""
+
     PARCEL_UPDATED = "parcel.updated"
     SIGNAL_NEW = "signal.new"
     ENTITLEMENT_COMPUTED = "entitlement.computed"
@@ -37,6 +38,7 @@ VALID_EVENTS = {
 
 class WebhookInfo(NamedTuple):
     """Webhook information for display."""
+
     id: int
     api_key_id: int
     url: str
@@ -47,6 +49,7 @@ class WebhookInfo(NamedTuple):
 
 class WebhookDeliveryResult(NamedTuple):
     """Result of webhook delivery attempt."""
+
     success: bool
     status_code: Optional[int]
     error: Optional[str]
@@ -65,6 +68,7 @@ class WebhookManager:
     def _generate_webhook_secret() -> str:
         """Generate a random webhook secret."""
         import secrets
+
         return secrets.token_urlsafe(32)
 
     @staticmethod
@@ -86,9 +90,7 @@ class WebhookManager:
         ).hexdigest()
 
     @staticmethod
-    def verify_signature(
-        payload: str, signature: str, secret: str
-    ) -> bool:
+    def verify_signature(payload: str, signature: str, secret: str) -> bool:
         """
         Verify webhook signature.
 
@@ -156,9 +158,7 @@ class WebhookManager:
         )
 
     @staticmethod
-    async def list_webhooks(
-        pool: asyncpg.Pool, api_key_id: int
-    ) -> List[WebhookInfo]:
+    async def list_webhooks(pool: asyncpg.Pool, api_key_id: int) -> List[WebhookInfo]:
         """
         List all webhooks for an API key.
 
@@ -293,11 +293,13 @@ class WebhookManager:
         Returns:
             WebhookDeliveryResult
         """
-        payload_json = json.dumps({
-            "event": event,
-            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-            "data": payload,
-        })
+        payload_json = json.dumps(
+            {
+                "event": event,
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "data": payload,
+            }
+        )
 
         signature = WebhookManager._create_signature(payload_json, secret)
 
@@ -310,11 +312,17 @@ class WebhookManager:
         # Retry logic
         for attempt in range(WebhookManager.MAX_RETRIES):
             try:
-                async with httpx.AsyncClient(timeout=WebhookManager.TIMEOUT_SECONDS) as client:
+                async with httpx.AsyncClient(
+                    timeout=WebhookManager.TIMEOUT_SECONDS
+                ) as client:
                     start_time = datetime.now(tz=timezone.utc)
-                    response = await client.post(url, content=payload_json, headers=headers)
+                    response = await client.post(
+                        url, content=payload_json, headers=headers
+                    )
                     end_time = datetime.now(tz=timezone.utc)
-                    delivery_time_ms = int((end_time - start_time).total_seconds() * 1000)
+                    delivery_time_ms = int(
+                        (end_time - start_time).total_seconds() * 1000
+                    )
 
                     if response.status_code < 400:
                         return WebhookDeliveryResult(

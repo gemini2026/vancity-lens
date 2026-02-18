@@ -14,12 +14,28 @@ logger = logging.getLogger(__name__)
 
 # Canonical Vancouver neighborhoods (22 official)
 VANCOUVER_NEIGHBORHOODS = {
-    "Arbutus Ridge", "Downtown", "Dunbar-Southlands", "Fairview",
-    "Grandview-Woodland", "Hastings-Sunrise", "Kensington-Cedar Cottage",
-    "Kerrisdale", "Killarney", "Kitsilano", "Marpole", "Mount Pleasant",
-    "Oakridge", "Renfrew-Collingwood", "Riley Park", "Shaughnessy",
-    "South Cambie", "Strathcona", "Sunset", "Victoria-Fraserview",
-    "West End", "West Point Grey",
+    "Arbutus Ridge",
+    "Downtown",
+    "Dunbar-Southlands",
+    "Fairview",
+    "Grandview-Woodland",
+    "Hastings-Sunrise",
+    "Kensington-Cedar Cottage",
+    "Kerrisdale",
+    "Killarney",
+    "Kitsilano",
+    "Marpole",
+    "Mount Pleasant",
+    "Oakridge",
+    "Renfrew-Collingwood",
+    "Riley Park",
+    "Shaughnessy",
+    "South Cambie",
+    "Strathcona",
+    "Sunset",
+    "Victoria-Fraserview",
+    "West End",
+    "West Point Grey",
 }
 
 # Common aliases → canonical name
@@ -59,9 +75,23 @@ NEIGHBORHOOD_ALIASES = {
 
 # Valid Vancouver zoning prefixes
 VALID_ZONING_PREFIXES = [
-    "RS-", "RT-", "RM-", "FM-", "C-", "CD-", "DD-", "FC-",
-    "HA-", "I-", "IC-", "M-", "MC-", "FCCDD-",
-    "BCPED", "CWD", "DEOD",
+    "RS-",
+    "RT-",
+    "RM-",
+    "FM-",
+    "C-",
+    "CD-",
+    "DD-",
+    "FC-",
+    "HA-",
+    "I-",
+    "IC-",
+    "M-",
+    "MC-",
+    "FCCDD-",
+    "BCPED",
+    "CWD",
+    "DEOD",
 ]
 
 
@@ -115,12 +145,15 @@ async def resolve_neighborhood_from_db(
     Falls back to the in-memory aliases if DB table doesn't exist.
     """
     try:
-        row = await conn.fetchrow("""
+        row = await conn.fetchrow(
+            """
             SELECT name FROM vancouver_neighborhoods
             WHERE name ILIKE $1
                OR $1 = ANY(alternate_names)
             LIMIT 1
-        """, name.strip())
+        """,
+            name.strip(),
+        )
         if row:
             return row["name"]
     except Exception:
@@ -131,7 +164,9 @@ async def resolve_neighborhood_from_db(
     return canonical if is_valid else None
 
 
-def validate_event_date_range(event_date_str: Optional[str]) -> Tuple[bool, Optional[str]]:
+def validate_event_date_range(
+    event_date_str: Optional[str],
+) -> Tuple[bool, Optional[str]]:
     """
     DV-REG-003: Validate effective/event date.
 

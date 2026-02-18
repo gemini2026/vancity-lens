@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 # ENUMS AND MODELS
 # ════════════════════════════════════════════════════════════════════════════
 
+
 class PipelineStage(str, Enum):
     """Development stages in the supply pipeline."""
+
     ENQUIRY = "enquiry"
     APPLICATION_SUBMITTED = "application_submitted"
     UNDER_STAFF_REVIEW = "under_staff_review"
@@ -56,6 +58,7 @@ STAGE_MIGRATION_MAP = {
 
 class PipelineEntry(BaseModel):
     """A single development project in the pipeline."""
+
     id: int
     parcel_pid: str
     address: str
@@ -78,13 +81,16 @@ _PID_PATTERN = re.compile(r"^\d{3}-?\d{3}-?\d{3}$")
 
 # Vancouver bounding box (WGS84) for geocode validation
 _VAN_BBOX = {
-    "min_lng": -123.27, "max_lng": -123.02,
-    "min_lat": 49.20, "max_lat": 49.32,
+    "min_lng": -123.27,
+    "max_lng": -123.02,
+    "min_lat": 49.20,
+    "max_lat": 49.32,
 }
 
 
 class PipelineEntryCreate(BaseModel):
     """Request model for creating a pipeline entry."""
+
     parcel_pid: str
     address: str
     neighborhood: Optional[str] = None
@@ -126,14 +132,19 @@ class PipelineEntryCreate(BaseModel):
     def validate_completion_date(cls, v: Optional[date]) -> Optional[date]:
         if v is not None:
             if v < date(2020, 1, 1):
-                raise ValueError(f"estimated_completion {v} is before 2020 — likely a data error")
+                raise ValueError(
+                    f"estimated_completion {v} is before 2020 — likely a data error"
+                )
             if v > date(2050, 1, 1):
-                raise ValueError(f"estimated_completion {v} is after 2050 — likely a data error")
+                raise ValueError(
+                    f"estimated_completion {v} is after 2050 — likely a data error"
+                )
         return v
 
 
 class PipelineStageChange(BaseModel):
     """A stage transition in pipeline history."""
+
     id: int
     pipeline_id: int
     from_stage: Optional[str] = None
@@ -145,6 +156,7 @@ class PipelineStageChange(BaseModel):
 
 class PipelineStageCounts(BaseModel):
     """Count of projects by stage."""
+
     stage: str
     count: int
     total_units: int
@@ -153,6 +165,7 @@ class PipelineStageCounts(BaseModel):
 
 class PipelineSummary(BaseModel):
     """High-level summary of pipeline."""
+
     total_entries: int
     total_units: int
     total_sqft: float
@@ -162,6 +175,7 @@ class PipelineSummary(BaseModel):
 
 class NeighborhoodSupply(BaseModel):
     """Supply analysis for a single neighborhood."""
+
     neighborhood: str
     total_projects: int
     total_units: int
@@ -172,6 +186,7 @@ class NeighborhoodSupply(BaseModel):
 
 class PipelineStats(BaseModel):
     """Detailed pipeline statistics."""
+
     total_projects: int
     total_units: int
     total_sqft: float
@@ -186,13 +201,13 @@ class PipelineStats(BaseModel):
 # SUPPLY PIPELINE TRACKER
 # ════════════════════════════════════════════════════════════════════════════
 
+
 class SupplyPipelineTracker:
     """Core class for supply pipeline management."""
 
     @staticmethod
     async def add_entry(
-        db_pool: asyncpg.Pool,
-        entry: PipelineEntryCreate
+        db_pool: asyncpg.Pool, entry: PipelineEntryCreate
     ) -> PipelineEntry:
         """
         Add a new project to the supply pipeline.
@@ -238,7 +253,7 @@ class SupplyPipelineTracker:
                     entry.proposed_sqft,
                     entry.developer,
                     entry.estimated_completion,
-                    entry.metadata
+                    entry.metadata,
                 )
 
             if not row:
@@ -260,7 +275,7 @@ class SupplyPipelineTracker:
         pipeline_id: int,
         new_stage: PipelineStage,
         signal_id: Optional[int] = None,
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
     ) -> PipelineEntry:
         """
         Update a project's pipeline stage and record the transition.
@@ -288,7 +303,7 @@ class SupplyPipelineTracker:
                 if not current_row:
                     raise ValueError(f"Pipeline entry {pipeline_id} not found")
 
-                old_stage = current_row['pipeline_stage']
+                old_stage = current_row["pipeline_stage"]
 
                 # Update the stage
                 update_query = """
@@ -303,7 +318,9 @@ class SupplyPipelineTracker:
                         created_at, updated_at
                 """
 
-                updated_row = await conn.fetchrow(update_query, new_stage.value, pipeline_id)
+                updated_row = await conn.fetchrow(
+                    update_query, new_stage.value, pipeline_id
+                )
 
                 # Record the stage transition
                 history_query = """
@@ -319,7 +336,7 @@ class SupplyPipelineTracker:
                     old_stage,
                     new_stage.value,
                     signal_id,
-                    notes
+                    notes,
                 )
 
                 # AC-PIPE-005: Generate stage transition alerts for matching watchlists
@@ -347,7 +364,7 @@ class SupplyPipelineTracker:
         units_max: Optional[int] = None,
         developer: Optional[str] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
     ) -> tuple[List[PipelineEntry], int]:
         """
         Query pipeline entries with optional filters.
@@ -406,7 +423,9 @@ class SupplyPipelineTracker:
             where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
 
             # Count query
-            count_query = f"SELECT COUNT(*) as total FROM supply_pipeline WHERE {where_sql}"
+            count_query = (
+                f"SELECT COUNT(*) as total FROM supply_pipeline WHERE {where_sql}"
+            )
 
             # Fetch query
             fetch_query = f"""
@@ -419,12 +438,12 @@ class SupplyPipelineTracker:
                 FROM supply_pipeline
                 WHERE {where_sql}
                 ORDER BY created_at DESC
-                LIMIT ${ len(params) + 1} OFFSET ${len(params) + 2}
+                LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
             """
 
             async with db_pool.acquire() as conn:
                 count_row = await conn.fetchrow(count_query, *params)
-                total_count = count_row['total'] if count_row else 0
+                total_count = count_row["total"] if count_row else 0
 
                 rows = await conn.fetch(fetch_query, *params, limit, offset)
 
@@ -499,8 +518,7 @@ class SupplyPipelineTracker:
 
     @staticmethod
     async def get_entry(
-        db_pool: asyncpg.Pool,
-        pipeline_id: int
+        db_pool: asyncpg.Pool, pipeline_id: int
     ) -> Optional[PipelineEntry]:
         """
         Get a single pipeline entry by ID.
@@ -540,8 +558,7 @@ class SupplyPipelineTracker:
 
     @staticmethod
     async def get_entry_by_parcel(
-        db_pool: asyncpg.Pool,
-        parcel_pid: str
+        db_pool: asyncpg.Pool, parcel_pid: str
     ) -> Optional[PipelineEntry]:
         """
         Get a pipeline entry by parcel PID.
@@ -580,8 +597,7 @@ class SupplyPipelineTracker:
 
     @staticmethod
     async def get_stage_history(
-        db_pool: asyncpg.Pool,
-        pipeline_id: int
+        db_pool: asyncpg.Pool, pipeline_id: int
     ) -> List[PipelineStageChange]:
         """
         Get the stage transition history for a pipeline entry.
@@ -608,18 +624,20 @@ class SupplyPipelineTracker:
 
             changes = [
                 PipelineStageChange(
-                    id=row['id'],
-                    pipeline_id=row['pipeline_id'],
-                    from_stage=row['from_stage'],
-                    to_stage=row['to_stage'],
-                    changed_at=row['changed_at'],
-                    signal_id=row['signal_id'],
-                    notes=row['notes']
+                    id=row["id"],
+                    pipeline_id=row["pipeline_id"],
+                    from_stage=row["from_stage"],
+                    to_stage=row["to_stage"],
+                    changed_at=row["changed_at"],
+                    signal_id=row["signal_id"],
+                    notes=row["notes"],
                 )
                 for row in rows
             ]
 
-            logger.info(f"Retrieved {len(changes)} stage changes for pipeline {pipeline_id}")
+            logger.info(
+                f"Retrieved {len(changes)} stage changes for pipeline {pipeline_id}"
+            )
             return changes
 
         except Exception as e:
@@ -627,9 +645,7 @@ class SupplyPipelineTracker:
             raise
 
     @staticmethod
-    async def get_pipeline_summary(
-        db_pool: asyncpg.Pool
-    ) -> PipelineSummary:
+    async def get_pipeline_summary(db_pool: asyncpg.Pool) -> PipelineSummary:
         """
         Get high-level summary of the entire pipeline.
 
@@ -686,30 +702,30 @@ class SupplyPipelineTracker:
 
             by_stage = [
                 PipelineStageCounts(
-                    stage=row['pipeline_stage'],
-                    count=row['count'],
-                    total_units=row['units'],
-                    total_sqft=float(row['sqft'])
+                    stage=row["pipeline_stage"],
+                    count=row["count"],
+                    total_units=row["units"],
+                    total_sqft=float(row["sqft"]),
                 )
                 for row in stage_rows
             ]
 
             by_neighborhood = {
-                row['neighborhood']: {
-                    'count': row['count'],
-                    'units': row['units'],
-                    'sqft': float(row['sqft'])
+                row["neighborhood"]: {
+                    "count": row["count"],
+                    "units": row["units"],
+                    "sqft": float(row["sqft"]),
                 }
                 for row in neighborhood_rows
             }
 
             logger.info("Retrieved pipeline summary")
             return PipelineSummary(
-                total_entries=total_row['count'],
-                total_units=total_row['units'],
-                total_sqft=float(total_row['sqft']),
+                total_entries=total_row["count"],
+                total_units=total_row["units"],
+                total_sqft=float(total_row["sqft"]),
                 by_stage=by_stage,
-                by_neighborhood=by_neighborhood
+                by_neighborhood=by_neighborhood,
             )
 
         except Exception as e:
@@ -718,8 +734,7 @@ class SupplyPipelineTracker:
 
     @staticmethod
     async def get_neighborhood_supply(
-        db_pool: asyncpg.Pool,
-        neighborhood: str
+        db_pool: asyncpg.Pool, neighborhood: str
     ) -> NeighborhoodSupply:
         """
         Get detailed supply analysis for a neighborhood.
@@ -772,30 +787,27 @@ class SupplyPipelineTracker:
                 completion_rows = await conn.fetch(completion_query, neighborhood)
 
             by_stage = {
-                row['pipeline_stage']: {
-                    'count': row['count'],
-                    'units': row['units'],
-                    'sqft': float(row['sqft'])
+                row["pipeline_stage"]: {
+                    "count": row["count"],
+                    "units": row["units"],
+                    "sqft": float(row["sqft"]),
                 }
                 for row in stage_rows
             }
 
             completion_range = {
-                str(row['quarter']): {
-                    'count': row['count'],
-                    'units': row['units']
-                }
+                str(row["quarter"]): {"count": row["count"], "units": row["units"]}
                 for row in completion_rows
             }
 
             logger.info(f"Retrieved supply for neighborhood {neighborhood}")
             return NeighborhoodSupply(
                 neighborhood=neighborhood,
-                total_projects=overall_row['count'],
-                total_units=overall_row['units'],
-                total_sqft=float(overall_row['sqft']),
+                total_projects=overall_row["count"],
+                total_units=overall_row["units"],
+                total_sqft=float(overall_row["sqft"]),
                 by_stage=by_stage,
-                estimated_completion_range=completion_range
+                estimated_completion_range=completion_range,
             )
 
         except Exception as e:
@@ -803,10 +815,7 @@ class SupplyPipelineTracker:
             raise
 
     @staticmethod
-    async def ingest_from_signal(
-        db_pool: asyncpg.Pool,
-        signal: dict
-    ) -> PipelineEntry:
+    async def ingest_from_signal(db_pool: asyncpg.Pool, signal: dict) -> PipelineEntry:
         """
         Auto-create or update a pipeline entry from an intelligence signal.
 
@@ -825,12 +834,12 @@ class SupplyPipelineTracker:
         """
         try:
             # Extract required data
-            if not signal.get('addresses') or len(signal['addresses']) == 0:
+            if not signal.get("addresses") or len(signal["addresses"]) == 0:
                 raise ValueError("Signal must have at least one address")
 
-            address = signal['addresses'][0]
-            neighborhood = signal.get('neighborhood')
-            parcel_pid = signal.get('parcel_pid', f"signal_{signal.get('id')}")
+            address = signal["addresses"][0]
+            neighborhood = signal.get("neighborhood")
+            parcel_pid = signal.get("parcel_pid", f"signal_{signal.get('id')}")
 
             # Check if entry already exists
             existing = await SupplyPipelineTracker.get_entry_by_parcel(
@@ -861,9 +870,9 @@ class SupplyPipelineTracker:
                         query,
                         parcel_pid,
                         neighborhood,
-                        signal.get('zoning_to'),
-                        signal.get('unit_count'),
-                        signal.get('id')
+                        signal.get("zoning_to"),
+                        signal.get("unit_count"),
+                        signal.get("id"),
                     )
 
                 logger.info(f"Updated pipeline entry from signal {signal.get('id')}")
@@ -876,16 +885,16 @@ class SupplyPipelineTracker:
                     address=address,
                     neighborhood=neighborhood,
                     pipeline_stage=PipelineStage.APPLICATION_SUBMITTED,
-                    current_zoning=signal.get('zoning_from'),
-                    proposed_zoning=signal.get('zoning_to'),
-                    proposed_storeys=signal.get('height_after'),
-                    proposed_units=signal.get('unit_count'),
-                    proposed_sqft=signal.get('sqft'),
+                    current_zoning=signal.get("zoning_from"),
+                    proposed_zoning=signal.get("zoning_to"),
+                    proposed_storeys=signal.get("height_after"),
+                    proposed_units=signal.get("unit_count"),
+                    proposed_sqft=signal.get("sqft"),
                     metadata={
-                        'sourced_from_signal': signal.get('id'),
-                        'signal_type': signal.get('signal_type'),
-                        'confidence': signal.get('confidence')
-                    }
+                        "sourced_from_signal": signal.get("id"),
+                        "signal_type": signal.get("signal_type"),
+                        "confidence": signal.get("confidence"),
+                    },
                 )
 
                 result = await SupplyPipelineTracker.add_entry(db_pool, entry)
@@ -898,7 +907,7 @@ class SupplyPipelineTracker:
                 """
 
                 async with db_pool.acquire() as conn:
-                    await conn.execute(link_query, result.id, signal.get('id'))
+                    await conn.execute(link_query, result.id, signal.get("id"))
 
                 logger.info(f"Created pipeline entry from signal {signal.get('id')}")
                 return result
@@ -909,8 +918,7 @@ class SupplyPipelineTracker:
 
     @staticmethod
     async def get_pipeline_stats(
-        db_pool: asyncpg.Pool,
-        neighborhood: Optional[str] = None
+        db_pool: asyncpg.Pool, neighborhood: Optional[str] = None
     ) -> PipelineStats:
         """
         Get detailed pipeline statistics.
@@ -979,30 +987,27 @@ class SupplyPipelineTracker:
                 stage_rows = await conn.fetch(stage_query, *params)
                 neighborhood_rows = await conn.fetch(neighborhood_query)
                 near_completion_row = await conn.fetchrow(
-                    near_completion_query,
-                    *(params if neighborhood else [])
+                    near_completion_query, *(params if neighborhood else [])
                 )
 
             projects_by_stage = {
-                row['pipeline_stage']: row['count']
-                for row in stage_rows
+                row["pipeline_stage"]: row["count"] for row in stage_rows
             }
 
             projects_by_neighborhood = {
-                row['neighborhood']: row['count']
-                for row in neighborhood_rows
+                row["neighborhood"]: row["count"] for row in neighborhood_rows
             }
 
             logger.info("Retrieved pipeline statistics")
             return PipelineStats(
-                total_projects=total_row['count'],
-                total_units=total_row['units'],
-                total_sqft=float(total_row['sqft']),
-                average_units_per_project=float(total_row['avg_units']),
-                average_storeys_per_project=float(total_row['avg_storeys']),
+                total_projects=total_row["count"],
+                total_units=total_row["units"],
+                total_sqft=float(total_row["sqft"]),
+                average_units_per_project=float(total_row["avg_units"]),
+                average_storeys_per_project=float(total_row["avg_storeys"]),
                 projects_by_stage=projects_by_stage,
                 projects_by_neighborhood=projects_by_neighborhood,
-                near_completion_count=near_completion_row['count']
+                near_completion_count=near_completion_row["count"],
             )
 
         except Exception as e:
@@ -1010,10 +1015,7 @@ class SupplyPipelineTracker:
             raise
 
     @staticmethod
-    async def delete_entry(
-        db_pool: asyncpg.Pool,
-        pipeline_id: int
-    ) -> bool:
+    async def delete_entry(db_pool: asyncpg.Pool, pipeline_id: int) -> bool:
         """
         Delete a pipeline entry and its history.
 
@@ -1048,30 +1050,31 @@ class SupplyPipelineTracker:
 # HELPER FUNCTIONS
 # ════════════════════════════════════════════════════════════════════════════
 
+
 def _row_to_entry(row) -> PipelineEntry:
     """Convert database row to PipelineEntry model."""
-    raw_stage = row['pipeline_stage']
+    raw_stage = row["pipeline_stage"]
     if raw_stage in STAGE_MIGRATION_MAP:
         stage = STAGE_MIGRATION_MAP[raw_stage]
     else:
         stage = PipelineStage(raw_stage)
     return PipelineEntry(
-        id=row['id'],
-        parcel_pid=row['parcel_pid'],
-        address=row['address'],
-        neighborhood=row['neighborhood'],
+        id=row["id"],
+        parcel_pid=row["parcel_pid"],
+        address=row["address"],
+        neighborhood=row["neighborhood"],
         pipeline_stage=stage,
-        current_zoning=row['current_zoning'],
-        proposed_zoning=row['proposed_zoning'],
-        proposed_storeys=row['proposed_storeys'],
-        proposed_units=row['proposed_units'],
-        proposed_sqft=float(row['proposed_sqft']) if row['proposed_sqft'] else None,
-        developer=row['developer'],
-        estimated_completion=row['estimated_completion'],
-        signal_ids=row['signal_ids'] or [],
-        metadata=row['metadata'] or {},
-        created_at=row['created_at'],
-        updated_at=row['updated_at']
+        current_zoning=row["current_zoning"],
+        proposed_zoning=row["proposed_zoning"],
+        proposed_storeys=row["proposed_storeys"],
+        proposed_units=row["proposed_units"],
+        proposed_sqft=float(row["proposed_sqft"]) if row["proposed_sqft"] else None,
+        developer=row["developer"],
+        estimated_completion=row["estimated_completion"],
+        signal_ids=row["signal_ids"] or [],
+        metadata=row["metadata"] or {},
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
     )
 
 
@@ -1207,7 +1210,9 @@ async def _generate_stage_transition_alerts(
             OR (wr.rule_type = 'zoning' AND LOWER(wr.rule_value) = LOWER($2))
           )
     """
-    zoning = pipeline_row.get("proposed_zoning") or pipeline_row.get("current_zoning") or ""
+    zoning = (
+        pipeline_row.get("proposed_zoning") or pipeline_row.get("current_zoning") or ""
+    )
 
     try:
         watchlist_rows = await conn.fetch(match_query, neighborhood or "", zoning)
@@ -1218,7 +1223,11 @@ async def _generate_stage_transition_alerts(
                 (watchlist_id, signal_id, alert_type, headline, summary, severity, is_read, created_at)
                 VALUES ($1, $2, 'stage_transition', $3, $4, $5, false, NOW())
                 """,
-                wl["watchlist_id"], signal_id, headline, summary, severity,
+                wl["watchlist_id"],
+                signal_id,
+                headline,
+                summary,
+                severity,
             )
         if watchlist_rows:
             logger.info(
@@ -1279,13 +1288,15 @@ async def resolve_developer_entity(conn, developer_name: str) -> int:
         await conn.execute(
             "UPDATE developer_entities "
             "SET aliases = array_append(aliases, $1) WHERE id = $2",
-            normalized, row["id"],
+            normalized,
+            row["id"],
         )
         return row["id"]
 
     new_id = await conn.fetchval(
         "INSERT INTO developer_entities (canonical_name, aliases) "
         "VALUES ($1, $2) RETURNING id",
-        normalized, [normalized],
+        normalized,
+        [normalized],
     )
     return new_id

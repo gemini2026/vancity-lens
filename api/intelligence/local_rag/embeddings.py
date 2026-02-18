@@ -39,16 +39,18 @@ DEFAULT_CHUNK_INSERT_CONCURRENCY = 10
 
 class EmbeddingError(Exception):
     """Custom exception for embedding operations."""
+
     pass
 
 
 # -- Embedding generation ------------------------------------------------------
 
+
 async def generate_embedding(
     text: str,
     api_key: str,
     input_type: str = "search_query",
-    max_retries: int = MAX_RETRIES
+    max_retries: int = MAX_RETRIES,
 ) -> List[float]:
     """
     Generate a single embedding using Cohere API.
@@ -88,7 +90,9 @@ async def generate_embedding(
                         f"Invalid embedding dimension: {len(embedding)} != {EMBEDDING_DIMENSION}"
                     )
 
-                logger.debug(f"Generated embedding ({input_type}) for text of length {len(text)}")
+                logger.debug(
+                    f"Generated embedding ({input_type}) for text of length {len(text)}"
+                )
                 return embedding
 
             except Exception as e:
@@ -112,7 +116,7 @@ async def batch_embed(
     texts: List[str],
     api_key: str,
     input_type: str = "search_document",
-    batch_size: int = DEFAULT_BATCH_SIZE
+    batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> List[List[float]]:
     """
     Generate embeddings for multiple texts using Cohere batch API.
@@ -134,14 +138,16 @@ async def batch_embed(
 
     async with cohere.AsyncClient(api_key=api_key) as co:
         for i in range(0, len(texts), batch_size):
-            batch = [t[:4096] for t in texts[i:i + batch_size]]
+            batch = [t[:4096] for t in texts[i : i + batch_size]]
 
             backoff = INITIAL_BACKOFF
             last_error = None
 
             for attempt in range(MAX_RETRIES):
                 try:
-                    logger.info(f"Embedding batch {i // batch_size + 1} ({len(batch)} texts)")
+                    logger.info(
+                        f"Embedding batch {i // batch_size + 1} ({len(batch)} texts)"
+                    )
 
                     async with COHERE_SEMAPHORE:
                         response = await asyncio.wait_for(
@@ -185,11 +191,9 @@ async def batch_embed(
 
 # -- Reranking -----------------------------------------------------------------
 
+
 async def rerank_results(
-    query: str,
-    documents: List[str],
-    api_key: str,
-    top_n: int = 10
+    query: str, documents: List[str], api_key: str, top_n: int = 10
 ) -> List[Dict[str, Any]]:
     """
     Rerank candidate documents using Cohere Rerank v3.
@@ -230,10 +234,14 @@ async def rerank_results(
     except Exception as e:
         logger.warning(f"Reranking failed, returning original order: {e}")
         # Graceful fallback: return original order
-        return [{"index": i, "relevance_score": 1.0 - (i * 0.01)} for i in range(min(top_n, len(documents)))]
+        return [
+            {"index": i, "relevance_score": 1.0 - (i * 0.01)}
+            for i in range(min(top_n, len(documents)))
+        ]
 
 
 # -- Chunk storage -------------------------------------------------------------
+
 
 async def store_chunk_with_embedding(
     db_pool: asyncpg.Pool,
@@ -242,7 +250,7 @@ async def store_chunk_with_embedding(
     chunk_text: str,
     section_header: Optional[str],
     token_count: int,
-    embedding: List[float]
+    embedding: List[float],
 ) -> int:
     """
     Store a chunk with embedding + tsvector in the database.
@@ -250,7 +258,7 @@ async def store_chunk_with_embedding(
     The tsvector column is populated automatically by a trigger (see migration 007),
     or we generate it inline here as a fallback.
     """
-    embedding_str = '[' + ','.join(str(x) for x in embedding) + ']'
+    embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
     query = """
         INSERT INTO document_chunks (
@@ -267,22 +275,28 @@ async def store_chunk_with_embedding(
     async with db_pool.acquire() as conn:
         try:
             chunk_id = await conn.fetchval(
-                query, document_id, chunk_index, chunk_text,
-                section_header, token_count, embedding_str
+                query,
+                document_id,
+                chunk_index,
+                chunk_text,
+                section_header,
+                token_count,
+                embedding_str,
             )
             logger.debug(f"Stored chunk {chunk_index} for doc {document_id}")
             return chunk_id
         except Exception as e:
-            logger.error(f"Error storing chunk {chunk_index} for doc {document_id}: {e}")
+            logger.error(
+                f"Error storing chunk {chunk_index} for doc {document_id}: {e}"
+            )
             raise
 
 
 # -- Full document processing --------------------------------------------------
 
+
 async def process_document_chunks(
-    db_pool: asyncpg.Pool,
-    document_id: int,
-    api_key: str
+    db_pool: asyncpg.Pool, document_id: int, api_key: str
 ) -> int:
     """
     Full pipeline: chunk document -> embed with Cohere -> store with tsvector.
@@ -306,7 +320,7 @@ async def process_document_chunks(
     if not doc_row:
         raise ValueError(f"Document {document_id} not found")
 
-    raw_text = doc_row['raw_text']
+    raw_text = doc_row["raw_text"]
     if not raw_text:
         logger.warning(f"Document {document_id} has no raw_text")
         return 0
@@ -319,19 +333,25 @@ async def process_document_chunks(
         return 0
 
     # Embed
-    chunk_texts = [c['chunk_text'] for c in chunks]
+    chunk_texts = [c["chunk_text"] for c in chunks]
     logger.info(f"Embedding {len(chunks)} chunks with Cohere")
     try:
-        embeddings = await batch_embed(chunk_texts, api_key, input_type="search_document")
+        embeddings = await batch_embed(
+            chunk_texts, api_key, input_type="search_document"
+        )
     except EmbeddingError as e:
         logger.error(f"Embedding failed for document {document_id}: {e}")
         raise
 
     if len(embeddings) != len(chunks):
-        raise EmbeddingError(f"Count mismatch: {len(embeddings)} embeddings vs {len(chunks)} chunks")
+        raise EmbeddingError(
+            f"Count mismatch: {len(embeddings)} embeddings vs {len(chunks)} chunks"
+        )
 
     # Store
-    insert_concurrency = int(os.getenv("CHUNK_INSERT_MAX_CONCURRENCY", DEFAULT_CHUNK_INSERT_CONCURRENCY))
+    insert_concurrency = int(
+        os.getenv("CHUNK_INSERT_MAX_CONCURRENCY", DEFAULT_CHUNK_INSERT_CONCURRENCY)
+    )
     insert_concurrency = max(1, min(insert_concurrency, 50))
     insert_sem = asyncio.Semaphore(insert_concurrency)
 
@@ -352,7 +372,9 @@ async def process_document_chunks(
                 logger.error(f"Failed to store chunk {chunk['chunk_index']}: {e}")
                 return 0
 
-    tasks = [_store_one(chunk, embedding) for chunk, embedding in zip(chunks, embeddings)]
+    tasks = [
+        _store_one(chunk, embedding) for chunk, embedding in zip(chunks, embeddings)
+    ]
     stored = sum(await asyncio.gather(*tasks))
 
     logger.info(f"Document {document_id}: stored {stored}/{len(chunks)} chunks")
@@ -360,6 +382,7 @@ async def process_document_chunks(
 
 
 # -- Hybrid search -------------------------------------------------------------
+
 
 async def hybrid_search(
     db_pool: asyncpg.Pool,
@@ -399,8 +422,10 @@ async def hybrid_search(
     """
     # Step 1: Embed the query
     logger.info(f"Hybrid search: '{query_text[:80]}...'")
-    query_embedding = await generate_embedding(query_text, api_key, input_type="search_query")
-    embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+    query_embedding = await generate_embedding(
+        query_text, api_key, input_type="search_query"
+    )
+    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
     # RAG-008: Build optional metadata pre-filter JOIN and WHERE clauses
     doc_filter_clauses = []
@@ -409,7 +434,9 @@ async def hybrid_search(
 
     if neighborhood:
         param_offset += 1
-        doc_filter_clauses.append(f"d_filt.metadata->>'neighborhood' = ${param_offset} OR EXISTS (SELECT 1 FROM intelligence_signals isig WHERE isig.document_id = dc.document_id AND isig.neighborhood = ${param_offset})")
+        doc_filter_clauses.append(
+            f"d_filt.metadata->>'neighborhood' = ${param_offset} OR EXISTS (SELECT 1 FROM intelligence_signals isig WHERE isig.document_id = dc.document_id AND isig.neighborhood = ${param_offset})"
+        )
         extra_params.append(neighborhood)
 
     if date_from:
@@ -425,7 +452,9 @@ async def hybrid_search(
     # Build the filter JOIN snippet
     if doc_filter_clauses:
         filter_join = "JOIN documents d_filt ON dc.document_id = d_filt.id"
-        filter_where = " AND (" + " AND ".join(f"({c})" for c in doc_filter_clauses) + ")"
+        filter_where = (
+            " AND (" + " AND ".join(f"({c})" for c in doc_filter_clauses) + ")"
+        )
     else:
         filter_join = ""
         filter_where = ""
@@ -487,12 +516,12 @@ async def hybrid_search(
     fetch_limit = limit * 3 if use_rerank else limit
 
     all_params = [
-        embedding_str,      # $1: query embedding
-        query_text,          # $2: text query
-        vector_weight,       # $3: vector weight
-        text_weight,         # $4: text weight
-        RRF_K,               # $5: RRF k constant
-        fetch_limit,         # $6: limit
+        embedding_str,  # $1: query embedding
+        query_text,  # $2: text query
+        vector_weight,  # $3: vector weight
+        text_weight,  # $4: text weight
+        RRF_K,  # $5: RRF k constant
+        fetch_limit,  # $6: limit
     ] + extra_params
 
     async with db_pool.acquire() as conn:
@@ -509,32 +538,34 @@ async def hybrid_search(
     # Build result list
     candidates = []
     for row in rows:
-        candidates.append({
-            'chunk_id': row['chunk_id'],
-            'chunk_text': row['chunk_text'],
-            'document_id': row['document_id'],
-            'section_header': row['section_header'],
-            'chunk_index': row['chunk_index'],
-            'rrf_score': float(row['rrf_score']),
-            'document_title': row['document_title'],
-            'source_url': row['source_url'],
-            'source_type': row['source_type'],
-            'published_date': row['published_date'],
-        })
+        candidates.append(
+            {
+                "chunk_id": row["chunk_id"],
+                "chunk_text": row["chunk_text"],
+                "document_id": row["document_id"],
+                "section_header": row["section_header"],
+                "chunk_index": row["chunk_index"],
+                "rrf_score": float(row["rrf_score"]),
+                "document_title": row["document_title"],
+                "source_url": row["source_url"],
+                "source_type": row["source_type"],
+                "published_date": row["published_date"],
+            }
+        )
 
     # Step 3: Optional Cohere reranking
     if use_rerank and len(candidates) > 1:
         logger.info(f"Reranking {len(candidates)} candidates with Cohere")
-        doc_texts = [c['chunk_text'] for c in candidates]
+        doc_texts = [c["chunk_text"] for c in candidates]
 
         rerank_hits = await rerank_results(query_text, doc_texts, api_key, top_n=limit)
 
         # Reorder candidates by rerank score
         reranked = []
         for r in rerank_hits:
-            candidate = candidates[r['index']].copy()
-            candidate['rerank_score'] = r['relevance_score']
-            candidate['final_score'] = r['relevance_score']
+            candidate = candidates[r["index"]].copy()
+            candidate["rerank_score"] = r["relevance_score"]
+            candidate["final_score"] = r["relevance_score"]
             reranked.append(candidate)
 
         logger.info(f"Hybrid search: {len(reranked)} final results (reranked)")
@@ -543,7 +574,7 @@ async def hybrid_search(
     # No reranking -- use RRF scores directly
     results = candidates[:limit]
     for r in results:
-        r['final_score'] = r['rrf_score']
+        r["final_score"] = r["rrf_score"]
 
     logger.info(f"Hybrid search: {len(results)} final results (RRF only)")
     return results
@@ -641,20 +672,22 @@ async def sparse_search(
 
     results = []
     for row in rows:
-        results.append({
-            "chunk_id": row["chunk_id"],
-            "chunk_text": row["chunk_text"],
-            "document_id": row["document_id"],
-            "section_header": row["section_header"],
-            "chunk_index": row["chunk_index"],
-            "text_score": float(row["text_score"]),
-            "rrf_score": float(row["text_score"]),
-            "final_score": float(row["text_score"]),
-            "document_title": row["document_title"],
-            "source_url": row["source_url"],
-            "source_type": row["source_type"],
-            "published_date": row["published_date"],
-        })
+        results.append(
+            {
+                "chunk_id": row["chunk_id"],
+                "chunk_text": row["chunk_text"],
+                "document_id": row["document_id"],
+                "section_header": row["section_header"],
+                "chunk_index": row["chunk_index"],
+                "text_score": float(row["text_score"]),
+                "rrf_score": float(row["text_score"]),
+                "final_score": float(row["text_score"]),
+                "document_title": row["document_title"],
+                "source_url": row["source_url"],
+                "source_type": row["source_type"],
+                "published_date": row["published_date"],
+            }
+        )
 
     logger.info(f"Sparse search: {len(results)} results")
     return results
@@ -662,12 +695,9 @@ async def sparse_search(
 
 # -- Legacy compatibility alias ------------------------------------------------
 
+
 async def semantic_search(
-    db_pool: asyncpg.Pool,
-    query_text: str,
-    api_key: str,
-    limit: int = 10,
-    **kwargs
+    db_pool: asyncpg.Pool, query_text: str, api_key: str, limit: int = 10, **kwargs
 ) -> List[Dict[str, Any]]:
     """Backward-compatible alias for hybrid_search."""
     return await hybrid_search(db_pool, query_text, api_key, limit=limit)

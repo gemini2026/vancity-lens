@@ -19,8 +19,10 @@ logger = logging.getLogger(__name__)
 # Pydantic Models
 # ════════════════════════════════════════════════════════════════════════════
 
+
 class ViewCone(BaseModel):
     """A protected view corridor in Vancouver."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -37,15 +39,25 @@ class ViewCone(BaseModel):
 
 class ViewConeIntersection(BaseModel):
     """Impact assessment of a parcel intersecting a view cone."""
+
     view_cone_name: str = Field(..., description="Name of the intersecting view cone")
-    max_height_m: Optional[float] = Field(None, description="Height cap imposed by view cone")
-    original_height_m: Optional[float] = Field(None, description="Original entitled height")
-    capped_height_m: Optional[float] = Field(None, description="Height after view cone cap applied")
-    buildable_sqft_reduction_pct: float = Field(0.0, description="Percentage reduction in buildable sqft due to height cap")
+    max_height_m: Optional[float] = Field(
+        None, description="Height cap imposed by view cone"
+    )
+    original_height_m: Optional[float] = Field(
+        None, description="Original entitled height"
+    )
+    capped_height_m: Optional[float] = Field(
+        None, description="Height after view cone cap applied"
+    )
+    buildable_sqft_reduction_pct: float = Field(
+        0.0, description="Percentage reduction in buildable sqft due to height cap"
+    )
 
 
 class ViewConeImpactSummary(BaseModel):
     """Summary of view cone impact assessment."""
+
     pid: str = Field(..., description="Parcel ID")
     intersects_view_cone: bool
     affected_cones: List[ViewConeIntersection]
@@ -54,6 +66,7 @@ class ViewConeImpactSummary(BaseModel):
 
 class ParcelViewConeStats(BaseModel):
     """Statistics on view cone coverage across all parcels."""
+
     total_parcels: int
     affected_parcels: int
     affected_percentage: float
@@ -121,6 +134,7 @@ SQL_INSERT_VIEW_CONE = """
 # Service Functions
 # ════════════════════════════════════════════════════════════════════════════
 
+
 async def check_view_cone_intersection(
     pool: asyncpg.Pool,
     pid: str,
@@ -139,7 +153,7 @@ async def check_view_cone_intersection(
             view_cone_name=row["name"],
             max_height_m=float(row["max_height_m"]) if row["max_height_m"] else None,
             original_height_m=None,  # Computed by caller with parcel data
-            capped_height_m=None,     # Computed by caller with parcel data
+            capped_height_m=None,  # Computed by caller with parcel data
             buildable_sqft_reduction_pct=0.0,
         )
         intersections.append(intersection)
@@ -163,7 +177,9 @@ async def check_view_cone_intersection_by_geom(
     import json
 
     async with pool.acquire() as conn:
-        rows = await conn.fetch(SQL_CHECK_INTERSECTION_BY_GEOM, json.dumps(geojson_geom))
+        rows = await conn.fetch(
+            SQL_CHECK_INTERSECTION_BY_GEOM, json.dumps(geojson_geom)
+        )
 
     intersections = []
     for row in rows:
@@ -267,8 +283,12 @@ async def load_view_cones_from_geojson(
                     SQL_INSERT_VIEW_CONE,
                     properties.get("name"),
                     properties.get("description"),
-                    float(properties.get("max_height_m")) if properties.get("max_height_m") else None,
-                    float(properties.get("max_height_ft")) if properties.get("max_height_ft") else None,
+                    float(properties.get("max_height_m"))
+                    if properties.get("max_height_m")
+                    else None,
+                    float(properties.get("max_height_ft"))
+                    if properties.get("max_height_ft")
+                    else None,
                     properties.get("source_location"),
                     properties.get("target_location"),
                     properties.get("cone_type", "protected_view"),
@@ -278,9 +298,13 @@ async def load_view_cones_from_geojson(
                 )
                 if view_cone_id:
                     inserted_count += 1
-                    logger.info(f"Loaded view cone: {properties.get('name')} (id={view_cone_id})")
+                    logger.info(
+                        f"Loaded view cone: {properties.get('name')} (id={view_cone_id})"
+                    )
             except Exception as e:
-                logger.error(f"Failed to insert view cone {properties.get('name')}: {e}")
+                logger.error(
+                    f"Failed to insert view cone {properties.get('name')}: {e}"
+                )
                 continue
 
     return inserted_count
@@ -374,13 +398,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1050, 49.2380],
-                    [-123.1000, 49.2450],
-                    [-123.0950, 49.2400],
-                    [-123.1000, 49.2330],
-                    [-123.1050, 49.2380],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1050, 49.2380],
+                        [-123.1000, 49.2450],
+                        [-123.0950, 49.2400],
+                        [-123.1000, 49.2330],
+                        [-123.1050, 49.2380],
+                    ]
+                ],
             },
         },
         {
@@ -398,13 +424,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.0950, 49.2400],
-                    [-123.0900, 49.2480],
-                    [-123.0850, 49.2420],
-                    [-123.0900, 49.2340],
-                    [-123.0950, 49.2400],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.0950, 49.2400],
+                        [-123.0900, 49.2480],
+                        [-123.0850, 49.2420],
+                        [-123.0900, 49.2340],
+                        [-123.0950, 49.2400],
+                    ]
+                ],
             },
         },
         {
@@ -422,13 +450,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.0850, 49.2420],
-                    [-123.0800, 49.2480],
-                    [-123.0750, 49.2400],
-                    [-123.0800, 49.2320],
-                    [-123.0850, 49.2420],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.0850, 49.2420],
+                        [-123.0800, 49.2480],
+                        [-123.0750, 49.2400],
+                        [-123.0800, 49.2320],
+                        [-123.0850, 49.2420],
+                    ]
+                ],
             },
         },
         {
@@ -446,13 +476,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1100, 49.2280],
-                    [-123.1050, 49.2360],
-                    [-123.1000, 49.2300],
-                    [-123.1050, 49.2220],
-                    [-123.1100, 49.2280],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1100, 49.2280],
+                        [-123.1050, 49.2360],
+                        [-123.1000, 49.2300],
+                        [-123.1050, 49.2220],
+                        [-123.1100, 49.2280],
+                    ]
+                ],
             },
         },
         {
@@ -470,13 +502,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1380, 49.2160],
-                    [-123.1330, 49.2240],
-                    [-123.1280, 49.2180],
-                    [-123.1330, 49.2100],
-                    [-123.1380, 49.2160],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1380, 49.2160],
+                        [-123.1330, 49.2240],
+                        [-123.1280, 49.2180],
+                        [-123.1330, 49.2100],
+                        [-123.1380, 49.2160],
+                    ]
+                ],
             },
         },
         {
@@ -494,13 +528,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1330, 49.2100],
-                    [-123.1280, 49.2020],
-                    [-123.1230, 49.2080],
-                    [-123.1280, 49.2160],
-                    [-123.1330, 49.2100],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1330, 49.2100],
+                        [-123.1280, 49.2020],
+                        [-123.1230, 49.2080],
+                        [-123.1280, 49.2160],
+                        [-123.1330, 49.2100],
+                    ]
+                ],
             },
         },
         {
@@ -518,13 +554,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1550, 49.2080],
-                    [-123.1500, 49.2160],
-                    [-123.1450, 49.2100],
-                    [-123.1500, 49.2020],
-                    [-123.1550, 49.2080],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1550, 49.2080],
+                        [-123.1500, 49.2160],
+                        [-123.1450, 49.2100],
+                        [-123.1500, 49.2020],
+                        [-123.1550, 49.2080],
+                    ]
+                ],
             },
         },
         {
@@ -542,13 +580,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.0650, 49.2620],
-                    [-123.0600, 49.2700],
-                    [-123.0550, 49.2640],
-                    [-123.0600, 49.2560],
-                    [-123.0650, 49.2620],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.0650, 49.2620],
+                        [-123.0600, 49.2700],
+                        [-123.0550, 49.2640],
+                        [-123.0600, 49.2560],
+                        [-123.0650, 49.2620],
+                    ]
+                ],
             },
         },
         {
@@ -566,13 +606,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1850, 49.2720],
-                    [-123.1800, 49.2800],
-                    [-123.1750, 49.2740],
-                    [-123.1800, 49.2660],
-                    [-123.1850, 49.2720],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1850, 49.2720],
+                        [-123.1800, 49.2800],
+                        [-123.1750, 49.2740],
+                        [-123.1800, 49.2660],
+                        [-123.1850, 49.2720],
+                    ]
+                ],
             },
         },
         {
@@ -590,13 +632,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.0400, 49.2860],
-                    [-123.0350, 49.2940],
-                    [-123.0300, 49.2880],
-                    [-123.0350, 49.2800],
-                    [-123.0400, 49.2860],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.0400, 49.2860],
+                        [-123.0350, 49.2940],
+                        [-123.0300, 49.2880],
+                        [-123.0350, 49.2800],
+                        [-123.0400, 49.2860],
+                    ]
+                ],
             },
         },
         {
@@ -614,13 +658,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1000, 49.2760],
-                    [-123.0950, 49.2840],
-                    [-123.0900, 49.2780],
-                    [-123.0950, 49.2700],
-                    [-123.1000, 49.2760],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1000, 49.2760],
+                        [-123.0950, 49.2840],
+                        [-123.0900, 49.2780],
+                        [-123.0950, 49.2700],
+                        [-123.1000, 49.2760],
+                    ]
+                ],
             },
         },
         {
@@ -638,13 +684,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1200, 49.2720],
-                    [-123.1150, 49.2800],
-                    [-123.1100, 49.2740],
-                    [-123.1150, 49.2660],
-                    [-123.1200, 49.2720],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1200, 49.2720],
+                        [-123.1150, 49.2800],
+                        [-123.1100, 49.2740],
+                        [-123.1150, 49.2660],
+                        [-123.1200, 49.2720],
+                    ]
+                ],
             },
         },
         {
@@ -662,13 +710,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1550, 49.2700],
-                    [-123.1500, 49.2780],
-                    [-123.1450, 49.2720],
-                    [-123.1500, 49.2640],
-                    [-123.1550, 49.2700],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1550, 49.2700],
+                        [-123.1500, 49.2780],
+                        [-123.1450, 49.2720],
+                        [-123.1500, 49.2640],
+                        [-123.1550, 49.2700],
+                    ]
+                ],
             },
         },
         {
@@ -686,13 +736,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1800, 49.2460],
-                    [-123.1750, 49.2540],
-                    [-123.1700, 49.2480],
-                    [-123.1750, 49.2400],
-                    [-123.1800, 49.2460],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1800, 49.2460],
+                        [-123.1750, 49.2540],
+                        [-123.1700, 49.2480],
+                        [-123.1750, 49.2400],
+                        [-123.1800, 49.2460],
+                    ]
+                ],
             },
         },
         {
@@ -710,13 +762,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1150, 49.2840],
-                    [-123.1100, 49.2920],
-                    [-123.1050, 49.2860],
-                    [-123.1100, 49.2780],
-                    [-123.1150, 49.2840],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1150, 49.2840],
+                        [-123.1100, 49.2920],
+                        [-123.1050, 49.2860],
+                        [-123.1100, 49.2780],
+                        [-123.1150, 49.2840],
+                    ]
+                ],
             },
         },
         {
@@ -734,13 +788,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.0950, 49.2920],
-                    [-123.0900, 49.3000],
-                    [-123.0850, 49.2940],
-                    [-123.0900, 49.2860],
-                    [-123.0950, 49.2920],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.0950, 49.2920],
+                        [-123.0900, 49.3000],
+                        [-123.0850, 49.2940],
+                        [-123.0900, 49.2860],
+                        [-123.0950, 49.2920],
+                    ]
+                ],
             },
         },
         {
@@ -758,13 +814,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.0730, 49.2950],
-                    [-123.0680, 49.3030],
-                    [-123.0630, 49.2970],
-                    [-123.0680, 49.2890],
-                    [-123.0730, 49.2950],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.0730, 49.2950],
+                        [-123.0680, 49.3030],
+                        [-123.0630, 49.2970],
+                        [-123.0680, 49.2890],
+                        [-123.0730, 49.2950],
+                    ]
+                ],
             },
         },
         {
@@ -782,13 +840,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1100, 49.2580],
-                    [-123.1050, 49.2660],
-                    [-123.1000, 49.2600],
-                    [-123.1050, 49.2520],
-                    [-123.1100, 49.2580],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1100, 49.2580],
+                        [-123.1050, 49.2660],
+                        [-123.1000, 49.2600],
+                        [-123.1050, 49.2520],
+                        [-123.1100, 49.2580],
+                    ]
+                ],
             },
         },
         {
@@ -806,13 +866,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1450, 49.2560],
-                    [-123.1400, 49.2640],
-                    [-123.1350, 49.2580],
-                    [-123.1400, 49.2500],
-                    [-123.1450, 49.2560],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1450, 49.2560],
+                        [-123.1400, 49.2640],
+                        [-123.1350, 49.2580],
+                        [-123.1400, 49.2500],
+                        [-123.1450, 49.2560],
+                    ]
+                ],
             },
         },
         {
@@ -830,13 +892,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1300, 49.2500],
-                    [-123.1250, 49.2580],
-                    [-123.1200, 49.2520],
-                    [-123.1250, 49.2440],
-                    [-123.1300, 49.2500],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1300, 49.2500],
+                        [-123.1250, 49.2580],
+                        [-123.1200, 49.2520],
+                        [-123.1250, 49.2440],
+                        [-123.1300, 49.2500],
+                    ]
+                ],
             },
         },
         {
@@ -854,13 +918,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1050, 49.2500],
-                    [-123.1000, 49.2580],
-                    [-123.0950, 49.2520],
-                    [-123.1000, 49.2440],
-                    [-123.1050, 49.2500],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1050, 49.2500],
+                        [-123.1000, 49.2580],
+                        [-123.0950, 49.2520],
+                        [-123.1000, 49.2440],
+                        [-123.1050, 49.2500],
+                    ]
+                ],
             },
         },
         {
@@ -878,13 +944,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1200, 49.2860],
-                    [-123.1150, 49.2940],
-                    [-123.1100, 49.2880],
-                    [-123.1150, 49.2800],
-                    [-123.1200, 49.2860],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1200, 49.2860],
+                        [-123.1150, 49.2940],
+                        [-123.1100, 49.2880],
+                        [-123.1150, 49.2800],
+                        [-123.1200, 49.2860],
+                    ]
+                ],
             },
         },
         {
@@ -902,13 +970,15 @@ def generate_sample_view_cones() -> List[Dict[str, Any]]:
             },
             "geometry": {
                 "type": "Polygon",
-                "coordinates": [[
-                    [-123.1350, 49.2860],
-                    [-123.1300, 49.2940],
-                    [-123.1250, 49.2880],
-                    [-123.1300, 49.2800],
-                    [-123.1350, 49.2860],
-                ]],
+                "coordinates": [
+                    [
+                        [-123.1350, 49.2860],
+                        [-123.1300, 49.2940],
+                        [-123.1250, 49.2880],
+                        [-123.1300, 49.2800],
+                        [-123.1350, 49.2860],
+                    ]
+                ],
             },
         },
     ]

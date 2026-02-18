@@ -105,7 +105,9 @@ async def handle_chat(
             history = await get_session_history(db_pool, session_id, limit=1)
             if history is None:
                 # Session doesn't exist, but we'll still store messages with this ID
-                logger.warning(f"Session {session_id} not found, will create on first message")
+                logger.warning(
+                    f"Session {session_id} not found, will create on first message"
+                )
         except Exception as e:
             logger.error(f"Error validating session {session_id}: {e}")
             # Continue anyway - session may be new
@@ -125,10 +127,7 @@ async def handle_chat(
         # Step 2: Retrieve matching intelligence signals
         logger.info("Retrieving intelligence signals...")
         signals = await get_relevant_signals(
-            db_pool,
-            query,
-            neighborhood=neighborhood_filter,
-            limit=5
+            db_pool, query, neighborhood=neighborhood_filter, limit=5
         )
 
         # Step 3: Build context string from chunks and signals
@@ -137,19 +136,25 @@ async def handle_chat(
         if chunks:
             context_parts.append("## RETRIEVED DOCUMENT CHUNKS:\n")
             for i, chunk in enumerate(chunks, 1):
-                score = chunk.get('final_score', chunk.get('rrf_score', 0.0))
+                score = chunk.get("final_score", chunk.get("rrf_score", 0.0))
                 context_parts.append(f"\n### Chunk {i} (Score: {score:.3f})")
-                context_parts.append(f"Source: {chunk.get('document_title', 'Unknown')}")
+                context_parts.append(
+                    f"Source: {chunk.get('document_title', 'Unknown')}"
+                )
                 context_parts.append(f"URL: {chunk.get('source_url', '')}")
-                if chunk.get('section_header'):
+                if chunk.get("section_header"):
                     context_parts.append(f"Section: {chunk['section_header']}")
                 context_parts.append(f"\n{chunk['chunk_text']}\n")
 
         if signals:
             context_parts.append("\n## INTELLIGENCE SIGNALS:\n")
             for i, signal in enumerate(signals, 1):
-                context_parts.append(f"\n### Signal {i}: {signal.headline or signal.summary[:50]}")
-                context_parts.append(f"Type: {signal.signal_type} | Severity: {signal.severity}")
+                context_parts.append(
+                    f"\n### Signal {i}: {signal.headline or signal.summary[:50]}"
+                )
+                context_parts.append(
+                    f"Type: {signal.signal_type} | Severity: {signal.severity}"
+                )
                 if signal.addresses:
                     context_parts.append(f"Addresses: {', '.join(signal.addresses)}")
                 if signal.neighborhood:
@@ -179,7 +184,9 @@ async def handle_chat(
             logger.info("Building multi-turn context...")
             history_context = ""
             try:
-                history_context = await build_context_window(db_pool, session_id, max_messages=10)
+                history_context = await build_context_window(
+                    db_pool, session_id, max_messages=10
+                )
             except Exception as e:
                 logger.warning(f"Could not build context window: {e}")
 
@@ -204,7 +211,7 @@ User query: {query}"""
         citations: List[SourceCitation] = []
 
         # Batch-fetch url_status and archive_url for cited documents
-        doc_ids = list({c.get('document_id') for c in chunks if c.get('document_id')})
+        doc_ids = list({c.get("document_id") for c in chunks if c.get("document_id")})
         url_health_map: dict = {}
         if doc_ids:
             try:
@@ -223,21 +230,21 @@ User query: {query}"""
 
         for chunk in chunks:
             # Include top chunks as citations (reranking already sorted by relevance)
-            score = chunk.get('final_score', chunk.get('rrf_score', 0.0))
-            doc_id = chunk.get('document_id')
+            score = chunk.get("final_score", chunk.get("rrf_score", 0.0))
+            doc_id = chunk.get("document_id")
             health = url_health_map.get(doc_id, {})
             citations.append(
                 SourceCitation(
-                    document_title=chunk.get('document_title', 'Unknown'),
-                    document_url=chunk.get('source_url', ''),
-                    source_type=chunk.get('source_type', 'unknown'),
-                    published_date=chunk.get('published_date'),
+                    document_title=chunk.get("document_title", "Unknown"),
+                    document_url=chunk.get("source_url", ""),
+                    source_type=chunk.get("source_type", "unknown"),
+                    published_date=chunk.get("published_date"),
                     relevance_score=score,
-                    excerpt=chunk['chunk_text'][:300],
+                    excerpt=chunk["chunk_text"][:300],
                     document_id=doc_id,
-                    chunk_id=chunk.get('chunk_id'),
-                    url_status=health.get('url_status') or chunk.get("url_status"),
-                    archive_url=health.get('archive_url') or chunk.get("archive_url"),
+                    chunk_id=chunk.get("chunk_id"),
+                    url_status=health.get("url_status") or chunk.get("url_status"),
+                    archive_url=health.get("archive_url") or chunk.get("archive_url"),
                 )
             )
 
@@ -247,7 +254,8 @@ User query: {query}"""
         # Step 6: Store chat message in database
         try:
             async with db_pool.acquire() as conn:
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO chat_messages (
                         session_id, role, content,
                         source_chunks, source_signals, created_at
@@ -255,29 +263,32 @@ User query: {query}"""
                     VALUES ($1, $2, $3, $4, $5, $6)
                 """,
                     uuid.UUID(session_id),
-                    'user',
+                    "user",
                     query,
-                    [c.get('chunk_id') for c in chunks if c.get('chunk_id')],
+                    [c.get("chunk_id") for c in chunks if c.get("chunk_id")],
                     [s.id for s in signals],
-                    datetime.now(timezone.utc)
+                    datetime.now(timezone.utc),
                 )
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO chat_messages (
                         session_id, role, content, created_at
                     )
                     VALUES ($1, $2, $3, $4)
                 """,
                     uuid.UUID(session_id),
-                    'assistant',
+                    "assistant",
                     answer,
-                    datetime.now(timezone.utc)
+                    datetime.now(timezone.utc),
                 )
         except Exception as e:
             logger.error(f"Failed to store chat message: {e}")
             # Continue anyway - don't fail the response
 
         # Step 7: Return ChatResponse
-        logger.info(f"Chat response generated ({search_mode} mode) with {len(citations)} citations")
+        logger.info(
+            f"Chat response generated ({search_mode} mode) with {len(citations)} citations"
+        )
         return ChatResponse(
             answer=answer,
             citations=citations,
@@ -336,8 +347,7 @@ def _build_demo_answer(
         for signal in signals[:5]:
             headline = signal.headline or signal.summary[:60]
             parts.append(
-                f"- **{headline}** — {signal.signal_type} | "
-                f"Severity: {signal.severity}"
+                f"- **{headline}** — {signal.signal_type} | Severity: {signal.severity}"
             )
             if signal.decision:
                 parts.append(f"  Decision: {signal.decision}")
@@ -356,7 +366,7 @@ async def get_relevant_signals(
     db_pool: asyncpg.Pool,
     query: str,
     neighborhood: Optional[str] = None,
-    limit: int = 5
+    limit: int = 5,
 ) -> List[SignalResponse]:
     """
     Retrieve intelligence signals matching query keywords and optional neighborhood.
@@ -418,24 +428,24 @@ async def get_relevant_signals(
         signals = []
         for row in rows:
             signal = SignalResponse(
-                id=row['id'],
-                document_id=row['document_id'],
-                signal_type=row['signal_type'],
-                summary=row['summary'],
-                headline=row['headline'],
-                addresses=row['addresses'] or [],
-                neighborhood=row['neighborhood'],
-                decision=row['decision'],
-                vote_for=row['vote_for'],
-                vote_against=row['vote_against'],
-                sentiment=row['sentiment'],
-                severity=row['severity'],
-                confidence=row['confidence'],
-                event_date=row['event_date'],
-                source_title=row['source_title'],
-                source_url=row['source_url'],
-                source_type=row['source_type'],
-                source_date=row['source_date']
+                id=row["id"],
+                document_id=row["document_id"],
+                signal_type=row["signal_type"],
+                summary=row["summary"],
+                headline=row["headline"],
+                addresses=row["addresses"] or [],
+                neighborhood=row["neighborhood"],
+                decision=row["decision"],
+                vote_for=row["vote_for"],
+                vote_against=row["vote_against"],
+                sentiment=row["sentiment"],
+                severity=row["severity"],
+                confidence=row["confidence"],
+                event_date=row["event_date"],
+                source_title=row["source_title"],
+                source_url=row["source_url"],
+                source_type=row["source_type"],
+                source_date=row["source_date"],
             )
             signals.append(signal)
 

@@ -79,7 +79,9 @@ def decompose_query(query: str) -> List[str]:
                     if cleaned:
                         sub_queries.append(cleaned)
                 if sub_queries:
-                    logger.info(f"Decomposed query into {len(sub_queries)} sub-queries: {sub_queries}")
+                    logger.info(
+                        f"Decomposed query into {len(sub_queries)} sub-queries: {sub_queries}"
+                    )
                     return sub_queries
 
     # No decomposition possible -- return original

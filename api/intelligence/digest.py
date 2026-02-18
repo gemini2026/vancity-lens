@@ -24,14 +24,17 @@ logger = logging.getLogger(__name__)
 # Enums
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class DigestFrequency(str, Enum):
     """Frequency options for digest subscriptions."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
 
 
 class DeliveryStatus(str, Enum):
     """Status of digest delivery."""
+
     PENDING = "pending"
     SENT = "sent"
     FAILED = "failed"
@@ -41,8 +44,10 @@ class DeliveryStatus(str, Enum):
 # Pydantic Models
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class DigestSubscription(BaseModel):
     """User digest subscription configuration."""
+
     id: Optional[int] = None
     user_id: int
     neighborhoods: List[str] = Field(default_factory=list)
@@ -55,6 +60,7 @@ class DigestSubscription(BaseModel):
 
 class DigestHighlight(BaseModel):
     """Top highlight from digest period."""
+
     signal_id: int
     headline: str
     summary: str
@@ -67,6 +73,7 @@ class DigestHighlight(BaseModel):
 
 class DigestStats(BaseModel):
     """Statistical summary for digest period."""
+
     total_signals: int
     by_type: Dict[str, int] = Field(default_factory=dict)
     by_neighborhood: Dict[str, int] = Field(default_factory=dict)
@@ -77,6 +84,7 @@ class DigestStats(BaseModel):
 
 class NeighborhoodUpdate(BaseModel):
     """Summary of signals for one neighborhood."""
+
     neighborhood: str
     signal_count: int
     signal_types: List[str] = Field(default_factory=list)
@@ -87,6 +95,7 @@ class NeighborhoodUpdate(BaseModel):
 
 class DigestContent(BaseModel):
     """Complete content of a generated digest."""
+
     subscription_id: int
     digest_date: date
     date_from: date
@@ -100,6 +109,7 @@ class DigestContent(BaseModel):
 
 class DigestDelivery(BaseModel):
     """Record of a digest delivery."""
+
     id: Optional[int] = None
     subscription_id: int
     digest_date: date
@@ -113,6 +123,7 @@ class DigestDelivery(BaseModel):
 # ────────────────────────────────────────────────────────────────────────────
 # DigestGenerator Class
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class DigestGenerator:
     """Generates digests from intelligence signals for specified neighborhoods and types."""
@@ -244,9 +255,7 @@ class DigestGenerator:
 
             # Add neighborhood filter if specified
             if neighborhoods:
-                placeholders = ", ".join(
-                    f"${i + 3}" for i in range(len(neighborhoods))
-                )
+                placeholders = ", ".join(f"${i + 3}" for i in range(len(neighborhoods)))
                 query += f" AND isig.neighborhood = ANY(ARRAY[{placeholders}])"
                 params.extend(neighborhoods)
 
@@ -266,7 +275,9 @@ class DigestGenerator:
                 rows = await conn.fetch(query, *params)
 
             signals = [dict(row) for row in rows]
-            logger.info(f"Fetched {len(signals)} signals for period {date_from} to {date_to}")
+            logger.info(
+                f"Fetched {len(signals)} signals for period {date_from} to {date_to}"
+            )
             return signals
 
         except Exception as e:
@@ -300,7 +311,9 @@ class DigestGenerator:
 
             # By severity
             severity = signal.get("severity", "info")
-            summary["by_severity"][severity] = summary["by_severity"].get(severity, 0) + 1
+            summary["by_severity"][severity] = (
+                summary["by_severity"].get(severity, 0) + 1
+            )
 
         return summary
 
@@ -349,7 +362,9 @@ class DigestGenerator:
             )
             highlights.append(highlight)
 
-        logger.info(f"Generated {len(highlights)} highlights from {len(signals)} signals")
+        logger.info(
+            f"Generated {len(highlights)} highlights from {len(signals)} signals"
+        )
         return highlights
 
     @staticmethod
@@ -433,9 +448,13 @@ class DigestGenerator:
                 sorted_sigs = sorted(
                     neighborhood_signals,
                     key=lambda s: (
-                        {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(
-                            s.get("severity", "info"), 0
-                        ),
+                        {
+                            "critical": 5,
+                            "high": 4,
+                            "medium": 3,
+                            "low": 2,
+                            "info": 1,
+                        }.get(s.get("severity", "info"), 0),
                         float(s.get("confidence", 0.5)),
                     ),
                     reverse=True,
@@ -443,7 +462,8 @@ class DigestGenerator:
                 top_sig = sorted_sigs[0]
                 top_signal = DigestHighlight(
                     signal_id=top_sig["id"],
-                    headline=top_sig.get("headline") or top_sig.get("summary", "")[:100],
+                    headline=top_sig.get("headline")
+                    or top_sig.get("summary", "")[:100],
                     summary=top_sig.get("summary", "")[:500],
                     signal_type=top_sig.get("signal_type", "other"),
                     neighborhood=neighborhood,
@@ -458,9 +478,13 @@ class DigestGenerator:
                 for sig in sorted(
                     neighborhood_signals,
                     key=lambda s: (
-                        {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(
-                            s.get("severity", "info"), 0
-                        ),
+                        {
+                            "critical": 5,
+                            "high": 4,
+                            "medium": 3,
+                            "low": 2,
+                            "info": 1,
+                        }.get(s.get("severity", "info"), 0),
                         float(s.get("confidence", 0.5)),
                     ),
                     reverse=True,
@@ -539,6 +563,7 @@ class DigestGenerator:
 # DigestScheduler Class
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class DigestScheduler:
     """Manages batch digest generation and delivery."""
 
@@ -607,7 +632,9 @@ class DigestScheduler:
             DigestDelivery record
         """
         try:
-            logger.info(f"Processing subscription {subscription.id} for user {subscription.user_id}")
+            logger.info(
+                f"Processing subscription {subscription.id} for user {subscription.user_id}"
+            )
 
             # Generate digest content with frequency-aware date range
             days_back = 1 if subscription.frequency == DigestFrequency.DAILY else 7
@@ -615,8 +642,12 @@ class DigestScheduler:
             digest_content = await DigestGenerator.generate_weekly_digest(
                 db_pool,
                 subscription.user_id,
-                neighborhoods=subscription.neighborhoods if subscription.neighborhoods else None,
-                signal_types=subscription.signal_types if subscription.signal_types else None,
+                neighborhoods=subscription.neighborhoods
+                if subscription.neighborhoods
+                else None,
+                signal_types=subscription.signal_types
+                if subscription.signal_types
+                else None,
                 date_from=digest_date_from,
             )
 
@@ -678,11 +709,15 @@ class DigestScheduler:
                 delivery_status=DeliveryStatus.PENDING,
             )
 
-            logger.info(f"Created delivery record {delivery_id} for subscription {subscription.id}")
+            logger.info(
+                f"Created delivery record {delivery_id} for subscription {subscription.id}"
+            )
             return delivery
 
         except Exception as e:
-            logger.error(f"Error processing subscription {subscription.id}: {e}", exc_info=True)
+            logger.error(
+                f"Error processing subscription {subscription.id}: {e}", exc_info=True
+            )
             raise
 
     @staticmethod
@@ -716,11 +751,14 @@ class DigestScheduler:
             deliveries = []
             for subscription in subscriptions:
                 try:
-                    delivery = await DigestScheduler.process_subscription(db_pool, subscription)
+                    delivery = await DigestScheduler.process_subscription(
+                        db_pool, subscription
+                    )
                     deliveries.append(delivery)
                 except Exception as e:
                     logger.error(
-                        f"Error processing subscription {subscription.id}: {e}", exc_info=True
+                        f"Error processing subscription {subscription.id}: {e}",
+                        exc_info=True,
                     )
                     # Continue with next subscription
 

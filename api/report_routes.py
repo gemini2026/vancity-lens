@@ -186,7 +186,9 @@ async def download_investor_memo_pdf(
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=investor_memo_{pid}.pdf"},
+            headers={
+                "Content-Disposition": f"attachment; filename=investor_memo_{pid}.pdf"
+            },
         )
     except HTTPException:
         raise

@@ -81,15 +81,23 @@ def _row_to_response(row) -> ChangeRecordResponse:
         change_type=row["change_type"],
         source_url=row["source_url"],
         source_document_title=row["source_document_title"],
-        publication_date=row["publication_date"].isoformat() if row["publication_date"] else None,
-        effective_date=row["effective_date"].isoformat() if row["effective_date"] else None,
+        publication_date=row["publication_date"].isoformat()
+        if row["publication_date"]
+        else None,
+        effective_date=row["effective_date"].isoformat()
+        if row["effective_date"]
+        else None,
         geographic_scope=row["geographic_scope"],
         affected_areas=row["affected_areas"] or [],
         entitlement_change=entitlement_change,
         plain_english_summary=row["plain_english_summary"],
-        nlp_confidence_score=float(row["nlp_confidence_score"]) if row["nlp_confidence_score"] is not None else None,
+        nlp_confidence_score=float(row["nlp_confidence_score"])
+        if row["nlp_confidence_score"] is not None
+        else None,
         requires_manual_review=row["requires_manual_review"],
-        extraction_timestamp=row["extraction_timestamp"].isoformat() if row["extraction_timestamp"] else None,
+        extraction_timestamp=row["extraction_timestamp"].isoformat()
+        if row["extraction_timestamp"]
+        else None,
         created_at=row["created_at"].isoformat() if row["created_at"] else None,
     )
 
@@ -120,10 +128,18 @@ async def get_changes(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     per_page: int = Query(20, ge=1, le=100, description="Results per page"),
     change_type: Optional[str] = Query(None, description="Filter by change type"),
-    geographic_scope: Optional[str] = Query(None, description="Filter by geographic scope"),
-    affected_area: Optional[str] = Query(None, description="Filter by affected area (case-insensitive match)"),
-    start_date: Optional[date] = Query(None, description="Filter by publication date >= start_date"),
-    end_date: Optional[date] = Query(None, description="Filter by publication date <= end_date"),
+    geographic_scope: Optional[str] = Query(
+        None, description="Filter by geographic scope"
+    ),
+    affected_area: Optional[str] = Query(
+        None, description="Filter by affected area (case-insensitive match)"
+    ),
+    start_date: Optional[date] = Query(
+        None, description="Filter by publication date >= start_date"
+    ),
+    end_date: Optional[date] = Query(
+        None, description="Filter by publication date <= end_date"
+    ),
     q: Optional[str] = Query(None, description="Full-text search on summary and title"),
 ):
     """
@@ -150,7 +166,9 @@ async def get_changes(
             param_idx += 1
 
         if affected_area:
-            conditions.append(f"EXISTS (SELECT 1 FROM unnest(affected_areas) AS a WHERE a ILIKE ${param_idx})")
+            conditions.append(
+                f"EXISTS (SELECT 1 FROM unnest(affected_areas) AS a WHERE a ILIKE ${param_idx})"
+            )
             params.append(f"%{affected_area}%")
             param_idx += 1
 
