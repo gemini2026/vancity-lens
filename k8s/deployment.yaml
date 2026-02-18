@@ -167,6 +167,7 @@ spec:
             secretKeyRef:
               name: vancity-lens-secrets
               key: admin-api-key
+              optional: true
         - name: CORS_ORIGINS
           valueFrom:
             configMapKeyRef:
