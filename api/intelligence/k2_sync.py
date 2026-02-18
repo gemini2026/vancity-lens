@@ -281,7 +281,30 @@ async def sync_to_k2(
         )
 
         # Format for K2
-        k2_batch = [format_for_k2(doc) for doc in batch]
+        k2_batch = []
+        for doc in batch:
+            try:
+                formatted = format_for_k2(doc)
+                # Validate no newlines in critical fields
+                if "\n" in formatted.get("source_uri", "") or "\r" in formatted.get("source_uri", ""):
+                    logger.warning(
+                        "Document %d has newlines in source_uri after sanitization: %r",
+                        doc["id"],
+                        formatted["source_uri"][:100]
+                    )
+                k2_batch.append(formatted)
+            except Exception as e:
+                logger.error(
+                    "Failed to format document %d (%s): %s",
+                    doc["id"],
+                    doc.get("title", "")[:50],
+                    e
+                )
+                continue
+
+        if not k2_batch:
+            logger.warning("Batch %d: No documents to upload after formatting", batch_num)
+            continue
 
         # Upload batch to K2
         try:
@@ -310,6 +333,7 @@ async def sync_to_k2(
 
         except Exception as e:
             logger.error("Failed to upload batch %d: %s", batch_num, e)
+            logger.error("Sample document from batch: source_uri=%r", k2_batch[0].get("source_uri", "")[:100] if k2_batch else "N/A")
             # Continue with next batch rather than failing entirely
             continue
 
