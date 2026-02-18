@@ -175,8 +175,12 @@ def format_for_k2(doc: Dict[str, Any]) -> Dict[str, Any]:
     source_url = doc["source_url"] or ""
     source_url = source_url.replace("\n", "").replace("\r", "").strip()
 
+    # Sanitize raw_text - K2 API requires single-line text (newlines cause "Invalid non-printable ASCII character" error)
+    raw_text = doc["raw_text"] or ""
+    raw_text = raw_text.replace("\n", " ").replace("\r", " ").strip()
+
     return {
-        "raw_text": doc["raw_text"] or "",
+        "raw_text": raw_text,
         "source_uri": source_url,  # K2 uses this for deduplication
         "metadata": k2_metadata,
     }
