@@ -171,9 +171,13 @@ def format_for_k2(doc: Dict[str, Any]) -> Dict[str, Any]:
             {k: v for k, v in doc["metadata"].items() if k != "postgres_id"}
         )
 
+    # Sanitize source_url - remove newlines and whitespace that break K2 API
+    source_url = doc["source_url"] or ""
+    source_url = source_url.replace("\n", "").replace("\r", "").strip()
+
     return {
         "raw_text": doc["raw_text"] or "",
-        "source_uri": doc["source_url"],  # K2 uses this for deduplication
+        "source_uri": source_url,  # K2 uses this for deduplication
         "metadata": k2_metadata,
     }
 
