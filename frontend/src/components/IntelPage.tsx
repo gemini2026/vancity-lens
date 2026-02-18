@@ -36,6 +36,13 @@ const SIGNAL_TYPE_BORDER_COLORS: Record<string, string> = {
   infrastructure_investment: "border-l-emerald-500",
 };
 
+const LightbulbIcon = (
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <path d="M9.5 2c-1.82 0-3.55.7-4.84 1.99C3.36 5.28 2.66 7.01 2.66 8.83c0 1.82.7 3.55 1.99 4.84l.01.01c.44.44.68 1.04.68 1.66v2.33c0 .92.75 1.67 1.67 1.67h6.67c.92 0 1.67-.75 1.67-1.67v-2.33c0-.62.24-1.22.68-1.66l.01-.01c1.29-1.29 1.99-3.02 1.99-4.84 0-1.82-.7-3.55-1.99-4.84C13.05 2.7 11.32 2 9.5 2z"/>
+    <path d="M9.5 20v2M7 22h5"/>
+  </svg>
+);
+
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   const today = new Date();
@@ -194,12 +201,7 @@ export default function IntelPage() {
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
           {chatMessages.length === 0 ? (
             <EmptyState
-              icon={
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M9.5 2c-1.82 0-3.55.7-4.84 1.99C3.36 5.28 2.66 7.01 2.66 8.83c0 1.82.7 3.55 1.99 4.84l.01.01c.44.44.68 1.04.68 1.66v2.33c0 .92.75 1.67 1.67 1.67h6.67c.92 0 1.67-.75 1.67-1.67v-2.33c0-.62.24-1.22.68-1.66l.01-.01c1.29-1.29 1.99-3.02 1.99-4.84 0-1.82-.7-3.55-1.99-4.84C13.05 2.7 11.32 2 9.5 2z"/>
-                  <path d="M9.5 20v2M7 22h5"/>
-                </svg>
-              }
+              icon={LightbulbIcon}
               heading="Ask VanCity Lens"
               description="Get instant answers about Vancouver development, rezoning applications, and neighborhood trends powered by AI."
               suggestions={[
