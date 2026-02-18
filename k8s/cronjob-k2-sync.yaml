@@ -1,0 +1,88 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vancity-lens-k2-sync
+  namespace: vancity-lens
+  labels:
+    app: vancity-lens-api
+    component: k2-sync
+spec:
+  # Schedule: every 30 minutes (sync new documents from scrapers to K2)
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+
+  # Keep last 3 successful and 1 failed job for debugging
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  suspend: false
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600  # 10 min max (batch uploads can take time)
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: vancity-lens-k2-sync
+        spec:
+          serviceAccountName: vancity-lens-api
+          terminationGracePeriodSeconds: 30
+          restartPolicy: OnFailure
+
+          containers:
+          - name: k2-sync
+            image: us-west1-docker.pkg.dev/openclaw-antonmishel-03460/vancity-lens-docker/vancity-lens-api:latest
+            imagePullPolicy: Always
+
+            command:
+            - python
+            - -m
+            - api.intelligence.k2_sync
+
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: database-url
+            - name: K2_API_HOST
+              value: "https://api-dev.knowledge2.ai"
+            - name: K2_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: k2-api-key
+            - name: K2_CORPUS_ID
+              valueFrom:
+                secretKeyRef:
+                  name: vancity-lens-secrets
+                  key: k2-corpus-id
+
+          - name: cloud-sql-proxy
+            image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1
+            args:
+              - "openclaw-antonmishel-03460:us-west1:vancity-lens-db"
+              - "--private-ip"
+              - "--auto-iam-authn"
+              - "--port=5432"
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 65534
