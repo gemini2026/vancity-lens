@@ -9,6 +9,7 @@ import type {
   ChatMessage, IntelSignal, SignalDocument, SourceCitation, IntelStats, SignalType, Severity,
 } from "@/lib/intel-types";
 import ExportButton from "./ExportButton";
+import { EmptyState } from "./EmptyState";
 import { cn } from "@/lib/utils";
 import { getApiBase } from "@/lib/api-base";
 
@@ -56,6 +57,7 @@ export default function IntelPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const [signals, setSignals] = useState<IntelSignal[]>([]);
   const [signalsLoading, setSignalsLoading] = useState(false);
@@ -145,12 +147,10 @@ export default function IntelPage() {
     } finally { setChatLoading(false); }
   };
 
-  const starterQueries = [
-    "What rezoning applications were approved recently?",
-    "What's happening in Mount Pleasant?",
-    "Show me density changes near Broadway stations",
-    "Any community opposition to new developments?",
-  ];
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+    inputRef.current?.focus();
+  };
 
   const selectClasses = "w-full px-2.5 py-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded text-[var(--color-foreground-secondary)] text-xs";
 
@@ -193,33 +193,23 @@ export default function IntelPage() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
           {chatMessages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-5 px-4">
-              <div className="text-4xl">🧠</div>
-              <div className="text-center max-w-[420px]">
-                <div className="text-sm font-semibold text-[var(--color-foreground)] mb-1.5">
-                  Vancouver Development Intelligence
-                </div>
-                <div className="text-[13px] text-[var(--color-foreground-muted)]">
-                  I analyze rezoning decisions, permits, community feedback, and policy changes across Vancouver. Ask me anything about Bill 47 opportunities.
-                </div>
-                {stats && (
-                  <div className="text-[11px] text-[var(--color-foreground-muted)] mt-2">
-                    {stats.total_signals} signals across {Object.keys(stats.by_neighborhood).length} neighborhoods
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-[440px]">
-                {starterQueries.map((query, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setInputValue(query)}
-                    className="px-3 py-3 bg-[var(--color-card)] border border-[var(--color-border)] text-[var(--color-foreground)] rounded-lg text-xs text-left cursor-pointer transition-colors hover:bg-[var(--color-card-hover)] hover:border-[var(--color-accent)]"
-                  >
-                    {query}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <EmptyState
+              icon={
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M9.5 2c-1.82 0-3.55.7-4.84 1.99C3.36 5.28 2.66 7.01 2.66 8.83c0 1.82.7 3.55 1.99 4.84l.01.01c.44.44.68 1.04.68 1.66v2.33c0 .92.75 1.67 1.67 1.67h6.67c.92 0 1.67-.75 1.67-1.67v-2.33c0-.62.24-1.22.68-1.66l.01-.01c1.29-1.29 1.99-3.02 1.99-4.84 0-1.82-.7-3.55-1.99-4.84C13.05 2.7 11.32 2 9.5 2z"/>
+                  <path d="M9.5 20v2M7 22h5"/>
+                </svg>
+              }
+              heading="Ask VanCity Lens"
+              description="Get instant answers about Vancouver development, rezoning applications, and neighborhood trends powered by AI."
+              suggestions={[
+                "What rezoning applications were approved recently?",
+                "What's happening in Mount Pleasant?",
+                "Show me density changes near Broadway stations",
+              ]}
+              onSuggestionClick={handleSuggestionClick}
+              className="flex-1"
+            />
           ) : (
             <>
               {chatMessages.map((msg) => (
@@ -264,6 +254,7 @@ export default function IntelPage() {
         {/* Input */}
         <div className="px-5 py-4 border-t border-[var(--color-border)] bg-[var(--color-surface-secondary)] flex gap-2">
           <input
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
