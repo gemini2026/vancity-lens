@@ -30,7 +30,7 @@ export default function LayerControlSheet({ isOpen, onClose, controls }: LayerCo
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--color-panel)] backdrop-blur-md rounded-t-2xl max-h-[70vh] overflow-y-auto border-t border-[var(--color-panel-border)] shadow-2xl">
         {/* Swipe handle */}
         <div className="flex justify-center py-3">
-          <div className="w-12 h-1 rounded-full bg-[var(--color-foreground-muted)]/30" />
+          <div className="w-3 h-1 rounded-full bg-[var(--color-foreground-muted)]/30" />
         </div>
 
         {/* Header */}
