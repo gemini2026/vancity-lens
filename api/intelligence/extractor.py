@@ -161,7 +161,7 @@ Extract all real estate intelligence signals from this chunk. Return valid JSON 
             # Strip markdown code fences if the model wraps JSON
             if response_text.startswith("```"):
                 lines = response_text.split("\n")
-                lines = [l for l in lines if not l.startswith("```")]
+                lines = [line for line in lines if not line.startswith("```")]
                 response_text = "\n".join(lines).strip()
 
             signals_data = json.loads(response_text)

@@ -15,14 +15,12 @@ Architecture:
   - Data validation (DV-DS009-001..006)
 """
 
-import asyncio
 import csv
 import io
 import json
 import logging
 from datetime import datetime
-from decimal import Decimal
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 import aiohttp
 import asyncpg

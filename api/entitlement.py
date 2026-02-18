@@ -209,7 +209,7 @@ async def compute_entitlement(
     # BC Assessment rolls are typically dated July 1 of the prior year
     now = datetime.now()
     # Assessment year 2024 → data from Jul 2024 → stale after Jan 2026
-    assessment_cutoff = datetime(now.year - 1, 1, 1) if now.month >= 7 else datetime(now.year - 2, 7, 1)
+    # assessment_cutoff = datetime(now.year - 1, 1, 1) if now.month >= 7 else datetime(now.year - 2, 7, 1)
     if parcel["assessed_value"] and parcel.get("year_built"):
         # We use year_built as a proxy — if the assessment is old, warn
         pass  # Assessment year not stored separately; we warn based on static date

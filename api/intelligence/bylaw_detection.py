@@ -10,8 +10,8 @@ Signal type: 'bylaw_amendment'
 
 import logging
 import re
-from datetime import date, datetime
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List
 
 import asyncpg
 

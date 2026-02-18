@@ -173,7 +173,7 @@ async def _generate_anthropic_chat(
     max_tokens: int,
     api_key: Optional[str],
 ) -> tuple[str, str, float]:
-    from anthropic import AsyncAnthropic, NotFoundError
+    from anthropic import AsyncAnthropic
 
     from .external_clients import ANTHROPIC_CHAT_TIMEOUT_SECONDS, ANTHROPIC_SEMAPHORE
 

@@ -10,10 +10,7 @@ This module handles:
 Search pipeline uses K2 search (with local BM25 fallback).
 """
 
-import asyncio
 import logging
-import os
-import time
 import uuid
 from datetime import datetime, date, timezone
 from typing import Optional, List
