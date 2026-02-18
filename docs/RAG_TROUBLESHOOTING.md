@@ -242,3 +242,179 @@ For persistent issues, check the logs:
 ```bash
 kubectl logs -n vancity-lens -l app=vancity-lens-api --tail=500 | grep -E "(RAG|embedding|vector)"
 ```
+
+---
+
+## Tavily Search Integration
+
+### What is Tavily?
+
+Tavily is an AI-powered web search API that discovers Vancouver development news, rezoning applications, and Bill 47 TOD content across the entire web. It supplements the built-in scrapers by finding content from sources we haven't explicitly configured.
+
+### Tavily CronJob Schedule
+
+Unlike other scrapers that run in-process, Tavily runs as a **Kubernetes CronJob**:
+
+- **Schedule:** Every 8 hours (00:00, 08:00, 16:00 UTC)
+- **Configuration:** `k8s/cronjob-tavily-search.yaml`
+- **Queries:** 
+  - "Vancouver rezoning application 2026"
+  - "Bill 47 TOD development Vancouver"
+  - "Vancouver density development news"
+
+### Check if Tavily is Running
+
+```bash
+# Check CronJob status
+kubectl get cronjobs -n vancity-lens | grep tavily
+
+# Check recent jobs
+kubectl get jobs -n vancity-lens | grep tavily
+
+# Check logs from last run
+kubectl logs -n vancity-lens -l app=vancity-lens-tavily-search --tail=100
+```
+
+### Manually Trigger Tavily
+
+```bash
+# Create a one-time job from the CronJob
+kubectl create job -n vancity-lens --from=cronjob/vancity-lens-tavily-search tavily-manual-run
+
+# Watch the job
+kubectl logs -n vancity-lens -l job-name=tavily-manual-run -f
+
+# Expected output
+{
+  "searches_performed": 3,
+  "urls_discovered": 25,
+  "new_documents": 8,
+  "skipped_duplicates": 17
+}
+```
+
+### Verify Tavily API Key
+
+```bash
+# Check if secret exists
+kubectl get secret -n vancity-lens vancity-lens-secrets -o jsonpath='{.data.tavily-api-key}' | base64 -d | wc -c
+
+# Expected: Should show character count > 0
+# If 0, the API key is not set - add it to the secret
+```
+
+### Why No Tavily Data?
+
+1. **CronJob not deployed** - Run: `kubectl apply -f k8s/cronjob-tavily-search.yaml`
+2. **API key not set** - Check secret: `kubectl get secret vancity-lens-secrets`
+3. **Haven't hit schedule yet** - Runs every 8 hours, may not have executed
+4. **Quota exceeded** - Tavily free tier: 1,000 credits/month
+5. **Job failing** - Check logs for errors
+
+---
+
+## RAG Performance Optimization
+
+### Why is RAG Slow?
+
+Common causes of slow RAG responses:
+
+1. **Vector search latency** - Searching 1000+ documents takes time
+2. **LLM generation time** - Gemini/Anthropic API calls take 2-5 seconds
+3. **No caching** - Every query is a fresh API call
+4. **Network latency** - GCP → Vertex AI / Anthropic API round-trip
+
+### Current Performance Characteristics
+
+**Typical response time breakdown:**
+- Vector similarity search: 500-1000ms
+- LLM generation (Gemini 2.5 Flash): 2-4 seconds
+- Total: **3-5 seconds**
+
+### Quick Wins
+
+#### 1. Use Gemini (Faster)
+
+Check your LLM backend setting:
+
+```bash
+kubectl get configmap -n vancity-lens vancity-lens-config -o yaml | grep llm-backend
+```
+
+**Fastest:** `llm-backend: "gemini"` with `gemini-model: "gemini-2.5-flash"`
+**Slower:** `llm-backend: "anthropic"`
+
+#### 2. Reduce Vector Search Scope
+
+Edit `/api/intelligence/retrieval_backend.py`:
+
+```python
+# Current (slower but more comprehensive)
+limit=10
+
+# Faster (fewer documents retrieved)
+limit=5
+```
+
+#### 3. Add Response Streaming (Future Enhancement)
+
+Currently RAG waits for the full LLM response before returning. Adding streaming would make responses **feel** faster by showing partial results immediately.
+
+**Status:** Not implemented yet (requires frontend + backend changes)
+
+### Advanced: Add Redis Caching
+
+For frequently asked questions, add Redis caching:
+
+```python
+# Pseudo-code
+cache_key = f"rag:{hash(query)}"
+cached = redis.get(cache_key)
+if cached:
+    return cached
+result = await handle_chat(...)
+redis.setex(cache_key, 3600, result)  # Cache for 1 hour
+```
+
+**Status:** Not implemented (would require Redis deployment)
+
+### Monitoring RAG Performance
+
+Check actual response times in logs:
+
+```bash
+kubectl logs -n vancity-lens -l app=vancity-lens-api --tail=500 | grep "chat request"
+```
+
+Expected log format:
+```
+INFO chat request completed in 3.2s (query: "What rezoning...", docs: 8, tokens: 1234)
+```
+
+---
+
+## Common Issues & Solutions
+
+### Issue: "RAG is slow"
+
+**Solution:**
+1. Confirm you're using Gemini (faster than Anthropic)
+2. Check network latency: `kubectl logs` should show <5s total
+3. If >10s, investigate vector search performance or database issues
+4. Consider reducing retrieval limit from 10 to 5 documents
+
+### Issue: "No Tavily content"
+
+**Solution:**
+1. Verify CronJob is deployed: `kubectl get cronjob vancity-lens-tavily-search`
+2. Check API key exists: `kubectl get secret vancity-lens-secrets`
+3. Manually trigger: `kubectl create job --from=cronjob/vancity-lens-tavily-search tavily-test`
+4. Check logs for errors: `kubectl logs -l job-name=tavily-test`
+
+### Issue: "Intelligence tab not clickable"
+
+**Solution:**
+- Fixed in latest deployment (z-index conflict with Disclaimer)
+- Update to commit `55d2726` or later
+- Verify: `kubectl get deployment vancity-lens-api -o jsonpath='{.spec.template.spec.containers[0].image}'`
+

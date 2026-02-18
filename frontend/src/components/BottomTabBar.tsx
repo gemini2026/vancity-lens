@@ -19,7 +19,7 @@ const tabs = [
 export default function BottomTabBar({ activeTab, onTabChange }: BottomTabBarProps) {
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border safe-area-bottom"
+      className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-surface/95 backdrop-blur-md border-t border-border safe-area-bottom"
       role="tablist"
       aria-label="Navigation"
     >
