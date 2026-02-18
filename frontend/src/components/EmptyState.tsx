@@ -1,6 +1,5 @@
-'use client';
-
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface EmptyStateProps {
   icon: React.ReactNode;
@@ -25,9 +24,13 @@ export function EmptyState({
   className = '',
 }: EmptyStateProps) {
   return (
-    <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
+    <div
+      className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}
+      role="status"
+      aria-label={heading}
+    >
       {/* Icon */}
-      <div className="mb-6 text-gray-400 dark:text-gray-600">
+      <div className="mb-6 text-foreground-muted">
         {icon}
       </div>
 
@@ -42,7 +45,7 @@ export function EmptyState({
       </p>
 
       {/* Suggestions */}
-      {suggestions.length > 0 && (
+      {suggestions.length > 0 && onSuggestionClick && (
         <div className="flex flex-col gap-2 w-full max-w-md">
           <p className="text-xs text-[var(--color-foreground-muted)] mb-2">
             Try asking:
@@ -50,7 +53,7 @@ export function EmptyState({
           {suggestions.map((suggestion, index) => (
             <button
               key={index}
-              onClick={() => onSuggestionClick?.(suggestion)}
+              onClick={() => onSuggestionClick(suggestion)}
               className="text-left px-4 py-2 text-sm rounded-lg border border-[var(--color-border)]
                          hover:bg-[var(--color-surface)] transition-colors
                          text-[var(--color-foreground-secondary)]"
