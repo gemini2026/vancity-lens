@@ -54,10 +54,10 @@ jobs:
 
       - name: Update deployment image tag
         run: |
-          IMAGE_URL="${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/vancity-lens-docker/${{ env.IMAGE_NAME }}"
-          sed -i "s|IMAGE_PLACEHOLDER|${IMAGE_URL}:${{ github.sha }}|g" k8s/deployment.yaml
+          cd k8s
+          kustomize edit set image REGISTRY/vancity-lens-api=us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/vancity-lens-docker/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - name: Deploy to GKE
         run: |
-          kubectl apply -k k8s/overlays/staging/
+          kubectl apply -k k8s/
           kubectl rollout status deployment/vancity-lens-api -n vancity-lens --timeout=5m
