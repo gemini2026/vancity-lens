@@ -285,13 +285,27 @@ async def sync_to_k2(
         for doc in batch:
             try:
                 formatted = format_for_k2(doc)
-                # Validate no newlines in critical fields
+
+                # Check for newlines in all string fields
+                issues = []
                 if "\n" in formatted.get("source_uri", "") or "\r" in formatted.get("source_uri", ""):
+                    issues.append(f"source_uri has newlines: {formatted['source_uri'][:100]!r}")
+                if "\n" in formatted.get("raw_text", "") or "\r" in formatted.get("raw_text", ""):
+                    issues.append(f"raw_text has newlines (len={len(formatted.get('raw_text', ''))})")
+
+                # Check metadata fields
+                metadata = formatted.get("metadata", {})
+                for key, value in metadata.items():
+                    if isinstance(value, str) and ("\n" in value or "\r" in value):
+                        issues.append(f"metadata.{key} has newlines: {value[:100]!r}")
+
+                if issues:
                     logger.warning(
-                        "Document %d has newlines in source_uri after sanitization: %r",
+                        "Document %d has newline issues: %s",
                         doc["id"],
-                        formatted["source_uri"][:100]
+                        "; ".join(issues)
                     )
+
                 k2_batch.append(formatted)
             except Exception as e:
                 logger.error(
