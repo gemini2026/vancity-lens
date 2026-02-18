@@ -18,9 +18,7 @@ Architecture:
 import asyncio
 import json
 import logging
-import re
 from datetime import datetime
-from decimal import Decimal
 from typing import Dict, List, Optional
 
 import aiohttp

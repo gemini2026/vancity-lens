@@ -673,7 +673,7 @@ class ReportGenerator:
             (
                 "Zoning",
                 parcel_data.current_zoning or "N/A",
-                f"TOD Tier (Bill 47)",
+                "TOD Tier (Bill 47)",
                 "-",
                 False,
             ),

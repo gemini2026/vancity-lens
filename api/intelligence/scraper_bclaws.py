@@ -13,7 +13,7 @@ Architecture:
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 from xml.etree import ElementTree
 

@@ -7,7 +7,7 @@ Simple one-click save/unsave for parcels. Complements the rule-based watchlist.
 import logging
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from .db import db
@@ -66,7 +66,7 @@ async def unsave_parcel(
 ):
     """Remove a saved parcel for the current user."""
     async with db.acquire() as conn:
-        result = await conn.execute(
+        await conn.execute(
             "DELETE FROM saved_parcels WHERE user_id = $1 AND pid = $2",
             user["id"],
             pid,

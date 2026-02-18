@@ -1,7 +1,6 @@
 """Playwright-based council meeting agenda scraper for vancouver.ca."""
 import asyncio
 import logging
-import re
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum

@@ -12,7 +12,6 @@ import asyncio
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
-from decimal import Decimal
 from typing import Optional
 
 import asyncpg
@@ -186,10 +185,11 @@ async def generate_undervalued_alerts(
                         alerts_created += 1
                     except Exception as e:
                         alerts_failed += 1
+                        last_error = e
                         logger.warning("Error creating undervalued alert (%s): %s", type(e).__name__, e, exc_info=True)
 
         if alerts_failed > 0 and alerts_created == 0:
-            logger.error("All %d alert creation attempts failed (last: %s)", alerts_failed, type(e).__name__)
+            logger.error("All %d alert creation attempts failed (last: %s)", alerts_failed, type(last_error).__name__ if 'last_error' in locals() else 'Unknown')
 
     return alerts_created
 

@@ -8,7 +8,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
