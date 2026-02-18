@@ -1,0 +1,722 @@
+[
+  {
+    "permit_number": "BP-2024-00112",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 285000000,
+    "issue_year": 2024,
+    "lat": 49.2633,
+    "lng": -123.1153
+  },
+  {
+    "permit_number": "BP-2024-00287",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 195000000,
+    "issue_year": 2024,
+    "lat": 49.2827,
+    "lng": -123.1207
+  },
+  {
+    "permit_number": "BP-2023-00431",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 142000000,
+    "issue_year": 2023,
+    "lat": 49.2388,
+    "lng": -123.1318
+  },
+  {
+    "permit_number": "BP-2025-00019",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 350000000,
+    "issue_year": 2025,
+    "lat": 49.2769,
+    "lng": -123.1099
+  },
+  {
+    "permit_number": "BP-2024-00533",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 88000000,
+    "issue_year": 2024,
+    "lat": 49.2491,
+    "lng": -123.0312
+  },
+  {
+    "permit_number": "BP-2023-00672",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 67000000,
+    "issue_year": 2023,
+    "lat": 49.2290,
+    "lng": -123.0238
+  },
+  {
+    "permit_number": "BP-2024-00714",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 54000000,
+    "issue_year": 2024,
+    "lat": 49.2525,
+    "lng": -123.0654
+  },
+  {
+    "permit_number": "BP-2025-00083",
+    "type_of_work": "New Building",
+    "specific_use": "Retail Uses",
+    "project_value": 12500000,
+    "issue_year": 2025,
+    "lat": 49.2608,
+    "lng": -123.1380
+  },
+  {
+    "permit_number": "BP-2024-00891",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 175000000,
+    "issue_year": 2024,
+    "lat": 49.2629,
+    "lng": -123.0687
+  },
+  {
+    "permit_number": "BP-2023-00955",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 230000000,
+    "issue_year": 2023,
+    "lat": 49.2860,
+    "lng": -123.1315
+  },
+  {
+    "permit_number": "BP-2024-01023",
+    "type_of_work": "New Building",
+    "specific_use": "Institutional",
+    "project_value": 45000000,
+    "issue_year": 2024,
+    "lat": 49.2642,
+    "lng": -123.2456
+  },
+  {
+    "permit_number": "BP-2025-00142",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 118000000,
+    "issue_year": 2025,
+    "lat": 49.2438,
+    "lng": -123.1292
+  },
+  {
+    "permit_number": "BP-2024-01188",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 98000000,
+    "issue_year": 2024,
+    "lat": 49.2344,
+    "lng": -123.0649
+  },
+  {
+    "permit_number": "BP-2023-01245",
+    "type_of_work": "New Building",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 1850000,
+    "issue_year": 2023,
+    "lat": 49.2519,
+    "lng": -123.1891
+  },
+  {
+    "permit_number": "BP-2024-01302",
+    "type_of_work": "New Building",
+    "specific_use": "Two-Family Dwelling",
+    "project_value": 2400000,
+    "issue_year": 2024,
+    "lat": 49.2483,
+    "lng": -123.1755
+  },
+  {
+    "permit_number": "BP-2025-00201",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 78000000,
+    "issue_year": 2025,
+    "lat": 49.2503,
+    "lng": -123.0412
+  },
+  {
+    "permit_number": "BP-2024-01467",
+    "type_of_work": "New Building",
+    "specific_use": "Office Uses",
+    "project_value": 156000000,
+    "issue_year": 2024,
+    "lat": 49.2851,
+    "lng": -123.1144
+  },
+  {
+    "permit_number": "BP-2023-01523",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 310000000,
+    "issue_year": 2023,
+    "lat": 49.2732,
+    "lng": -123.1005
+  },
+  {
+    "permit_number": "BP-2024-01601",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 42000000,
+    "issue_year": 2024,
+    "lat": 49.2392,
+    "lng": -123.0558
+  },
+  {
+    "permit_number": "BP-2025-00278",
+    "type_of_work": "New Building",
+    "specific_use": "Dwelling Uses",
+    "project_value": 3200000,
+    "issue_year": 2025,
+    "lat": 49.2267,
+    "lng": -123.1571
+  },
+  {
+    "permit_number": "BP-2024-01755",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 72000000,
+    "issue_year": 2024,
+    "lat": 49.2484,
+    "lng": -123.0987
+  },
+  {
+    "permit_number": "BP-2023-01812",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 58000000,
+    "issue_year": 2023,
+    "lat": 49.2565,
+    "lng": -123.1678
+  },
+  {
+    "permit_number": "BP-2024-01900",
+    "type_of_work": "New Building",
+    "specific_use": "Service Uses",
+    "project_value": 8900000,
+    "issue_year": 2024,
+    "lat": 49.2713,
+    "lng": -123.0813
+  },
+  {
+    "permit_number": "BP-2025-00356",
+    "type_of_work": "New Building",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 2100000,
+    "issue_year": 2025,
+    "lat": 49.2374,
+    "lng": -123.1860
+  },
+  {
+    "permit_number": "BP-2024-02034",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 185000,
+    "issue_year": 2024,
+    "lat": 49.2441,
+    "lng": -123.1623
+  },
+  {
+    "permit_number": "BP-2023-02111",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 3400000,
+    "issue_year": 2023,
+    "lat": 49.2790,
+    "lng": -123.1288
+  },
+  {
+    "permit_number": "BP-2024-02198",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Retail Uses",
+    "project_value": 1250000,
+    "issue_year": 2024,
+    "lat": 49.2632,
+    "lng": -123.1383
+  },
+  {
+    "permit_number": "BP-2025-00412",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Office Uses",
+    "project_value": 4800000,
+    "issue_year": 2025,
+    "lat": 49.2847,
+    "lng": -123.1178
+  },
+  {
+    "permit_number": "BP-2024-02301",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 95000,
+    "issue_year": 2024,
+    "lat": 49.2298,
+    "lng": -123.0345
+  },
+  {
+    "permit_number": "BP-2023-02389",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Dwelling Uses",
+    "project_value": 275000,
+    "issue_year": 2023,
+    "lat": 49.2512,
+    "lng": -123.2012
+  },
+  {
+    "permit_number": "BP-2024-02456",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Service Uses",
+    "project_value": 620000,
+    "issue_year": 2024,
+    "lat": 49.2671,
+    "lng": -123.0722
+  },
+  {
+    "permit_number": "BP-2025-00489",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Institutional",
+    "project_value": 2100000,
+    "issue_year": 2025,
+    "lat": 49.2595,
+    "lng": -123.1515
+  },
+  {
+    "permit_number": "BP-2024-02578",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 150000,
+    "issue_year": 2024,
+    "lat": 49.2356,
+    "lng": -123.0891
+  },
+  {
+    "permit_number": "BP-2023-02634",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 1800000,
+    "issue_year": 2023,
+    "lat": 49.2466,
+    "lng": -123.1045
+  },
+  {
+    "permit_number": "BP-2024-02712",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Mixed Use",
+    "project_value": 950000,
+    "issue_year": 2024,
+    "lat": 49.2533,
+    "lng": -123.0827
+  },
+  {
+    "permit_number": "BP-2025-00553",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 320000,
+    "issue_year": 2025,
+    "lat": 49.2281,
+    "lng": -123.1432
+  },
+  {
+    "permit_number": "BP-2024-02845",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Retail Uses",
+    "project_value": 445000,
+    "issue_year": 2024,
+    "lat": 49.2697,
+    "lng": -123.1501
+  },
+  {
+    "permit_number": "BP-2023-02901",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Two-Family Dwelling",
+    "project_value": 210000,
+    "issue_year": 2023,
+    "lat": 49.2418,
+    "lng": -123.0466
+  },
+  {
+    "permit_number": "BP-2024-02988",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 78000,
+    "issue_year": 2024,
+    "lat": 49.2222,
+    "lng": -123.1178
+  },
+  {
+    "permit_number": "BP-2025-00621",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Office Uses",
+    "project_value": 1650000,
+    "issue_year": 2025,
+    "lat": 49.2813,
+    "lng": -123.1067
+  },
+  {
+    "permit_number": "BP-2024-03078",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Dwelling Uses",
+    "project_value": 125000,
+    "issue_year": 2024,
+    "lat": 49.2547,
+    "lng": -123.2089
+  },
+  {
+    "permit_number": "BP-2023-03145",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Service Uses",
+    "project_value": 890000,
+    "issue_year": 2023,
+    "lat": 49.2624,
+    "lng": -123.0944
+  },
+  {
+    "permit_number": "BP-2024-03211",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 2750000,
+    "issue_year": 2024,
+    "lat": 49.2759,
+    "lng": -123.1355
+  },
+  {
+    "permit_number": "BP-2025-00698",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 198000,
+    "issue_year": 2025,
+    "lat": 49.2405,
+    "lng": -123.1717
+  },
+  {
+    "permit_number": "BP-2024-03334",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Mixed Use",
+    "project_value": 3100000,
+    "issue_year": 2024,
+    "lat": 49.2688,
+    "lng": -123.0578
+  },
+  {
+    "permit_number": "BP-2023-03401",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Retail Uses",
+    "project_value": 550000,
+    "issue_year": 2023,
+    "lat": 49.2571,
+    "lng": -123.1234
+  },
+  {
+    "permit_number": "BP-2024-03489",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Institutional",
+    "project_value": 4200000,
+    "issue_year": 2024,
+    "lat": 49.2313,
+    "lng": -123.1555
+  },
+  {
+    "permit_number": "BP-2025-00756",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 245000,
+    "issue_year": 2025,
+    "lat": 49.2462,
+    "lng": -123.0289
+  },
+  {
+    "permit_number": "BP-2024-03567",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Two-Family Dwelling",
+    "project_value": 165000,
+    "issue_year": 2024,
+    "lat": 49.2389,
+    "lng": -123.0712
+  },
+  {
+    "permit_number": "BP-2023-03645",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 1420000,
+    "issue_year": 2023,
+    "lat": 49.2744,
+    "lng": -123.1422
+  },
+  {
+    "permit_number": "BP-2024-03712",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 52000,
+    "issue_year": 2024,
+    "lat": 49.2201,
+    "lng": -123.0533
+  },
+  {
+    "permit_number": "BP-2025-00834",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Dwelling Uses",
+    "project_value": 380000,
+    "issue_year": 2025,
+    "lat": 49.2556,
+    "lng": -123.1944
+  },
+  {
+    "permit_number": "BP-2024-03845",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Office Uses",
+    "project_value": 2300000,
+    "issue_year": 2024,
+    "lat": 49.2831,
+    "lng": -123.1232
+  },
+  {
+    "permit_number": "BP-2024-03912",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 42000,
+    "issue_year": 2024,
+    "lat": 49.2455,
+    "lng": -123.1678
+  },
+  {
+    "permit_number": "BP-2023-03989",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Dwelling Uses",
+    "project_value": 38000,
+    "issue_year": 2023,
+    "lat": 49.2317,
+    "lng": -123.0389
+  },
+  {
+    "permit_number": "BP-2024-04056",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 55000,
+    "issue_year": 2024,
+    "lat": 49.2493,
+    "lng": -123.1899
+  },
+  {
+    "permit_number": "BP-2025-00912",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Retail Uses",
+    "project_value": 125000,
+    "issue_year": 2025,
+    "lat": 49.2618,
+    "lng": -123.0811
+  },
+  {
+    "permit_number": "BP-2024-04134",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 320000,
+    "issue_year": 2024,
+    "lat": 49.2788,
+    "lng": -123.1345
+  },
+  {
+    "permit_number": "BP-2023-04201",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 35000,
+    "issue_year": 2023,
+    "lat": 49.2401,
+    "lng": -123.1512
+  },
+  {
+    "permit_number": "BP-2024-04278",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Service Uses",
+    "project_value": 88000,
+    "issue_year": 2024,
+    "lat": 49.2256,
+    "lng": -123.0267
+  },
+  {
+    "permit_number": "BP-2025-00989",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Two-Family Dwelling",
+    "project_value": 48000,
+    "issue_year": 2025,
+    "lat": 49.2534,
+    "lng": -123.0955
+  },
+  {
+    "permit_number": "BP-2024-04367",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 41000,
+    "issue_year": 2024,
+    "lat": 49.2378,
+    "lng": -123.1788
+  },
+  {
+    "permit_number": "BP-2023-04423",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Office Uses",
+    "project_value": 495000,
+    "issue_year": 2023,
+    "lat": 49.2701,
+    "lng": -123.1089
+  },
+  {
+    "permit_number": "BP-2024-04512",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 29000,
+    "issue_year": 2024,
+    "lat": 49.2429,
+    "lng": -123.2105
+  },
+  {
+    "permit_number": "BP-2025-01067",
+    "type_of_work": "Demolition / Deconstruction",
+    "specific_use": "Dwelling Uses",
+    "project_value": 67000,
+    "issue_year": 2025,
+    "lat": 49.2286,
+    "lng": -123.1155
+  },
+  {
+    "permit_number": "BP-2024-04623",
+    "type_of_work": "Salvage and Abatement",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 75000,
+    "issue_year": 2024,
+    "lat": 49.2345,
+    "lng": -123.0822
+  },
+  {
+    "permit_number": "BP-2023-04701",
+    "type_of_work": "Salvage and Abatement",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 220000,
+    "issue_year": 2023,
+    "lat": 49.2812,
+    "lng": -123.0967
+  },
+  {
+    "permit_number": "BP-2024-04789",
+    "type_of_work": "Salvage and Abatement",
+    "specific_use": "Retail Uses",
+    "project_value": 145000,
+    "issue_year": 2024,
+    "lat": 49.2577,
+    "lng": -123.1411
+  },
+  {
+    "permit_number": "BP-2025-01134",
+    "type_of_work": "Salvage and Abatement",
+    "specific_use": "Dwelling Uses",
+    "project_value": 92000,
+    "issue_year": 2025,
+    "lat": 49.2468,
+    "lng": -123.1622
+  },
+  {
+    "permit_number": "BP-2024-04878",
+    "type_of_work": "Salvage and Abatement",
+    "specific_use": "One-Family Dwelling",
+    "project_value": 68000,
+    "issue_year": 2024,
+    "lat": 49.2239,
+    "lng": -123.0445
+  },
+  {
+    "permit_number": "BP-2023-04956",
+    "type_of_work": "Salvage and Abatement",
+    "specific_use": "Service Uses",
+    "project_value": 185000,
+    "issue_year": 2023,
+    "lat": 49.2654,
+    "lng": -123.0712
+  },
+  {
+    "permit_number": "BP-2024-05034",
+    "type_of_work": "Temporary Building / Structure",
+    "specific_use": "Service Uses",
+    "project_value": 120000,
+    "issue_year": 2024,
+    "lat": 49.2773,
+    "lng": -123.1001
+  },
+  {
+    "permit_number": "BP-2025-01201",
+    "type_of_work": "Temporary Building / Structure",
+    "specific_use": "Retail Uses",
+    "project_value": 85000,
+    "issue_year": 2025,
+    "lat": 49.2641,
+    "lng": -123.1544
+  },
+  {
+    "permit_number": "BP-2024-05112",
+    "type_of_work": "Temporary Building / Structure",
+    "specific_use": "Institutional",
+    "project_value": 250000,
+    "issue_year": 2024,
+    "lat": 49.2509,
+    "lng": -123.1278
+  },
+  {
+    "permit_number": "BP-2023-05189",
+    "type_of_work": "Temporary Building / Structure",
+    "specific_use": "Service Uses",
+    "project_value": 65000,
+    "issue_year": 2023,
+    "lat": 49.2335,
+    "lng": -123.0611
+  },
+  {
+    "permit_number": "BP-2024-05267",
+    "type_of_work": "Temporary Building / Structure",
+    "specific_use": "Retail Uses",
+    "project_value": 175000,
+    "issue_year": 2024,
+    "lat": 49.2487,
+    "lng": -123.1833
+  },
+  {
+    "permit_number": "BP-2025-01278",
+    "type_of_work": "Temporary Building / Structure",
+    "specific_use": "Service Uses",
+    "project_value": 95000,
+    "issue_year": 2025,
+    "lat": 49.2722,
+    "lng": -123.0889
+  },
+  {
+    "permit_number": "BP-2026-00012",
+    "type_of_work": "New Building",
+    "specific_use": "Multiple Dwelling",
+    "project_value": 132000000,
+    "issue_year": 2026,
+    "lat": 49.2447,
+    "lng": -123.0466
+  },
+  {
+    "permit_number": "BP-2026-00034",
+    "type_of_work": "Addition / Alteration",
+    "specific_use": "Mixed Use",
+    "project_value": 1950000,
+    "issue_year": 2026,
+    "lat": 49.2589,
+    "lng": -123.1122
+  },
+  {
+    "permit_number": "BP-2026-00051",
+    "type_of_work": "New Building",
+    "specific_use": "Mixed Use",
+    "project_value": 265000000,
+    "issue_year": 2026,
+    "lat": 49.2736,
+    "lng": -123.1277
+  }
+]

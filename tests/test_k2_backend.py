@@ -104,7 +104,7 @@ class TestK2SearchNormalization:
 
     def test_k2_search_chunks_resolves_corpus_name_on_not_found(self, monkeypatch):
         from api.intelligence.k2_client import k2_search_chunks
-        from sdk.errors import Knowledge2Error
+        from sdk.errors import NotFoundError
 
         _set_required_k2_env(monkeypatch, corpus_id="vancity")
 
@@ -120,7 +120,7 @@ class TestK2SearchNormalization:
             def search(self, *, corpus_id, query, top_k, return_config):
                 self.search_calls.append(corpus_id)
                 if corpus_id == "vancity":
-                    raise Knowledge2Error("Corpus not found", status_code=404, request_id="req-1")
+                    raise NotFoundError("Corpus not found", status_code=404, request_id="req-1")
                 assert corpus_id == "resolved-id"
                 return {
                     "results": [

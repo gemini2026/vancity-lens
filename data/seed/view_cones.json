@@ -1,0 +1,167 @@
+[
+  {
+    "name": "Queen Elizabeth Park to North Shore Mountains",
+    "view_number": "3.2.1",
+    "description": "Protected view corridor from Queen Elizabeth Park hilltop looking north towards the North Shore Mountains and Burrard Inlet.",
+    "max_height_m": 80.0,
+    "source_location": "Queen Elizabeth Park",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1128, 49.2418], [-123.1200, 49.2900], [-123.1050, 49.2900], [-123.1128, 49.2418]]]}
+  },
+  {
+    "name": "Cambie Bridge to North Shore Mountains",
+    "view_number": "3.2.2",
+    "description": "Protected view from Cambie Bridge looking north to the North Shore Mountains.",
+    "max_height_m": 100.0,
+    "source_location": "Cambie Bridge",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1140, 49.2710], [-123.1200, 49.2950], [-123.1080, 49.2950], [-123.1140, 49.2710]]]}
+  },
+  {
+    "name": "Granville Bridge to North Shore Mountains",
+    "view_number": "3.2.3",
+    "description": "View corridor from Granville Bridge northward to the North Shore Mountains.",
+    "max_height_m": 95.0,
+    "source_location": "Granville Bridge",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1345, 49.2700], [-123.1400, 49.2950], [-123.1290, 49.2950], [-123.1345, 49.2700]]]}
+  },
+  {
+    "name": "West 7th Avenue to North Shore Mountains",
+    "view_number": "3.2.4",
+    "description": "Protected view from West 7th Avenue and Fir Street looking north to the mountains.",
+    "max_height_m": 85.0,
+    "source_location": "West 7th Avenue at Fir Street",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1390, 49.2640], [-123.1450, 49.2950], [-123.1330, 49.2950], [-123.1390, 49.2640]]]}
+  },
+  {
+    "name": "Burrard Bridge to North Shore Mountains",
+    "view_number": "3.2.5",
+    "description": "View from Burrard Bridge looking north towards the North Shore Mountains.",
+    "max_height_m": 90.0,
+    "source_location": "Burrard Bridge",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1370, 49.2720], [-123.1420, 49.2960], [-123.1320, 49.2960], [-123.1370, 49.2720]]]}
+  },
+  {
+    "name": "Stanley Park Entrance to Lions Gate Bridge",
+    "view_number": "3.1.1",
+    "description": "Iconic view from the Stanley Park entrance along Georgia Street to the Lions Gate Bridge and North Shore Mountains.",
+    "max_height_m": 60.0,
+    "source_location": "Georgia Street at Stanley Park",
+    "target_location": "Lions Gate Bridge",
+    "bylaw_reference": "View Protection Guidelines Section 3.1",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1380, 49.2920], [-123.1450, 49.3050], [-123.1310, 49.3050], [-123.1380, 49.2920]]]}
+  },
+  {
+    "name": "City Hall to North Shore Mountains",
+    "view_number": "3.2.6",
+    "description": "Protected view from Vancouver City Hall at Cambie and 12th looking north.",
+    "max_height_m": 75.0,
+    "source_location": "Vancouver City Hall",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1148, 49.2600], [-123.1200, 49.2950], [-123.1096, 49.2950], [-123.1148, 49.2600]]]}
+  },
+  {
+    "name": "Ontario Street to North Shore Mountains",
+    "view_number": "3.2.7",
+    "description": "View corridor along Ontario Street from 33rd Avenue looking north.",
+    "max_height_m": 70.0,
+    "source_location": "Ontario Street at 33rd Avenue",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1020, 49.2450], [-123.1070, 49.2950], [-123.0970, 49.2950], [-123.1020, 49.2450]]]}
+  },
+  {
+    "name": "Trimble Park to English Bay",
+    "view_number": "3.3.1",
+    "description": "Protected view from Trimble Park looking west across English Bay.",
+    "max_height_m": 50.0,
+    "source_location": "Trimble Park",
+    "target_location": "English Bay",
+    "bylaw_reference": "View Protection Guidelines Section 3.3",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1900, 49.2680], [-123.2100, 49.2720], [-123.2100, 49.2640], [-123.1900, 49.2680]]]}
+  },
+  {
+    "name": "Jericho Beach to Downtown Skyline",
+    "view_number": "3.4.1",
+    "description": "Protected view from Jericho Beach looking east towards the downtown Vancouver skyline.",
+    "max_height_m": 120.0,
+    "source_location": "Jericho Beach",
+    "target_location": "Downtown Vancouver Skyline",
+    "bylaw_reference": "View Protection Guidelines Section 3.4",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1950, 49.2720], [-123.1300, 49.2850], [-123.1300, 49.2750], [-123.1950, 49.2720]]]}
+  },
+  {
+    "name": "Commercial Drive to North Shore Mountains",
+    "view_number": "3.2.8",
+    "description": "Protected view from Commercial Drive at 1st Avenue looking north to the mountains.",
+    "max_height_m": 65.0,
+    "source_location": "Commercial Drive at 1st Avenue",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.0700, 49.2690], [-123.0750, 49.2950], [-123.0650, 49.2950], [-123.0700, 49.2690]]]}
+  },
+  {
+    "name": "Heather Street to Water and Mountains",
+    "view_number": "3.2.9",
+    "description": "View from Heather Street at 12th Avenue looking north to Burrard Inlet and mountains.",
+    "max_height_m": 78.0,
+    "source_location": "Heather Street at 12th Avenue",
+    "target_location": "Burrard Inlet and North Shore",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1270, 49.2600], [-123.1320, 49.2950], [-123.1220, 49.2950], [-123.1270, 49.2600]]]}
+  },
+  {
+    "name": "Fraser River to North Shore",
+    "view_number": "3.5.1",
+    "description": "Protected view corridor from the Fraser River foreshore looking north across the city.",
+    "max_height_m": 110.0,
+    "source_location": "Marine Drive at Ontario",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.5",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1020, 49.2080], [-123.1120, 49.2900], [-123.0920, 49.2900], [-123.1020, 49.2080]]]}
+  },
+  {
+    "name": "False Creek South to North Shore",
+    "view_number": "3.2.10",
+    "description": "View corridor from False Creek South shore looking north across False Creek to North Shore Mountains.",
+    "max_height_m": 88.0,
+    "source_location": "False Creek South",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1280, 49.2690], [-123.1340, 49.2950], [-123.1220, 49.2950], [-123.1280, 49.2690]]]}
+  },
+  {
+    "name": "Main Street to North Shore Mountains",
+    "view_number": "3.2.11",
+    "description": "Protected view along Main Street corridor from King Edward looking north.",
+    "max_height_m": 72.0,
+    "source_location": "Main Street at King Edward",
+    "target_location": "North Shore Mountains",
+    "bylaw_reference": "View Protection Guidelines Section 3.2",
+    "cone_type": "protected_view",
+    "geometry": {"type": "Polygon", "coordinates": [[[-123.1010, 49.2490], [-123.1060, 49.2950], [-123.0960, 49.2950], [-123.1010, 49.2490]]]}
+  }
+]

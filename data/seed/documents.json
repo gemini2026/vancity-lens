@@ -1,0 +1,762 @@
+[
+  {
+    "id": 1,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-2590-2606-granville-street",
+    "title": "Rezoning Application: 2590-2606 Granville Street",
+    "published_date": "2024-03-15",
+    "raw_text": "Application to rezone 2590-2606 Granville Street from C-3A to CD-1. Proposal for a 29-storey mixed-use tower with 240 market rental units and commercial at grade. FSR of 9.12. Applicant: Westbank Projects Corp."
+  },
+  {
+    "id": 2,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-april-16-2024",
+    "title": "Regular Council Meeting Minutes - April 16, 2024",
+    "published_date": "2024-04-16",
+    "raw_text": "Council approved the rezoning of 2538 Birch Street from RS-1 to CD-1. The project proposes a 6-storey residential building with 74 units, including 20% below-market rental. Vote: 7-3 in favour."
+  },
+  {
+    "id": 3,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1477-1495-west-broadway",
+    "title": "Rezoning Application: 1477-1495 West Broadway",
+    "published_date": "2024-05-22",
+    "raw_text": "Application to rezone 1477-1495 West Broadway from C-3A to CD-1 for a 39-storey tower with 410 market and secured rental units, with ground-floor commercial. Located within 200m of future South Granville SkyTrain station."
+  },
+  {
+    "id": 4,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-may-21-2024",
+    "title": "Regular Council Meeting Minutes - May 21, 2024",
+    "published_date": "2024-05-21",
+    "raw_text": "Council approved the rezoning of 1780 East Broadway from I-1 to CD-1 for a 6-storey mixed-use building with 68 residential units. Application aligned with Broadway Plan area densification goals. Vote: 8-2."
+  },
+  {
+    "id": 5,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-6060-cambie-street-oakridge-transit-cen",
+    "title": "Rezoning Application: 6060 Cambie Street (Oakridge Transit Centre)",
+    "published_date": "2024-01-10",
+    "raw_text": "Major rezoning application for the Oakridge Transit Centre site at 6060 Cambie Street. Proposal for a master-planned community with up to 2,500 units across multiple towers (up to 40 storeys), 46,000 sqm commercial, community centre, and daycare. Site area: 4.3 hectares."
+  },
+  {
+    "id": 6,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-1296-station-street",
+    "title": "Development Permit Board Decision: 1296 Station Street",
+    "published_date": "2024-06-10",
+    "raw_text": "DPB approved development permit for 1296 Station Street. 12-storey mixed-use building with 148 residential units and ground-floor retail. Project by Anthem Properties in Mount Pleasant neighbourhood. Conditions include public art contribution and laneway improvements."
+  },
+  {
+    "id": 7,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-june-18-2024",
+    "title": "Regular Council Meeting Minutes - June 18, 2024",
+    "published_date": "2024-06-18",
+    "raw_text": "Council approved the rezoning of 3838 Cambie Street from RS-1 to CD-1, allowing a 6-storey residential building with 72 units. Located within the Cambie Corridor Plan area, 400m from King Edward Canada Line station. Vote: 9-1."
+  },
+  {
+    "id": 8,
+    "source_type": "news",
+    "source_url": "https://dailyhive.com/vancouver#first-major-tower-under-broadway-plan-gets-green-light",
+    "title": "First Major Tower Under Broadway Plan Gets Green Light",
+    "published_date": "2024-07-03",
+    "raw_text": "Vancouver City Council has approved one of the first major tower projects under the Broadway Plan. The 36-storey mixed-use tower at 1780 East Broadway will include 350 rental units, with 20% designated as below-market. The project demonstrates the densification potential of the Broadway corridor."
+  },
+  {
+    "id": 9,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-2105-west-broadway",
+    "title": "Rezoning Application: 2105 West Broadway",
+    "published_date": "2024-07-15",
+    "raw_text": "Application to rezone 2105 West Broadway from C-2 to CD-1 for a 18-storey mixed-use building with 180 units. Located near future Arbutus SkyTrain station. Broadway Plan Tier 1 area. Applicant: Concert Properties."
+  },
+  {
+    "id": 10,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-july-23-2024",
+    "title": "Regular Council Meeting Minutes - July 23, 2024",
+    "published_date": "2024-07-23",
+    "raw_text": "Council approved the rezoning of 5950-5998 Cambie Street from C-1 to CD-1 for a 12-storey mixed-use building with 155 strata units and ground-level retail. Within 400m of Oakridge-41st Avenue Canada Line station. FSR 4.5. Vote: 7-3."
+  },
+  {
+    "id": 11,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1045-clark-drive",
+    "title": "Rezoning Application: 1045 Clark Drive",
+    "published_date": "2024-08-05",
+    "raw_text": "Application to rezone 1045 Clark Drive from I-2 to CD-1. Proposal for a 28-storey residential tower with 310 market rental units, located adjacent to VCC-Clark SkyTrain station. Transit-oriented development leveraging Bill 47 Tier 1 density."
+  },
+  {
+    "id": 12,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-688-abbott-street",
+    "title": "Development Permit Board Decision: 688 Abbott Street",
+    "published_date": "2024-08-19",
+    "raw_text": "DPB approved development permit for 688 Abbott Street in Chinatown. 8-storey social housing project with 120 units of supportive housing. Developer: BC Housing. Height variance granted due to heritage adjacency constraints."
+  },
+  {
+    "id": 13,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-september-17-2024",
+    "title": "Regular Council Meeting Minutes - September 17, 2024",
+    "published_date": "2024-09-17",
+    "raw_text": "Council approved the rezoning of 4575 Granville Street from C-2 to CD-1 for an 8-storey mixed-use building with 95 rental units, including 20% affordable. Kerrisdale neighbourhood. Height aligns with Cambie Corridor Plan. Vote: 8-2."
+  },
+  {
+    "id": 14,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-3680-west-king-edward-avenue",
+    "title": "Rezoning Application: 3680 West King Edward Avenue",
+    "published_date": "2024-09-28",
+    "raw_text": "Application to rezone 3680 West King Edward Avenue from RS-1 to RM-8A. Proposal for townhouse complex with 24 units on a 1,200 sqm lot. Part of the Missing Middle Housing Initiative. Dunbar-Southlands neighbourhood."
+  },
+  {
+    "id": 15,
+    "source_type": "news",
+    "source_url": "https://biv.com/real-estate#massive-oakridge-transit-centre-redevelopment-approved",
+    "title": "Massive Oakridge Transit Centre Redevelopment Approved",
+    "published_date": "2024-10-08",
+    "raw_text": "Vancouver City Council has approved the master plan for the Oakridge Transit Centre redevelopment at 6060 Cambie Street. The project will deliver up to 2,500 homes, a new community centre, 46,000 sqm of commercial space, and transit improvements. The 4.3-hectare site is one of the largest redevelopments in Vancouver's history."
+  },
+  {
+    "id": 16,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-october-15-2024",
+    "title": "Regular Council Meeting Minutes - October 15, 2024",
+    "published_date": "2024-10-15",
+    "raw_text": "Council approved the rezoning of 488-526 West King Edward Avenue from C-1 to CD-1. 18-storey tower with 210 units above a 3-storey commercial podium. Located 300m from King Edward Canada Line station. FSR 5.2. Vote: 7-4."
+  },
+  {
+    "id": 17,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-2220-cambie-street",
+    "title": "Rezoning Application: 2220 Cambie Street",
+    "published_date": "2024-10-22",
+    "raw_text": "Application to rezone 2220 Cambie Street from I-1 to CD-1. Proposed 22-storey tower with 260 rental units at Broadway-City Hall station. Within TOA Tier 1 (200m). Broadway Plan compliance. Applicant: Bosa Properties."
+  },
+  {
+    "id": 18,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-3456-commercial-drive",
+    "title": "Development Permit Board Decision: 3456 Commercial Drive",
+    "published_date": "2024-11-04",
+    "raw_text": "DPB denied development permit for 3456 Commercial Drive. Proposed 6-storey mixed-use building did not comply with heritage conservation guidelines for the Commercial Drive Heritage Conservation Area. Significant community opposition cited."
+  },
+  {
+    "id": 19,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-november-19-2024",
+    "title": "Regular Council Meeting Minutes - November 19, 2024",
+    "published_date": "2024-11-19",
+    "raw_text": "Council approved the rezoning of 7730 Cambie Street from RS-1 to CD-1 for a 6-storey apartment building with 82 units including 15% affordable rental. Marpole neighbourhood, within Cambie Corridor Plan. Vote: 8-3."
+  },
+  {
+    "id": 20,
+    "source_type": "news",
+    "source_url": "https://www.shapeyourcity.ca/",
+    "title": "Bill 47 Transit-Oriented Areas: What It Means for Vancouver Density",
+    "published_date": "2024-11-25",
+    "raw_text": "The Province's Bill 47 Transit-Oriented Areas legislation mandates minimum densities within 200m, 400m, and 800m of rapid transit stations. For SkyTrain stations, this means up to 20 storeys within 200m, 12 storeys within 400m, and 8 storeys within 800m. Bus exchanges get 12 storeys within 200m and 8 within 400m."
+  },
+  {
+    "id": 21,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-888-terminal-avenue",
+    "title": "Rezoning Application: 888 Terminal Avenue",
+    "published_date": "2024-12-03",
+    "raw_text": "Application to rezone 888 Terminal Avenue from I-2 to CD-1. Proposal for a 35-storey residential tower with 380 units, leveraging proximity to Main Street-Science World SkyTrain station (TOA Tier 1). Includes community amenity contribution of $4.2M."
+  },
+  {
+    "id": 22,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-december-10-2024",
+    "title": "Regular Council Meeting Minutes - December 10, 2024",
+    "published_date": "2024-12-10",
+    "raw_text": "Council approved the rezoning of 1308 Kingsway from C-2 to CD-1 for a 6-storey mixed-use building with 55 residential units and ground-floor commercial. Kensington-Cedar Cottage neighbourhood. Vote: 9-2."
+  },
+  {
+    "id": 23,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-2601-2691-east-grandview-highway",
+    "title": "Rezoning Application: 2601-2691 East Grandview Highway",
+    "published_date": "2025-01-14",
+    "raw_text": "Application to rezone 2601-2691 East Grandview Highway from I-3 to CD-1. Proposal for 4 towers (12-30 storeys) with 1,200 units, 15,000 sqm commercial, and a 2-acre public park. Part of Rupert and Renfrew station area plan."
+  },
+  {
+    "id": 24,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-january-21-2025",
+    "title": "Regular Council Meeting Minutes - January 21, 2025",
+    "published_date": "2025-01-21",
+    "raw_text": "Council deferred the rezoning of 3333 Main Street from I-1 to CD-1 pending additional traffic studies. Proposed 15-storey tower with 175 units near Riley Park. Residents expressed concerns about parking and shadowing. Matter referred back to staff."
+  },
+  {
+    "id": 25,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-550-pacific-boulevard",
+    "title": "Development Permit Board Decision: 550 Pacific Boulevard",
+    "published_date": "2025-02-03",
+    "raw_text": "DPB approved development permit for 550 Pacific Boulevard (Northeast False Creek). Phase 2 of the master plan: two towers at 30 and 25 storeys with 520 residential units, 5,000 sqm retail, and public waterfront plaza. Project by Concord Pacific."
+  },
+  {
+    "id": 26,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-4050-rupert-street",
+    "title": "Rezoning Application: 4050 Rupert Street",
+    "published_date": "2025-01-28",
+    "raw_text": "Application to rezone 4050 Rupert Street from RS-1 to RM-7. Proposal for 6-storey apartment building with 48 units. Located 600m from Rupert SkyTrain station. Bill 47 Tier 3 density. Renfrew-Collingwood neighbourhood."
+  },
+  {
+    "id": 27,
+    "source_type": "news",
+    "source_url": "https://globalnews.ca/tag/skytrain/",
+    "title": "Broadway Subway Extension on Track for 2026 Opening",
+    "published_date": "2025-01-30",
+    "raw_text": "The Broadway Subway Extension, adding six new SkyTrain stations from VCC-Clark to Arbutus, remains on schedule for a 2026 opening. The extension will serve approximately 130,000 daily passengers and unlock significant density along the Broadway corridor under the Broadway Plan."
+  },
+  {
+    "id": 28,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-february-18-2025",
+    "title": "Regular Council Meeting Minutes - February 18, 2025",
+    "published_date": "2025-02-18",
+    "raw_text": "Council approved the rezoning of 5688 Willow Street from RS-1 to CD-1 for a 4-storey apartment building with 36 units. Oakridge neighbourhood. Part of Cambie Corridor Phase 3 densification. Vote: 10-1."
+  },
+  {
+    "id": 29,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1055-east-hastings-street",
+    "title": "Rezoning Application: 1055 East Hastings Street",
+    "published_date": "2025-02-25",
+    "raw_text": "Application to rezone 1055 East Hastings Street from C-2 to CD-1 for a 12-storey mixed-use building with 140 secured rental units and 1,500 sqm commercial. Hastings-Sunrise neighbourhood. Near Commercial-Broadway SkyTrain station area."
+  },
+  {
+    "id": 30,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-4710-kingsway",
+    "title": "Development Permit Board Decision: 4710 Kingsway",
+    "published_date": "2025-03-10",
+    "raw_text": "DPB approved development permit for 4710 Kingsway. 18-storey residential tower with 200 units near Metrotown station area. Developer: Ledingham McAllister. Conditions include affordable housing contribution and public realm improvements along Kingsway."
+  },
+  {
+    "id": 31,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-march-18-2025",
+    "title": "Regular Council Meeting Minutes - March 18, 2025",
+    "published_date": "2025-03-18",
+    "raw_text": "Council approved the rezoning of 2525 Quebec Street from I-1 to CD-1 for a 14-storey residential building with 165 units. Olympic Village area. Near Olympic Village Canada Line station. FSR 4.8. Vote: 8-3."
+  },
+  {
+    "id": 32,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1888-main-street",
+    "title": "Rezoning Application: 1888 Main Street",
+    "published_date": "2025-04-02",
+    "raw_text": "Application to rezone 1888 Main Street from C-2 to CD-1. Proposed 8-storey mixed-use building with 92 units including 25% below-market rental. Mount Pleasant neighbourhood. Main Street village character zone."
+  },
+  {
+    "id": 33,
+    "source_type": "news",
+    "source_url": "https://thetyee.ca/#missing-middle-housing-one-year-in-vancouver-sees-results",
+    "title": "Missing Middle Housing: One Year In, Vancouver Sees Results",
+    "published_date": "2025-04-10",
+    "raw_text": "One year after Vancouver's Missing Middle Housing Initiative, permits for multiplex housing have increased 340%. Over 200 applications for townhouses, triplexes, and sixplexes have been filed across RS-zoned neighbourhoods. Dunbar-Southlands, Kerrisdale, and Arbutus Ridge lead in applications."
+  },
+  {
+    "id": 34,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-april-15-2025",
+    "title": "Regular Council Meeting Minutes - April 15, 2025",
+    "published_date": "2025-04-15",
+    "raw_text": "Council approved the rezoning of 6398 Cambie Street from C-1 to CD-1 for a 10-storey mixed-use building with 130 rental units. Near Langara-49th Avenue Canada Line station. Includes childcare facility. Vote: 9-2."
+  },
+  {
+    "id": 35,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-150-east-broadway",
+    "title": "Rezoning Application: 150 East Broadway",
+    "published_date": "2025-04-28",
+    "raw_text": "Application to rezone 150 East Broadway from C-3A to CD-1. 25-storey tower with 285 units proposed near Mount Pleasant station (Broadway Extension). Transit-oriented development with commercial podium. Applicant: PCI Developments."
+  },
+  {
+    "id": 36,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-2055-yukon-street",
+    "title": "Development Permit Board Decision: 2055 Yukon Street",
+    "published_date": "2025-05-12",
+    "raw_text": "DPB approved development permit for 2055 Yukon Street. 6-storey mixed-use building with 72 units and 800 sqm commercial. Riley Park neighbourhood. Design includes heritage-inspired facade elements to complement adjacent heritage homes."
+  },
+  {
+    "id": 37,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-may-20-2025",
+    "title": "Regular Council Meeting Minutes - May 20, 2025",
+    "published_date": "2025-05-20",
+    "raw_text": "Council approved the rezoning of 2889 East 12th Avenue from RS-1 to RM-7 for a 4-storey apartment building with 32 units. Renfrew-Collingwood neighbourhood. Part of the Grandview-Woodland Community Plan transition area. Vote: 7-4."
+  },
+  {
+    "id": 38,
+    "source_type": "news",
+    "source_url": "https://www.vancouverisawesome.com/",
+    "title": "Senāķw Tower Complex: Construction Progress Update",
+    "published_date": "2025-06-05",
+    "raw_text": "The Senāķw development on Squamish Nation land near Vanier Park continues construction of its 11 towers. When complete, the project will add approximately 6,000 rental units to the Kitsilano-Fairview area, making it one of the largest residential projects in Canadian history."
+  },
+  {
+    "id": 39,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-june-17-2025",
+    "title": "Regular Council Meeting Minutes - June 17, 2025",
+    "published_date": "2025-06-17",
+    "raw_text": "Council denied the rezoning of 3456 Commercial Drive from C-2 to CD-1. Proposed 8-storey building faced strong community opposition due to impacts on Commercial Drive heritage character. 127 speakers registered against. Vote: 2-9 against."
+  },
+  {
+    "id": 40,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-4688-fraser-street",
+    "title": "Rezoning Application: 4688 Fraser Street",
+    "published_date": "2025-07-01",
+    "raw_text": "Application to rezone 4688 Fraser Street from C-1 to CD-1. 6-storey mixed-use building with 58 units. Fraser Street corridor densification. Victoria-Fraserview neighbourhood. Includes affordable housing contribution."
+  },
+  {
+    "id": 41,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-july-15-2025",
+    "title": "Regular Council Meeting Minutes - July 15, 2025",
+    "published_date": "2025-07-15",
+    "raw_text": "Council approved the rezoning of 1950 Glen Drive from I-2 to CD-1 for a 20-storey residential tower with 225 units. Near VCC-Clark SkyTrain station, Bill 47 Tier 1 area. Includes 20% affordable rental units. Vote: 8-3."
+  },
+  {
+    "id": 42,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-777-pacific-boulevard",
+    "title": "Development Permit Board Decision: 777 Pacific Boulevard",
+    "published_date": "2025-07-28",
+    "raw_text": "DPB approved development permit for 777 Pacific Boulevard. Northeast False Creek Phase 3: 45-storey tower with 450 residential units and 8,000 sqm office. Includes a new public school facility. Developer: Concord Pacific."
+  },
+  {
+    "id": 43,
+    "source_type": "news",
+    "source_url": "https://biv.com/real-estate#vancouver-housing-starts-surge-along-broadway-corridor",
+    "title": "Vancouver Housing Starts Surge Along Broadway Corridor",
+    "published_date": "2025-08-12",
+    "raw_text": "Housing starts in Vancouver increased 42% year-over-year in the Broadway corridor, driven by the upcoming SkyTrain extension and Broadway Plan density allowances. Over 4,500 units are currently under construction between VCC-Clark and Arbutus stations."
+  },
+  {
+    "id": 44,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-september-16-2025",
+    "title": "Regular Council Meeting Minutes - September 16, 2025",
+    "published_date": "2025-09-16",
+    "raw_text": "Council approved an infrastructure levy increase for developments within TOA areas to fund transit station improvements and public amenities. The levy applies to projects exceeding 8 storeys within 800m of SkyTrain stations."
+  },
+  {
+    "id": 45,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-5455-willow-street",
+    "title": "Rezoning Application: 5455 Willow Street",
+    "published_date": "2025-09-22",
+    "raw_text": "Application to rezone 5455 Willow Street from RS-1 to CD-1 for a 6-storey apartment with 64 units. Oakridge neighbourhood, 350m from Oakridge-41st Avenue Canada Line station. Bill 47 Tier 2 density."
+  },
+  {
+    "id": 46,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-october-21-2025",
+    "title": "Regular Council Meeting Minutes - October 21, 2025",
+    "published_date": "2025-10-21",
+    "raw_text": "Council approved the rezoning of 2850 Shaughnessy Street from RS-1 to RM-8A. Townhouse development with 18 units in Shaughnessy. Significant debate about neighbourhood character. Vote: 6-5."
+  },
+  {
+    "id": 47,
+    "source_type": "news",
+    "source_url": "https://dailyhive.com/vancouver#joyce-collingwood-station-precinct-plan-moves-forward",
+    "title": "Joyce-Collingwood Station Precinct Plan Moves Forward",
+    "published_date": "2025-10-30",
+    "raw_text": "The City of Vancouver has adopted the Joyce-Collingwood Station Precinct Plan, which will guide development of up to 20,000 new homes within 800m of Joyce-Collingwood SkyTrain station. The plan leverages Bill 47 densities and includes new parks, a community centre, and improved pedestrian connections."
+  },
+  {
+    "id": 48,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-4155-halifax-street",
+    "title": "Rezoning Application: 4155 Halifax Street",
+    "published_date": "2025-11-05",
+    "raw_text": "Application to rezone 4155 Halifax Street from I-2 to CD-1. 15-storey residential building with 170 units. Hastings-Sunrise neighbourhood. Within 800m of Renfrew SkyTrain station. Bill 47 Tier 3 area. Applicant: Onni Group."
+  },
+  {
+    "id": 49,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-november-18-2025",
+    "title": "Regular Council Meeting Minutes - November 18, 2025",
+    "published_date": "2025-11-18",
+    "raw_text": "Council approved a density bonus policy update for TOA Tier 1 areas. Developers can achieve up to 25% additional density beyond Bill 47 minimums in exchange for 30% affordable rental units. Policy effective January 1, 2026."
+  },
+  {
+    "id": 50,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-1188-west-pender-street",
+    "title": "Development Permit Board Decision: 1188 West Pender Street",
+    "published_date": "2025-12-01",
+    "raw_text": "DPB approved development permit for 1188 West Pender Street. 52-storey office tower with 75,000 sqm office space and ground-floor retail. Downtown Vancouver. Tallest office building proposed in Vancouver. View cone analysis confirmed compliance."
+  },
+  {
+    "id": 51,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-december-16-2025",
+    "title": "Regular Council Meeting Minutes - December 16, 2025",
+    "published_date": "2025-12-16",
+    "raw_text": "Council approved the 2026 Capital Plan including $180M for transit-area infrastructure improvements. Major investments: Joyce-Collingwood precinct ($45M), Broadway corridor utilities ($55M), and Marpole community centre ($28M). Vote: 11-0."
+  },
+  {
+    "id": 52,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-2355-main-street",
+    "title": "Rezoning Application: 2355 Main Street",
+    "published_date": "2026-01-08",
+    "raw_text": "Application to rezone 2355 Main Street from C-2 to CD-1. 10-storey mixed-use building with 115 units and 2,000 sqm retail/office. Mount Pleasant neighbourhood. Part of the Main Street corridor intensification."
+  },
+  {
+    "id": 53,
+    "source_type": "news",
+    "source_url": "https://vancouversun.com/category/news/local-news#broadway-subway-begins-testing-ahead-of-opening",
+    "title": "Broadway Subway Begins Testing Ahead of Opening",
+    "published_date": "2026-01-15",
+    "raw_text": "TransLink has begun testing trains on the Broadway Subway Extension, with revenue service expected by summer 2026. The six new stations from Great Northern Way to Arbutus will serve an estimated 130,000 daily riders and catalyze major development along the corridor."
+  },
+  {
+    "id": 54,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-january-20-2026",
+    "title": "Regular Council Meeting Minutes - January 20, 2026",
+    "published_date": "2026-01-20",
+    "raw_text": "Council approved the rezoning of 6888 Station Hill Drive from RS-1 to CD-1 for a 16-storey residential tower with 190 units. Sunset neighbourhood, within 400m of Joyce-Collingwood SkyTrain station. Bill 47 Tier 2 area. Vote: 8-3."
+  },
+  {
+    "id": 55,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1555-west-broadway",
+    "title": "Rezoning Application: 1555 West Broadway",
+    "published_date": "2026-01-28",
+    "raw_text": "Application to rezone 1555 West Broadway from C-3A to CD-1. 32-storey mixed-use tower with 340 units. Adjacent to future South Granville Broadway Subway station. Bill 47 Tier 1 density. Includes 6,000 sqm office and ground-floor retail."
+  },
+  {
+    "id": 56,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#dunbar-residents-assoc-v-city-of-vancouver-bill-47-toa-chall",
+    "title": "Dunbar Residents Assoc. v. City of Vancouver (Bill 47 TOA Challenge)",
+    "published_date": "2024-07-12",
+    "raw_text": "BC Supreme Court dismissed a petition by the Dunbar Residents Association challenging the City of Vancouver's implementation of Bill 47 transit-oriented area density minimums near Dunbar Street bus exchange. The petitioners argued the prescribed minimum densities of 12 storeys within 200m violated neighbourhood character protections. Justice Henderson held that provincial legislation takes precedence over municipal zoning preferences and that Bill 47's density mandates are a valid exercise of provincial authority under s. 481.1 of the Local Government Act. Petition dismissed with costs to the respondent."
+  },
+  {
+    "id": 57,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#heritage-vancouver-society-v-jameson-development-corp",
+    "title": "Heritage Vancouver Society v. Jameson Development Corp.",
+    "published_date": "2024-09-18",
+    "raw_text": "BC Court of Appeal upheld a lower court ruling that the heritage designation of the Bauer Building at 340 Cambie Street effectively blocked the proposed 38-storey tower development by Jameson Development Corp. The Court confirmed that heritage designation under Part 15 of the Local Government Act confers protection that cannot be overridden by density entitlements alone. The developer had argued that Bill 47 Tier 1 density entitlements near Stadium-Chinatown SkyTrain station superseded heritage restrictions. The Court held that heritage designations and TOA density provisions must be read harmoniously, and heritage protections remain intact absent explicit legislative override."
+  },
+  {
+    "id": 58,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#pacific-environmental-council-v-creekside-towers-ltd",
+    "title": "Pacific Environmental Council v. Creekside Towers Ltd.",
+    "published_date": "2024-11-05",
+    "raw_text": "The BC Environmental Appeal Board ruled against a judicial review challenge by the Pacific Environmental Council regarding environmental permits for the Creekside Towers development at 1600 Columbia Street on the south shore of False Creek. The tribunal found that the environmental impact assessment was conducted in accordance with the Environmental Management Act and that the developer had adequately addressed contaminated soil remediation, stormwater management, and shoreline habitat protection requirements. The development of a 24-storey residential tower with 280 units may proceed subject to existing permit conditions."
+  },
+  {
+    "id": 59,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#strata-plan-bcs-4872-v-apex-redevelopment-inc-strata-wind-up",
+    "title": "Strata Plan BCS 4872 v. Apex Redevelopment Inc. (Strata Wind-Up)",
+    "published_date": "2025-01-22",
+    "raw_text": "BC Supreme Court approved the wind-up and dissolution of Strata Plan BCS 4872, a 1975-era 48-unit low-rise complex at 4520-4540 Knight Street, clearing the way for site assembly by Apex Redevelopment Inc. The court was satisfied that the required 80% supermajority of strata lot owners had voted in favour of dissolution under Part 16 of the Strata Property Act. Four dissenting owners challenged the wind-up as procedurally deficient and the offered compensation as inadequate. Justice Blaine rejected both arguments, finding the process fully compliant and the independent appraisal fair. The site will be redeveloped as a 20-storey residential tower with 240 units under the Kensington-Cedar Cottage area plan."
+  },
+  {
+    "id": 60,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#squamish-nation-council-v-province-of-bc-sen-w-jurisdiction",
+    "title": "Squamish Nation Council v. Province of BC (Senāķw Jurisdiction)",
+    "published_date": "2025-03-14",
+    "raw_text": "BC Supreme Court confirmed that the Squamish Nation holds exclusive jurisdiction over land use and development on the Senāķw site near the Burrard Street Bridge, and that municipal bylaws, zoning regulations, and provincial transit-oriented area legislation do not apply to federal reserve lands or lands subject to the Framework Agreement on First Nation Land Management. The Province had sought a declaration regarding the applicability of Bill 47 density provisions to the Senāķw project. The Court dismissed the application, affirming that the Indian Act and First Nations Land Management Act create a separate jurisdictional framework. The ruling has implications for other First Nations development projects in Metro Vancouver."
+  },
+  {
+    "id": 61,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#skyline-properties-ltd-v-city-of-vancouver-view-cone-varianc",
+    "title": "Skyline Properties Ltd. v. City of Vancouver (View Cone Variance)",
+    "published_date": "2025-05-08",
+    "raw_text": "BC Supreme Court ruled in favour of Skyline Properties Ltd. in a dispute over the denial of a height variance for a proposed 42-storey residential tower at 1050 Burrard Street. The developer had applied for a variance from View Cone 3.2.1 (Queen Elizabeth Park to North Shore Mountains) that would have permitted an additional 8 storeys. The Court found that the City's Development Permit Board had failed to follow its own guidelines in assessing the variance, specifically by not applying the updated 2024 View Cone Management Policy that allows for contextual height increases where surrounding buildings already penetrate the view cone. The matter was remitted to the DPB for reconsideration."
+  },
+  {
+    "id": 62,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#chan-et-al-v-cambie-corridor-developments-ltd-construction-d",
+    "title": "Chan et al. v. Cambie Corridor Developments Ltd. (Construction Deficiency)",
+    "published_date": "2025-07-15",
+    "raw_text": "BC Supreme Court certified a class action proceeding brought by 186 unit owners at the Cambie Gardens development at 5250-5290 Cambie Street against Cambie Corridor Developments Ltd. The plaintiffs allege widespread construction deficiencies including water ingress through the building envelope, defective fire separation assemblies, inadequate sound insulation between units, and premature failure of mechanical systems. The defendant developer built the 22-storey, 265-unit project under the Cambie Corridor Plan. The court found sufficient commonality among the claims and appointed class counsel. Trial expected in 2027."
+  },
+  {
+    "id": 63,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#vancouver-affordable-housing-coalition-v-province-of-bc",
+    "title": "Vancouver Affordable Housing Coalition v. Province of BC",
+    "published_date": "2025-09-10",
+    "raw_text": "BC Supreme Court dismissed a constitutional challenge to the Province's affordable housing inclusionary zoning requirements under Bill 47. The Vancouver Affordable Housing Coalition, representing several mid-size developers, argued that requiring 20% below-market units in projects exceeding 100 units within TOA areas constituted an unreasonable regulatory taking contrary to s. 1 of the Charter. Justice Marchand held that the inclusionary requirement is a reasonable limit prescribed by law, serves a pressing and substantial objective of addressing the housing affordability crisis, and is proportionate to the developmental benefits conferred by TOA density entitlements. Challenge dismissed."
+  },
+  {
+    "id": 64,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#broadway-corridor-expropriation-mignault-holdings-v-province",
+    "title": "Broadway Corridor Expropriation: Mignault Holdings v. Province of BC",
+    "published_date": "2025-11-20",
+    "raw_text": "BC Supreme Court adjudicated a compensation dispute arising from the expropriation of commercial properties at 455-465 West Broadway for the Broadway Subway Extension corridor. Mignault Holdings Ltd. challenged the Province's offered compensation of $8.2M as inadequate, claiming the properties were worth $14.5M based on their redevelopment potential under the Broadway Plan. The Court appointed an independent assessor who valued the properties at $11.8M, accounting for both existing use value and a portion of the rezoning uplift potential. The Court adopted the independent assessment and ordered the Province to pay the difference plus interest."
+  },
+  {
+    "id": 65,
+    "source_type": "court_ruling",
+    "source_url": "https://www.bccourts.ca/search_judgments.aspx#west-end-residents-v-pacific-gate-towers-ltd-shadow-noise-im",
+    "title": "West End Residents v. Pacific Gate Towers Ltd. (Shadow & Noise Impact)",
+    "published_date": "2026-01-10",
+    "raw_text": "BC Supreme Court dismissed a petition by a group of West End residents seeking an injunction against the construction of the 35-storey Pacific Gate residential tower at 1225 Davie Street. The petitioners claimed the tower would cause unreasonable shadow impact on nearby parks and residential buildings and that construction noise would constitute a nuisance. Justice Campbell held that the development had received all required permits, that shadow studies showed compliance with the City's shadow impact guidelines, and that construction noise is an expected and temporary consequence of lawful development. The Court noted that urban densification necessarily involves some impact on existing residents and that the permitting process adequately balances competing interests."
+  },
+  {
+    "id": 66,
+    "source_type": "news",
+    "source_url": "https://dailyhive.com/vancouver#broadway-plan-year-in-review-12-towers-approved-in-2025",
+    "title": "Broadway Plan Year in Review: 12 Towers Approved in 2025",
+    "published_date": "2025-12-28",
+    "raw_text": "In a year of record development approvals along the Broadway corridor, Vancouver City Council approved 12 tower projects totalling over 3,800 residential units. The approvals ranged from 12 to 39 storeys and were concentrated near the six new Broadway Subway stations. Mount Pleasant and Fairview led with the most approvals. Industry analysts estimate the combined project value at over $4.2 billion, making 2025 the most active year for development on the corridor since the Broadway Plan was adopted."
+  },
+  {
+    "id": 67,
+    "source_type": "news",
+    "source_url": "https://biv.com/real-estate#land-prices-near-skytrain-stations-surge-60-since-bill-47",
+    "title": "Land Prices Near SkyTrain Stations Surge 60% Since Bill 47",
+    "published_date": "2025-10-15",
+    "raw_text": "Commercial and residential land within 200m of SkyTrain stations has increased in assessed value by an average of 60% since the passage of Bill 47 Transit-Oriented Areas legislation, according to a new report by Colliers International. The highest increases were recorded near Joyce-Collingwood (82%), Oakridge-41st (75%), and the future Arbutus station (71%). The report notes that while land values have risen sharply, the mandated density increases mean per-unit land costs have actually decreased by 15-20%, improving project viability for developers."
+  },
+  {
+    "id": 68,
+    "source_type": "news",
+    "source_url": "https://thetyee.ca/#broadway-boom-displacing-hundreds-of-long-term-renters",
+    "title": "Broadway Boom Displacing Hundreds of Long-Term Renters",
+    "published_date": "2025-08-22",
+    "raw_text": "An investigation by The Tyee has found that at least 340 long-term renters have been displaced from low-rise apartment buildings along the Broadway corridor to make way for tower developments approved under the Broadway Plan. Many displaced tenants are seniors who had lived in their units for over a decade paying rents well below market rate. While developers are required to offer right of first refusal for new units, tenant advocates say the gap between old and new rents makes return unaffordable. The City's tenant relocation policy covers moving costs and provides interim rent supplements, but critics argue the support is insufficient."
+  },
+  {
+    "id": 69,
+    "source_type": "news",
+    "source_url": "https://vancouversun.com/category/news/local-news#vancouver-office-vacancy-drops-as-tech-firms-expand",
+    "title": "Vancouver Office Vacancy Drops as Tech Firms Expand",
+    "published_date": "2025-11-08",
+    "raw_text": "Vancouver's downtown office vacancy rate fell to 7.2% in Q3 2025, down from 11.8% a year ago, driven by expansion from tech firms and the return-to-office trend. The Mount Pleasant tech corridor saw the tightest conditions at 3.1% vacancy. New office supply along the Broadway corridor, including the approved 52-storey tower at 1188 West Pender, is expected to add 200,000 sqm of office space by 2028. CBRE projects that downtown office rents will increase 8-12% over the next 18 months as demand outpaces supply."
+  },
+  {
+    "id": 70,
+    "source_type": "news",
+    "source_url": "https://dailyhive.com/vancouver#canada-line-hits-record-ridership-as-toa-development-acceler",
+    "title": "Canada Line Hits Record Ridership as TOA Development Accelerates",
+    "published_date": "2025-09-30",
+    "raw_text": "TransLink reports that Canada Line ridership has reached a record 160,000 average daily boardings in September 2025, exceeding pre-pandemic highs for the first time. The surge is attributed to population growth driven by transit-oriented developments along the Cambie Corridor, with over 3,200 new residential units completed near Canada Line stations in 2024-2025. TransLink is now studying capacity improvements including longer trains and signal upgrades to handle projected ridership of 200,000 daily by 2030."
+  },
+  {
+    "id": 71,
+    "source_type": "news",
+    "source_url": "https://biv.com/real-estate#2026-housing-outlook-supply-wave-to-test-vancouver-market",
+    "title": "2026 Housing Outlook: Supply Wave to Test Vancouver Market",
+    "published_date": "2026-01-22",
+    "raw_text": "A record 8,200 new housing units are expected to complete in Vancouver in 2026, the largest single-year addition in the city's history. The supply wave is led by Broadway Plan corridor towers and Cambie Corridor projects. CMHC forecasts that the increased supply may moderate price growth to 2-4% for condos, while rental rates could see their first decline in over a decade in some neighbourhoods. Developers are watching absorption rates closely, with several projects delaying pre-sale launches until market conditions stabilize."
+  },
+  {
+    "id": 72,
+    "source_type": "news",
+    "source_url": "https://thetyee.ca/#vancouver-heritage-demolitions-hit-record-as-density-push-co",
+    "title": "Vancouver Heritage Demolitions Hit Record as Density Push Continues",
+    "published_date": "2026-02-05",
+    "raw_text": "Vancouver lost 87 pre-1940 buildings to demolition in 2025, the highest number in a single year since records began in 1990, according to data from Heritage Vancouver. The majority were single-family homes and low-rise commercial buildings in the Broadway Plan area and along the Cambie Corridor, demolished to make way for higher-density developments. Heritage advocates are calling for stronger retention incentives, including density transfer credits and heritage floor area bonuses, to preserve the city's architectural history amid the densification push."
+  },
+  {
+    "id": 73,
+    "source_type": "news",
+    "source_url": "https://vancouversun.com/category/news/local-news#surrey-langley-skytrain-enters-final-design-phase",
+    "title": "Surrey-Langley SkyTrain Enters Final Design Phase",
+    "published_date": "2026-02-10",
+    "raw_text": "The Surrey-Langley SkyTrain extension has entered its final design phase, with construction expected to begin in late 2026. The 16-km extension from King George station to Langley City Centre will add eight new stations and is projected to cost $4.9 billion. TransLink anticipates that Bill 47 TOA density provisions will apply to all new station areas, potentially unlocking over 50,000 new housing units along the corridor. The project is expected to open for service in 2032."
+  },
+  {
+    "id": 74,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#special-council-meeting-minutes-june-18-2024-heritage-policy",
+    "title": "Special Council Meeting Minutes - June 18, 2024 (Heritage Policy)",
+    "published_date": "2024-06-18",
+    "raw_text": "Council adopted amendments to the Heritage Conservation Policy to strengthen protections for Category A and B heritage buildings within TOA areas. New provisions require a heritage impact assessment for any development within 30m of a designated heritage building and create a heritage density transfer program allowing owners of heritage buildings to sell unused density to receiving sites within the same TOA tier. Vote: 9-2."
+  },
+  {
+    "id": 75,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-october-22-2024-rental-prote",
+    "title": "Regular Council Meeting Minutes - October 22, 2024 (Rental Protection)",
+    "published_date": "2024-10-22",
+    "raw_text": "Council approved enhanced tenant relocation and protection policies for developments in TOA areas. The new policy requires developers to provide displaced tenants with a minimum 18-month rent supplement equal to the difference between their current rent and comparable market units, plus moving expenses. Developers must also offer right of first refusal for new units at 20% below market for a period of 10 years. Vote: 10-1."
+  },
+  {
+    "id": 76,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#special-council-meeting-minutes-june-17-2025-marpole-area-pl",
+    "title": "Special Council Meeting Minutes - June 17, 2025 (Marpole Area Plan)",
+    "published_date": "2025-06-17",
+    "raw_text": "Council adopted the updated Marpole Community Plan following two years of consultation. The plan increases height limits along Cambie Street south of 64th Avenue to 25 storeys within TOA Tier 1, designates the Marine Drive corridor for mixed-use intensification up to 12 storeys, and creates new park and greenway connections to the Fraser River foreshore. The plan anticipates 8,500 new housing units over 20 years. Vote: 8-3."
+  },
+  {
+    "id": 77,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#special-council-meeting-minutes-september-16-2025-parking-re",
+    "title": "Special Council Meeting Minutes - September 16, 2025 (Parking Reform)",
+    "published_date": "2025-09-16",
+    "raw_text": "Council approved a comprehensive parking bylaw reform that eliminates minimum parking requirements for all residential and commercial developments within 800m of a SkyTrain station. Projects may still provide parking but are no longer required to do so. The bylaw also introduces maximum parking limits of 0.5 stalls per unit in TOA Tier 1 and 0.8 stalls per unit in Tier 2. The reform is expected to reduce construction costs by $30,000-$60,000 per unit and accelerate project timelines. Vote: 7-4."
+  },
+  {
+    "id": 78,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-november-18-2025-community-b",
+    "title": "Regular Council Meeting Minutes - November 18, 2025 (Community Benefits)",
+    "published_date": "2025-11-18",
+    "raw_text": "Council approved a new Community Benefits Agreement framework for major developments exceeding 200 units within TOA areas. The framework requires developers to commit to local hiring targets (30% of construction workforce from the local area), apprenticeship positions, and contributions to a neighbourhood improvement fund calculated at $500 per residential unit. The policy applies to all new rezoning applications effective January 1, 2026. Vote: 9-2."
+  },
+  {
+    "id": 79,
+    "source_type": "council_minutes",
+    "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#regular-council-meeting-minutes-february-4-2026",
+    "title": "Regular Council Meeting Minutes - February 4, 2026",
+    "published_date": "2026-02-04",
+    "raw_text": "Council approved the rezoning of 3055 Grandview Highway from I-3 to CD-1 for a 22-storey mixed-use tower with 275 units and 3,000 sqm commercial. Located within 300m of Renfrew SkyTrain station, the project qualifies for Bill 47 Tier 2 density. The developer will provide 20% affordable rental units. Vote: 8-3."
+  },
+  {
+    "id": 80,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-2150-keith-drive",
+    "title": "Development Permit Board Decision: 2150 Keith Drive",
+    "published_date": "2024-09-09",
+    "raw_text": "DPB approved development permit for 2150 Keith Drive in the Grandview-Woodland neighbourhood. 14-storey residential tower with 165 units, including 30 social housing units provided in partnership with BC Housing. The project is located 150m from the future Great Northern Way Broadway Subway station. Conditions include a public art contribution of $350,000 and improvements to the adjacent greenway."
+  },
+  {
+    "id": 81,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-3888-norfolk-street",
+    "title": "Development Permit Board Decision: 3888 Norfolk Street",
+    "published_date": "2025-02-10",
+    "raw_text": "DPB approved with conditions the development permit for 3888 Norfolk Street in the Renfrew-Collingwood neighbourhood. 10-storey residential building with 118 secured rental units. The project leverages Bill 47 Tier 3 density within 800m of the Rupert SkyTrain station. The Board required enhanced setbacks on the south facade to reduce shadow impacts on adjacent single-family homes and a landscaped buffer along the east property line."
+  },
+  {
+    "id": 82,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-990-beatty-street",
+    "title": "Development Permit Board Decision: 990 Beatty Street",
+    "published_date": "2025-06-23",
+    "raw_text": "DPB denied the development permit for 990 Beatty Street in Yaletown. The proposed 28-storey mixed-use tower with 310 residential units and 2,500 sqm retail was found to penetrate View Cone 9 (Cambie Bridge to North Shore Mountains) beyond the allowable envelope. The Board directed the applicant to reduce the tower height by a minimum of 6 storeys or redesign the floor plate to achieve compliance. The applicant indicated they would revise and resubmit."
+  },
+  {
+    "id": 83,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-1255-pendrell-street",
+    "title": "Development Permit Board Decision: 1255 Pendrell Street",
+    "published_date": "2025-10-14",
+    "raw_text": "DPB approved development permit for 1255 Pendrell Street in the West End. 18-storey residential tower with 195 units, replacing a 1962-era 3-storey walkup. The project includes 35 below-market rental units as part of the tenant relocation plan. Existing tenants will receive priority access at rents 20% below market for 10 years. The design was praised for its slender tower form and generous public realm contribution at the ground level."
+  },
+  {
+    "id": 84,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-2275-clark-drive",
+    "title": "Development Permit Board Decision: 2275 Clark Drive",
+    "published_date": "2026-01-13",
+    "raw_text": "DPB approved development permit for 2275 Clark Drive near the VCC-Clark SkyTrain station. 25-storey mixed-use tower with 290 rental units and 4,000 sqm office space. The project is one of the first to utilize the new TOA Tier 1 density bonus policy, providing 30% affordable rental units in exchange for 25% additional density. Developer: Chard Development. The Board commended the project's mass timber hybrid construction approach."
+  },
+  {
+    "id": 85,
+    "source_type": "dpb_minutes",
+    "source_url": "https://vancouver.ca/home-property-development/development-permit-board.aspx#development-permit-board-decision-4100-joyce-street",
+    "title": "Development Permit Board Decision: 4100 Joyce Street",
+    "published_date": "2026-02-10",
+    "raw_text": "DPB approved development permit for 4100 Joyce Street in the Renfrew-Collingwood neighbourhood. 18-storey residential tower with 210 units under the Joyce-Collingwood Station Precinct Plan. Located 180m from Joyce-Collingwood SkyTrain station. The project includes a 500 sqm ground-level community space to be operated by the Collingwood Neighbourhood House. Developer: Polygon Homes."
+  },
+  {
+    "id": 86,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1880-arbutus-street",
+    "title": "Rezoning Application: 1880 Arbutus Street",
+    "published_date": "2025-08-15",
+    "raw_text": "Application to rezone 1880 Arbutus Street from C-2 to CD-1 for a 20-storey mixed-use tower with 230 units. Located 120m from the future Arbutus SkyTrain station. Bill 47 Tier 1 density. Proposal includes 4,500 sqm ground-floor retail and a 1,200 sqm childcare facility. Applicant: Wesgroup Properties."
+  },
+  {
+    "id": 87,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-5088-joyce-street",
+    "title": "Rezoning Application: 5088 Joyce Street",
+    "published_date": "2025-10-02",
+    "raw_text": "Application to rezone 5088 Joyce Street from C-1 to CD-1 for a 15-storey residential tower with 180 units under the Joyce-Collingwood Station Precinct Plan. Located 350m from Joyce-Collingwood SkyTrain station, Bill 47 Tier 2. The application includes 25% affordable rental units and a ground-level community health clinic. Applicant: Anthem Properties."
+  },
+  {
+    "id": 88,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-2688-kingsway",
+    "title": "Rezoning Application: 2688 Kingsway",
+    "published_date": "2025-12-10",
+    "raw_text": "Application to rezone 2688 Kingsway from C-2 to CD-1 for a 12-storey mixed-use building with 145 units and 2,800 sqm commercial. Kensington-Cedar Cottage neighbourhood. The site is 500m from Joyce-Collingwood SkyTrain station. The proposal includes a heritage retention component for the existing 1928 Kingsway Theatre facade, which will be integrated into the podium design."
+  },
+  {
+    "id": 89,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-1322-west-broadway",
+    "title": "Rezoning Application: 1322 West Broadway",
+    "published_date": "2026-01-30",
+    "raw_text": "Application to rezone 1322 West Broadway from C-3A to CD-1 for a 28-storey mixed-use tower with 310 units. Located within 200m of the future South Granville Broadway Subway station. Bill 47 Tier 1. The project proposes 8,000 sqm of office space and 2,000 sqm retail. The applicant has offered a community amenity contribution of $5.8M for park improvements. Applicant: QuadReal Property Group."
+  },
+  {
+    "id": 90,
+    "source_type": "rezoning_application",
+    "source_url": "https://rezoning.vancouver.ca/applications/#rezoning-application-6555-cambie-street",
+    "title": "Rezoning Application: 6555 Cambie Street",
+    "published_date": "2026-02-12",
+    "raw_text": "Application to rezone 6555 Cambie Street from C-1 to CD-1 for a 14-storey residential building with 168 units. Located 250m from Langara-49th Avenue Canada Line station, Bill 47 Tier 2. The proposal includes 20% below-market rental units and a ground-level daycare with 37 spaces. Applicant: Intracorp."
+  },
+  {
+    "id": 91,
+    "source_type": "community_plan",
+    "source_url": "https://vancouver.ca/home-property-development/grandview-woodland-community-plan.aspx",
+    "title": "Grandview-Woodland Community Plan: 2024 Five-Year Review",
+    "published_date": "2024-06-15",
+    "raw_text": "The City of Vancouver released the five-year review of the Grandview-Woodland Community Plan. The review found that the plan has delivered 1,200 of its targeted 3,800 new housing units, with the majority concentrated near Commercial-Broadway station. Key amendments include increasing allowable heights along East Broadway from 6 to 12 storeys to align with Bill 47 TOA provisions, designating new artist live-work zones along Venables Street, and establishing a neighbourhood heritage fund of $2M to support facade restoration on Commercial Drive."
+  },
+  {
+    "id": 92,
+    "source_type": "community_plan",
+    "source_url": "https://vancouver.ca/home-property-development/broadway-plan.aspx",
+    "title": "Broadway Plan Annual Monitoring Report 2025",
+    "published_date": "2025-04-30",
+    "raw_text": "The City released the 2025 Annual Monitoring Report for the Broadway Plan. Key metrics: 4,800 units approved (exceeding the 3,500-unit annual target), 18 rezoning applications processed, average approval timeline of 14 months. The report notes that 65% of approved units are rental tenure, with 22% qualifying as affordable. Infrastructure investment of $120M has been committed for water, sewer, and transportation upgrades in the plan area. The report recommends increasing the affordable housing target to 25% for future approvals."
+  },
+  {
+    "id": 93,
+    "source_type": "community_plan",
+    "source_url": "https://vancouver.ca/home-property-development/making-housing-work.aspx",
+    "title": "Rupert-Renfrew Station Area Plan: Phase 2 Public Consultation Summary",
+    "published_date": "2025-07-20",
+    "raw_text": "The City published the Phase 2 consultation summary for the Rupert-Renfrew Station Area Plan. The plan proposes up to 15,000 new housing units within 800m of Rupert and Renfrew SkyTrain stations, with towers up to 30 storeys near station entrances. Community feedback revealed strong support for new parks and green space (78%), concerns about traffic congestion (65%), and divided opinions on tower heights (52% supportive, 38% opposed). The final plan is expected in early 2026."
+  },
+  {
+    "id": 94,
+    "source_type": "community_plan",
+    "source_url": "https://vancouver.ca/home-property-development/community-plans.aspx",
+    "title": "Hastings-Sunrise Community Vision Update",
+    "published_date": "2025-10-10",
+    "raw_text": "The City adopted an updated community vision for Hastings-Sunrise that integrates Bill 47 TOA density provisions around Renfrew, Rupert, and Gilmore SkyTrain stations. The update increases allowable heights along Hastings Street from 4 to 8 storeys and designates three new mixed-use village centres at Renfrew, Rupert, and Boundary. The plan anticipates 4,200 new housing units over 15 years and includes $35M in park and greenway improvements along the Burrard Inlet foreshore."
+  },
+  {
+    "id": 95,
+    "source_type": "community_plan",
+    "source_url": "https://vancouver.ca/home-property-development/cambie-corridor-plan.aspx",
+    "title": "Oakridge Municipal Town Centre Plan",
+    "published_date": "2026-01-15",
+    "raw_text": "The City released the draft Oakridge Municipal Town Centre Plan, designating the area around Oakridge-41st Avenue Canada Line station as a municipal town centre with heights up to 40 storeys within 200m of the station. The plan builds on the Cambie Corridor Plan and the Oakridge Transit Centre redevelopment, envisioning a complete community with 12,000 new housing units, 50,000 sqm commercial, a new civic centre, and a 3-hectare central park. Public consultation runs through March 2026."
+  }
+]

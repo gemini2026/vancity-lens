@@ -1,0 +1,14 @@
+[
+  {"name": "Strathcona Community Garden", "address": "857 Malkin Avenue", "number_of_plots": 300, "lat": 49.2745, "lng": -123.0870},
+  {"name": "Cottonwood Community Garden", "address": "3698 Commercial Street", "number_of_plots": 55, "lat": 49.2560, "lng": -123.0700},
+  {"name": "Cypress Community Garden", "address": "1200 West 7th Avenue", "number_of_plots": 45, "lat": 49.2650, "lng": -123.1380},
+  {"name": "Maple Community Garden", "address": "501 West 7th Avenue", "number_of_plots": 62, "lat": 49.2650, "lng": -123.1140},
+  {"name": "Burrard Slopes Community Garden", "address": "1788 West 6th Avenue", "number_of_plots": 40, "lat": 49.2660, "lng": -123.1460},
+  {"name": "McSpadden Park Community Garden", "address": "2101 Victoria Drive", "number_of_plots": 25, "lat": 49.2620, "lng": -123.0650},
+  {"name": "Dunbar Community Garden", "address": "3575 West 18th Avenue", "number_of_plots": 30, "lat": 49.2560, "lng": -123.1870},
+  {"name": "Arbutus Victory Garden", "address": "2200 West 22nd Avenue", "number_of_plots": 35, "lat": 49.2530, "lng": -123.1560},
+  {"name": "UBC Farm Community Garden", "address": "3461 Ross Drive", "number_of_plots": 80, "lat": 49.2530, "lng": -123.2380},
+  {"name": "Jonathan Rogers Park Garden", "address": "110 West 7th Avenue", "number_of_plots": 28, "lat": 49.2650, "lng": -123.1070},
+  {"name": "Trillium Park Community Garden", "address": "5688 Ontario Street", "number_of_plots": 32, "lat": 49.2250, "lng": -123.1030},
+  {"name": "Norquay Community Garden", "address": "4955 Earles Street", "number_of_plots": 20, "lat": 49.2380, "lng": -123.0530}
+]

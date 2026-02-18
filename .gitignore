@@ -57,6 +57,8 @@ pgdata/
 
 # ── Data (too large for git, download separately) ────
 data/
+!data/seed/
+!data/load_seed.py
 
 # ── Migration Eval Outputs ───────────────────────────
 migration/rag_eval/output/

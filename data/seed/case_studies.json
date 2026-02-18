@@ -1,0 +1,86 @@
+[
+  {
+    "pid": "100-001-006",
+    "title": "RS-1 on Cambie near King Edward: 10 \u2192 20 Storeys",
+    "narrative": "A classic single-family lot on Cambie Street, 600 sqm, zoned RS-1 with FSR 0.6. Under Bill 47, proximity to King Edward SkyTrain station unlocks Tier 1 entitlement \u2014 up to 20 storeys and 5.5 FSR. This represents one of the largest density uplifts in the city.",
+    "highlight_metrics": {
+      "current_zoning": "RS-1",
+      "current_storeys": 10,
+      "entitled_storeys": 20,
+      "storey_uplift": 10,
+      "current_fsr": 0.6,
+      "entitled_fsr": 5.5,
+      "lot_area_sqm": 600,
+      "assessed_value": 3200000
+    },
+    "display_order": 1,
+    "is_active": true
+  },
+  {
+    "pid": "100-001-010",
+    "title": "Marpole RS-1 near Marine Drive Station",
+    "narrative": "A 750 sqm single-family lot in Marpole, assessed at $2.1M. Marine Drive SkyTrain station is within walking distance, unlocking Tier 1 Bill 47 entitlements. The low current FSR of 0.6 means the density uplift creates substantial buildable area \u2014 an ideal small-developer opportunity.",
+    "highlight_metrics": {
+      "current_zoning": "RS-1",
+      "current_storeys": 10,
+      "entitled_storeys": 20,
+      "storey_uplift": 10,
+      "current_fsr": 0.6,
+      "entitled_fsr": 5.5,
+      "lot_area_sqm": 750,
+      "assessed_value": 2100000
+    },
+    "display_order": 2,
+    "is_active": true
+  },
+  {
+    "pid": "100-001-001",
+    "title": "Commercial C-3A on Granville: Already Zoned Higher",
+    "narrative": "This 1,800 sqm commercial site on Granville Street is already zoned C-3A with FSR 3.0 and 30-storey height. Bill 47 Tier 1 only allows 20 storeys and 5.5 FSR \u2014 the existing zoning already exceeds the Bill 47 entitlement. Demonstrates that not every TOA parcel is an opportunity.",
+    "highlight_metrics": {
+      "current_zoning": "C-3A",
+      "current_storeys": 30,
+      "bill47_storeys": 20,
+      "zoning_already_exceeds": true,
+      "current_fsr": 3.0,
+      "lot_area_sqm": 1800,
+      "assessed_value": 12500000
+    },
+    "display_order": 3,
+    "is_active": true
+  },
+  {
+    "pid": "100-001-051",
+    "title": "Renfrew RS-1: Edge of TOA, Tier 3 Marginal",
+    "narrative": "A small 500 sqm lot on Renfrew Street, assessed at $1.7M. Sitting at the outer edge of the Transit-Oriented Area (400\u2013800m from the station), it qualifies for only Tier 3: 8 storeys and 3.0 FSR. The uplift is real but modest \u2014 representing the lower end of Bill 47 opportunities.",
+    "highlight_metrics": {
+      "current_zoning": "RS-1",
+      "current_storeys": 10,
+      "entitled_storeys": 8,
+      "storey_uplift": 0,
+      "current_fsr": 0.6,
+      "entitled_fsr": 3.0,
+      "lot_area_sqm": 500,
+      "assessed_value": 1700000
+    },
+    "display_order": 4,
+    "is_active": true
+  },
+  {
+    "pid": "100-001-011",
+    "title": "12,000 sqm Industrial: Highest Absolute Buildable SF",
+    "narrative": "The largest lot in this area at 12,000 sqm, this Renfrew-Collingwood industrial parcel creates the highest absolute buildable square footage under Bill 47. Even a modest FSR uplift on this lot generates enormous development potential \u2014 but the scale also means higher execution complexity and capital requirements.",
+    "highlight_metrics": {
+      "current_zoning": "I-3",
+      "current_storeys": 18,
+      "entitled_storeys": 20,
+      "storey_uplift": 2,
+      "current_fsr": 3.0,
+      "entitled_fsr": 5.5,
+      "lot_area_sqm": 12000,
+      "assessed_value": 45000000
+    },
+    "display_order": 5,
+    "is_active": true
+  }
+]

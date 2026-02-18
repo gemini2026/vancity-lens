@@ -292,10 +292,18 @@ async def sync_to_k2(
 
                 # Check for newlines in all string fields
                 issues = []
-                if "\n" in formatted.get("source_uri", "") or "\r" in formatted.get("source_uri", ""):
-                    issues.append(f"source_uri has newlines: {formatted['source_uri'][:100]!r}")
-                if "\n" in formatted.get("raw_text", "") or "\r" in formatted.get("raw_text", ""):
-                    issues.append(f"raw_text has newlines (len={len(formatted.get('raw_text', ''))})")
+                if "\n" in formatted.get("source_uri", "") or "\r" in formatted.get(
+                    "source_uri", ""
+                ):
+                    issues.append(
+                        f"source_uri has newlines: {formatted['source_uri'][:100]!r}"
+                    )
+                if "\n" in formatted.get("raw_text", "") or "\r" in formatted.get(
+                    "raw_text", ""
+                ):
+                    issues.append(
+                        f"raw_text has newlines (len={len(formatted.get('raw_text', ''))})"
+                    )
 
                 # Check metadata fields
                 metadata = formatted.get("metadata", {})
@@ -307,7 +315,7 @@ async def sync_to_k2(
                     logger.warning(
                         "Document %d has newline issues: %s",
                         doc["id"],
-                        "; ".join(issues)
+                        "; ".join(issues),
                     )
 
                 k2_batch.append(formatted)
@@ -316,12 +324,14 @@ async def sync_to_k2(
                     "Failed to format document %d (%s): %s",
                     doc["id"],
                     doc.get("title", "")[:50],
-                    e
+                    e,
                 )
                 continue
 
         if not k2_batch:
-            logger.warning("Batch %d: No documents to upload after formatting", batch_num)
+            logger.warning(
+                "Batch %d: No documents to upload after formatting", batch_num
+            )
             continue
 
         # Upload batch to K2
@@ -329,13 +339,17 @@ async def sync_to_k2(
             # Log first document in batch for debugging
             if k2_batch:
                 import json as json_lib
-                logger.info("First document in batch:\n%s", json_lib.dumps(k2_batch[0], indent=2, default=str)[:1000])
+
+                logger.info(
+                    "First document in batch:\n%s",
+                    json_lib.dumps(k2_batch[0], indent=2, default=str)[:1000],
+                )
 
                 # Check for invisible characters in source_uri around position 48
                 source_uri = k2_batch[0].get("source_uri", "")
                 if len(source_uri) > 40:
                     snippet = source_uri[40:60]
-                    hex_dump = ' '.join(f'{ord(c):02x}' for c in snippet)
+                    hex_dump = " ".join(f"{ord(c):02x}" for c in snippet)
                     logger.info("source_uri[40:60] = %r (hex: %s)", snippet, hex_dump)
 
             # Try uploading just the first document to isolate the issue
@@ -349,7 +363,10 @@ async def sync_to_k2(
                     wait=True,
                     poll_s=5,
                 )
-                logger.info("Single-document upload succeeded! Response: %s", single_doc_response)
+                logger.info(
+                    "Single-document upload succeeded! Response: %s",
+                    single_doc_response,
+                )
             except Exception as single_err:
                 logger.error("Single-document upload also failed: %s", single_err)
 
@@ -378,7 +395,10 @@ async def sync_to_k2(
 
         except Exception as e:
             logger.error("Failed to upload batch %d: %s", batch_num, e)
-            logger.error("Sample document from batch: source_uri=%r", k2_batch[0].get("source_uri", "")[:100] if k2_batch else "N/A")
+            logger.error(
+                "Sample document from batch: source_uri=%r",
+                k2_batch[0].get("source_uri", "")[:100] if k2_batch else "N/A",
+            )
             # Continue with next batch rather than failing entirely
             continue
 
