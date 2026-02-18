@@ -129,3 +129,21 @@ body {
 .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
   border-left-color: var(--color-surface-secondary);
 }
+
+/* Mobile touch target utilities */
+@media (max-width: 768px) {
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .touch-target-large {
+    min-width: 48px;
+    min-height: 48px;
+  }
+
+  .touch-target-xl {
+    min-width: 56px;
+    min-height: 56px;
+  }
+}

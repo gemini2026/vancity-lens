@@ -946,7 +946,7 @@ export default function MapView() {
         <button
           onClick={() => setShowSignals(!showSignals)}
           className={cn(
-            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showSignals
               ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
               : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -958,7 +958,7 @@ export default function MapView() {
         <button
           onClick={() => setShowClusters(!showClusters)}
           className={cn(
-            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showClusters
               ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
               : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -970,7 +970,7 @@ export default function MapView() {
         <button
           onClick={() => setShowRiskChoropleth(prev => !prev)}
           className={cn(
-            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showRiskChoropleth
               ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
               : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -983,7 +983,7 @@ export default function MapView() {
         <button
           onClick={() => setShowHeatmap(prev => !prev)}
           className={cn(
-            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showHeatmap
               ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
               : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -996,7 +996,7 @@ export default function MapView() {
         <button
           onClick={() => setShowTopDeals(prev => !prev)}
           className={cn(
-            "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+            "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
             showTopDeals
               ? "bg-emerald-600/20 border border-emerald-500/30 text-emerald-400"
               : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -1009,7 +1009,7 @@ export default function MapView() {
         {!showCaseStudies && (
           <button
             onClick={() => setShowCaseStudies(true)}
-            className="px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
+            className="touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
           >
             Examples
           </button>
@@ -1020,7 +1020,7 @@ export default function MapView() {
       <div className="md:hidden absolute bottom-20 right-4 z-10">
         <button
           onClick={() => setShowLayerMenu(!showLayerMenu)}
-          className="w-12 h-12 rounded-full bg-[var(--color-panel)] border border-[var(--color-panel-border)] backdrop-blur-md flex items-center justify-center text-[var(--color-foreground-muted)] shadow-lg"
+          className="touch-target-large w-12 h-12 rounded-full bg-[var(--color-panel)] border border-[var(--color-panel-border)] backdrop-blur-md flex items-center justify-center text-[var(--color-foreground-muted)] shadow-lg"
         >
           <Layers className="w-5 h-5" />
         </button>
@@ -1029,7 +1029,7 @@ export default function MapView() {
             <button
               onClick={() => setShowSignals(!showSignals)}
               className={cn(
-                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
                 showSignals
                   ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
                   : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -1041,7 +1041,7 @@ export default function MapView() {
             <button
               onClick={() => setShowClusters(!showClusters)}
               className={cn(
-                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
                 showClusters
                   ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
                   : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -1053,7 +1053,7 @@ export default function MapView() {
             <button
               onClick={() => setShowRiskChoropleth(prev => !prev)}
               className={cn(
-                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
                 showRiskChoropleth
                   ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
                   : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -1066,7 +1066,7 @@ export default function MapView() {
             <button
               onClick={() => setShowHeatmap(prev => !prev)}
               className={cn(
-                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
                 showHeatmap
                   ? "bg-blue-600/20 border border-blue-500/30 text-blue-400"
                   : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -1079,7 +1079,7 @@ export default function MapView() {
             <button
               onClick={() => setShowTopDeals(prev => !prev)}
               className={cn(
-                "px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
+                "touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer",
                 showTopDeals
                   ? "bg-emerald-600/20 border border-emerald-500/30 text-emerald-400"
                   : "bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)]"
@@ -1092,7 +1092,7 @@ export default function MapView() {
             {!showCaseStudies && (
               <button
                 onClick={() => setShowCaseStudies(true)}
-                className="px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
+                className="touch-target px-3 py-2 rounded-lg text-[11px] font-semibold backdrop-blur-md transition-all cursor-pointer bg-[var(--color-panel)] border border-[var(--color-panel-border)] text-[var(--color-foreground-muted)] hover:text-[var(--color-foreground)]"
               >
                 Examples
               </button>
