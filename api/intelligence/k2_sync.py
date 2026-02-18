@@ -326,6 +326,11 @@ async def sync_to_k2(
 
         # Upload batch to K2
         try:
+            # Log first document in batch for debugging
+            if k2_batch:
+                import json as json_lib
+                logger.info("First document in batch:\n%s", json_lib.dumps(k2_batch[0], indent=2, default=str)[:1000])
+
             response = k2_client.upload_documents_batch(
                 corpus_id=corpus_id,
                 documents=k2_batch,
