@@ -11,7 +11,7 @@ on:
       - '.github/workflows/deploy-backend.yml'
 
 env:
-  REGISTRY: us-docker.pkg.dev
+  REGISTRY: us-west1-docker.pkg.dev
   IMAGE_NAME: vancity-lens-api
 
 jobs:
