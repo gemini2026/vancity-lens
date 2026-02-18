@@ -7,7 +7,138 @@ HOOKS_DIR = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "src" 
 LAYOUT_DIR = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "src" / "app"
 
 
-@pytest.mark.skip(reason="ResponsiveLayout component was refactored into app/layout.tsx and BottomTabBar.tsx")
+class TestMobileNavComponent:
+    def test_mobilenav_file_exists(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        assert filepath.exists(), "MobileNav.tsx should exist"
+
+    def test_mobilenav_is_client_component(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert '"use client"' in content, "MobileNav should be a client component"
+
+    def test_mobilenav_imports_react(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "import { useState } from" in content, "MobileNav should import useState"
+
+    def test_mobilenav_has_interface(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "interface MobileNavProps" in content, "MobileNav should have props interface"
+
+    def test_mobilenav_accepts_activetab_prop(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert 'activeTab: "map" | "intel" | "hoods" | "alerts"' in content
+
+    def test_mobilenav_accepts_ontabchange_callback(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "onTabChange:" in content
+
+    def test_mobilenav_uses_usestate_for_isopen(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "useState(false)" in content, "MobileNav should track isOpen state"
+
+    def test_mobilenav_hamburger_button_hidden_on_desktop(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "md:hidden" in content, "Hamburger button should use md:hidden"
+
+    def test_mobilenav_hamburger_has_three_lines(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "h-0.5 w-6" in content, "Should have hamburger line elements"
+        assert content.count("h-0.5") >= 3, "Should have at least three line elements"
+
+    def test_mobilenav_hamburger_animated(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "rotate-45" in content, "First line should rotate when open"
+        assert "translate-y-2" in content, "Lines should translate when open"
+        assert "opacity-0" in content, "Middle line should fade when open"
+
+    def test_mobilenav_has_overlay(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "bg-black/50" in content, "Overlay should have semi-transparent background"
+
+    def test_mobilenav_overlay_closes_drawer(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert content.count("onClick={() => setIsOpen(false)}") >= 2
+
+    def test_mobilenav_drawer_slides_from_left(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "left-0" in content, "Drawer should be positioned left"
+        assert "-translate-x-full" in content, "Drawer should slide from left"
+        assert "translate-x-0" in content, "Drawer should slide in"
+
+    def test_mobilenav_drawer_has_close_button(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "✕" in content, "Drawer should have close button"
+
+    def test_mobilenav_drawer_fixed_width(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "w-64" in content, "Drawer should have fixed width"
+
+    def test_mobilenav_navigation_items_defined(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "navItems" in content, "Navigation items should be defined"
+        assert "map" in content and "intel" in content and "hoods" in content and "alerts" in content
+
+    def test_mobilenav_nav_items_mapped(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "navItems.map" in content, "Nav items should be mapped to buttons"
+
+    def test_mobilenav_active_tab_highlighted(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "bg-blue-600" in content, "Active tab should have blue background"
+        assert "text-white" in content, "Active tab text should be white"
+
+    def test_mobilenav_inactive_tab_styling(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "text-gray-300" in content, "Inactive tab should have gray text"
+        assert "hover:bg-slate-800" in content, "Inactive tab should have hover state"
+
+    def test_mobilenav_aria_expanded(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "aria-expanded" in content, "Hamburger button should have aria-expanded"
+
+    def test_mobilenav_aria_current(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "aria-current" in content, "Active nav item should have aria-current"
+
+    def test_mobilenav_nav_role(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert 'role="navigation"' in content, "Drawer should have navigation role"
+
+    def test_mobilenav_transition_duration(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "duration-300" in content, "Animations should use 300ms duration"
+
+    def test_mobilenav_icons_present(self):
+        filepath = COMPONENTS_DIR / "MobileNav.tsx"
+        content = filepath.read_text()
+        assert "📍" in content, "Map icon should be present"
+        assert "🧠" in content, "Intelligence icon should be present"
+        assert "🏢" in content, "Neighborhoods icon should be present"
+        assert "🔔" in content, "Alerts icon should be present"
+
+
 class TestResponsiveLayoutComponent:
     def test_responsivelayout_file_exists(self):
         filepath = COMPONENTS_DIR / "ResponsiveLayout.tsx"
@@ -421,7 +552,6 @@ class TestAnimations:
         assert "duration-200" in content or "transition" in content
 
 
-@pytest.mark.skip(reason="App now uses CSS variables/theme system, not hardcoded dark classes")
 class TestDarkTheme:
     def test_dark_background_layout(self):
         filepath = COMPONENTS_DIR / "ResponsiveLayout.tsx"
@@ -444,11 +574,12 @@ class TestDarkTheme:
         assert "text-gray" in content or "text-white" in content or "text-slate" in content
 
 
-@pytest.mark.skip(reason="MobileNav and ResponsiveLayout were refactored away")
 class TestIntegration:
     def test_all_components_present(self):
         components = [
-            "BottomTabBar.tsx",  # This one actually exists
+            "MobileNav.tsx",
+            "ResponsiveLayout.tsx",
+            "BottomTabBar.tsx",
         ]
         for component in components:
             filepath = COMPONENTS_DIR / component

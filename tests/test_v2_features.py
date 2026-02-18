@@ -12,9 +12,14 @@ import json
 import os
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+# Project root path for seed data
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SEED_DATA_PATH = PROJECT_ROOT / "data" / "seed" / "case_studies.json"
 
 
 # ── 1. Before/After Comparison Component ──────────────────────────
@@ -254,20 +259,20 @@ class TestCaseStudiesSeedData:
     """V2 Feature 4: Case studies seed data."""
 
     def test_seed_file_exists(self):
-        assert os.path.exists("data/seed/case_studies.json")
+        assert SEED_DATA_PATH.exists(), f"Case studies seed file not found at {SEED_DATA_PATH}"
 
     def test_seed_is_valid_json(self):
-        with open("data/seed/case_studies.json") as f:
+        with open(SEED_DATA_PATH) as f:
             data = json.load(f)
         assert isinstance(data, list)
 
     def test_seed_has_five_studies(self):
-        with open("data/seed/case_studies.json") as f:
+        with open(SEED_DATA_PATH) as f:
             data = json.load(f)
         assert len(data) == 5
 
     def test_each_study_has_required_fields(self):
-        with open("data/seed/case_studies.json") as f:
+        with open(SEED_DATA_PATH) as f:
             data = json.load(f)
         for study in data:
             assert "pid" in study
@@ -277,20 +282,20 @@ class TestCaseStudiesSeedData:
 
     def test_has_already_exceeds_scenario(self):
         """At least one case study demonstrates 'already exceeds' scenario."""
-        with open("data/seed/case_studies.json") as f:
+        with open(SEED_DATA_PATH) as f:
             data = json.load(f)
         exceeds = [s for s in data if s["highlight_metrics"].get("zoning_already_exceeds")]
         assert len(exceeds) >= 1
 
     def test_has_tier1_uplift_scenario(self):
         """At least one case study shows a major tier 1 uplift."""
-        with open("data/seed/case_studies.json") as f:
+        with open(SEED_DATA_PATH) as f:
             data = json.load(f)
         uplifts = [s for s in data if s["highlight_metrics"].get("storey_uplift", 0) >= 10]
         assert len(uplifts) >= 1
 
     def test_has_display_order(self):
-        with open("data/seed/case_studies.json") as f:
+        with open(SEED_DATA_PATH) as f:
             data = json.load(f)
         orders = [s["display_order"] for s in data]
         assert sorted(orders) == list(range(1, 6))
