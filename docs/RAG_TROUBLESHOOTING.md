@@ -245,6 +245,104 @@ kubectl logs -n vancity-lens -l app=vancity-lens-api --tail=500 | grep -E "(RAG|
 
 ---
 
+## K2 Document Sync
+
+### What is K2?
+
+K2 (Knowledge2.ai) is the production RAG backend that VanCity Lens uses for vector search and retrieval. Documents scraped into the PostgreSQL database need to be uploaded to the K2 corpus before RAG can find them.
+
+### Sync Architecture
+
+```
+PostgreSQL documents (195)
+    ↓ (k2_sync.py)
+K2 Corpus (api-dev.knowledge2.ai)
+    ↓ (RAG queries)
+Intelligence Chat responses
+```
+
+### Check K2 Sync Status
+
+```bash
+# Quick status check
+./scripts/sync-k2.sh --status
+```
+
+This shows:
+- Total documents in PostgreSQL
+- How many are synced to K2
+- How many are pending sync
+- K2 corpus document count
+- Recent sync jobs
+
+### Manual Sync
+
+```bash
+# Dry run - see what would be synced
+./scripts/sync-k2.sh --dry-run --limit 10
+
+# Sync unsynced documents
+./scripts/sync-k2.sh
+
+# Force re-sync all documents
+./scripts/sync-k2.sh --force
+
+# Sync specific number of documents
+./scripts/sync-k2.sh --limit 50
+```
+
+### Initial Bulk Upload
+
+After fresh deployment or when K2 corpus is empty, run the initial sync job to upload all documents:
+
+```bash
+./scripts/sync-k2.sh --initial
+```
+
+This creates a Kubernetes Job that:
+- Uploads all 195 documents to K2 in batches of 100
+- Takes ~5-10 minutes
+- Shows progress logs in real-time
+- Auto-indexes documents for immediate RAG availability
+
+### Ongoing Sync (CronJob)
+
+Deploy the K2 sync CronJob for automatic syncing:
+
+```bash
+kubectl apply -f k8s/cronjob-k2-sync.yaml
+```
+
+This runs every 30 minutes and uploads any new documents from scrapers to K2.
+
+**Schedule:** `*/30 * * * *` (every 30 minutes)
+
+### How Sync Tracking Works
+
+The sync system uses `metadata->>'k2_synced'` in the documents table to track which documents have been uploaded to K2:
+- Unsynced: `k2_synced` is `NULL` or `'false'`
+- Synced: `k2_synced` is `'true'` with `k2_synced_at` timestamp
+
+Idempotency: K2 deduplicates by `source_uri` (mapped to `source_url` from PostgreSQL), so re-uploading the same document is safe.
+
+### Troubleshooting
+
+**Issue: "K2 corpus has 0 documents"**
+- Run initial sync: `./scripts/sync-k2.sh --initial`
+- Check sync status: `./scripts/sync-k2.sh --status`
+
+**Issue: "New Tavily documents not showing in RAG"**
+- Check if CronJob is running: `kubectl get cronjob vancity-lens-k2-sync`
+- Manually trigger sync: `./scripts/sync-k2.sh`
+- Verify K2 corpus count increased: `./scripts/sync-k2.sh --status`
+
+**Issue: "Sync job failed"**
+- Check job logs: `kubectl logs -n vancity-lens -l component=k2-sync --tail=100`
+- Common causes: K2 API rate limits, network timeout, invalid credentials
+- Retry: Delete and recreate the job
+
+---
+
 ## Tavily Search Integration
 
 ### What is Tavily?
