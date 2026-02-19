@@ -24,18 +24,54 @@ import asyncpg
 logger = logging.getLogger(__name__)
 
 # ── Default Search Queries ────────────────────────────────────
+#
+# Organized by realtor decision categories to minimize duplication with
+# existing government/official scrapers (Council, DPB, Rezoning, News, etc.)
+#
+# Target: Pre-official and soft signals (developer announcements, neighborhood
+# momentum, economic drivers) that don't appear in permit systems.
+#
+# Expected: 150 URLs/run, 50-70% duplication (vs 96.5% with old queries)
+#
 
 DEFAULT_QUERIES = [
-    "Vancouver rezoning application 2026",
-    "Bill 47 TOD development Vancouver",
-    "Vancouver density development news",
+    # ── Category 1: Deal Pipeline ────────────────────────────────
+    # Pre-permit announcements, groundbreaking, architect selections, pre-sales
+    "Vancouver developer announces new project 2026",
+    "Vancouver construction groundbreaking ceremony 2026",
+    "Vancouver architecture firm selected residential tower 2026",
+    "Vancouver condo pre-sale launch 2026",
+
+    # ── Category 2: Neighborhood Momentum ─────────────────────────
+    # Business openings, community improvements, arts/culture signals
+    "Vancouver new restaurant opening 2026",
+    "Vancouver neighborhood improvement BIA community 2026",
+    "Vancouver arts district gallery opening 2026",
+
+    # ── Category 3: Market Intelligence ───────────────────────────
+    # Broker reports, appraisal trends, competitive intelligence
+    "Vancouver real estate market report 2026",
+    "Vancouver property valuation trends 2026",
+
+    # ── Category 4: Infrastructure & Amenities ────────────────────
+    # Transit, parks, bike lanes, pedestrian improvements
+    "Vancouver SkyTrain extension bus rapid transit 2026",
+    "Vancouver new park community center opening 2026",
+    "Vancouver bike lane seawall pedestrian infrastructure 2026",
+
+    # ── Category 5: Economic Drivers ──────────────────────────────
+    # Tech companies, job growth, office leasing, commercial activity
+    "Vancouver tech company office expansion relocation 2026",
+    "Vancouver jobs hiring employment growth 2026",
+    "Vancouver office lease coworking commercial real estate 2026",
 ]
 
 # Maximum results per search query
 MAX_RESULTS_PER_QUERY = 10
 
 # Number of top URLs to extract full content from per search run
-MAX_EXTRACT_URLS = 5
+# Increased from 5 to 10 due to higher unique content expected
+MAX_EXTRACT_URLS = 10
 
 # Search window (days)
 SEARCH_DAYS = 7
