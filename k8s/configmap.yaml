@@ -20,7 +20,7 @@ data:
   gcp-region: "us-west1"
 
   # RAG backend switch
-  rag-backend: "local" # local|k2
+  rag-backend: "k2" # local|k2 (default: k2 for production use)
 
   # K2 (Knowledge2) runtime config (non-secret)
   k2-api-host: "https://api-dev.knowledge2.ai"
