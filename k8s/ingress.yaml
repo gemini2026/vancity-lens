@@ -15,11 +15,18 @@ spec:
   rules:
   - http:
       paths:
-      - path: /
+      - path: /api
         pathType: Prefix
         backend:
           service:
             name: vancity-lens-api
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vancity-lens-frontend
             port:
               number: 80
 

@@ -103,3 +103,12 @@ jobs:
           kubectl run staging-ui --rm -i --restart=Never --image=curlimages/curl:8.7.1 \
             --namespace "${{ env.NAMESPACE }}" -- \
             curl -fsS http://vancity-lens-frontend.${{ env.NAMESPACE }}.svc.cluster.local/ > /dev/null
+
+      - name: Comprehensive Smoke Tests (Public URL)
+        env:
+          STAGING_URL: https://staging.vancitylens.com
+        run: |
+          echo "Waiting for GKE ingress to propagate (30s)..."
+          sleep 30
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh "$STAGING_URL"
