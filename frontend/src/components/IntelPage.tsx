@@ -228,7 +228,13 @@ export default function IntelPage() {
                         {msg.citations.map((citation, idx) => (
                           <a
                             key={idx}
-                            href={citation.document_id ? `${API_BASE}/api/v1/intel/documents/${citation.document_id}/page` : citation.document_url}
+                            href={
+                              citation.document_id
+                                ? `${API_BASE}/api/v1/intel/documents/${citation.document_id}/page`
+                                : citation.url_status === "dead" && citation.archive_url
+                                  ? citation.archive_url
+                                  : citation.document_url || citation.archive_url || "#"
+                            }
                             target="_blank" rel="noopener noreferrer"
                             className={cn("inline-block px-2 py-1 rounded text-[11px] no-underline whitespace-nowrap",
                               msg.role === "user" ? "bg-white/15 text-[var(--color-foreground)]" : "bg-[var(--color-surface-secondary)] text-blue-400"

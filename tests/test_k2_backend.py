@@ -102,6 +102,43 @@ class TestK2SearchNormalization:
         assert c0["section_header"] == "Section A"
         assert c0["chunk_index"] == 5
 
+    def test_k2_search_chunks_preserves_local_document_id_from_current_metadata(self, monkeypatch):
+        from api.intelligence.k2_client import k2_search_chunks
+
+        _set_required_k2_env(monkeypatch)
+
+        class StubClient:
+            def search(self, *, corpus_id, query, top_k, return_config):
+                return {
+                    "results": [
+                        {
+                            "chunk_id": "k2-chunk-2",
+                            "text": "Chunk backed by synced Postgres document",
+                            "score": 0.73,
+                            "custom_metadata": {
+                                "postgres_id": "10305",
+                                "source_type": "dpb_minutes",
+                            },
+                            "system_metadata": {
+                                "provenance": {
+                                    "title": "Development Permit Board Decision: 4100 Joyce Street",
+                                    "source_uri": "https://vancouver.ca/home-property-development/dpb-decision-2026-02-10-4100-joyce.aspx",
+                                }
+                            },
+                        }
+                    ]
+                }
+
+        with patch("api.intelligence.k2_client.get_k2_client", return_value=StubClient()):
+            chunks = k2_search_chunks("joyce", top_k=1)
+
+        assert len(chunks) == 1
+        c0 = chunks[0]
+        assert c0["document_id"] == 10305
+        assert c0["document_title"] == "Development Permit Board Decision: 4100 Joyce Street"
+        assert c0["source_url"] == "https://vancouver.ca/home-property-development/dpb-decision-2026-02-10-4100-joyce.aspx"
+        assert c0["source_type"] == "dpb_minutes"
+
     def test_k2_search_chunks_resolves_corpus_name_on_not_found(self, monkeypatch):
         from api.intelligence.k2_client import k2_search_chunks
         from sdk.errors import NotFoundError

@@ -175,6 +175,18 @@ def _coerce_result_metadata(result: dict[str, Any]) -> tuple[dict[str, Any], dic
     return custom_meta, system_meta
 
 
+def _coerce_local_document_id(*values: Any) -> int | None:
+    """Best-effort conversion of K2 metadata fields to a local Postgres document id."""
+    for value in values:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.isdigit():
+                return int(stripped)
+    return None
+
+
 def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, Any]]:
     """Search K2 and normalize results to the chunk dict shape expected by chat.py."""
 
@@ -256,6 +268,17 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
         if not isinstance(provenance, dict):
             provenance = {}
         chunk_text = (r.get("text") or "").strip()
+        local_document_id = _coerce_local_document_id(
+            custom_meta.get("postgres_id"),
+            custom_meta.get("postgres_document_id"),
+            custom_meta.get("local_document_id"),
+            meta.get("postgres_id"),
+            meta.get("postgres_document_id"),
+            meta.get("local_document_id"),
+            meta.get("document_id"),
+            provenance.get("postgres_id"),
+            provenance.get("document_id"),
+        )
 
         # Best-effort mapping: metadata keys depend on how K2 ingestion was configured.
         document_title = (
@@ -294,7 +317,7 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
                 # Bill47 chunk shape
                 "chunk_id": None,  # K2 chunk IDs are strings; DB expects INT[] for chat history
                 "chunk_text": chunk_text,
-                "document_id": None,  # local DB doc IDs don't exist for K2
+                "document_id": local_document_id,
                 "section_header": meta.get("section_header"),
                 "chunk_index": meta.get("chunk_index"),
                 "rrf_score": final_score,

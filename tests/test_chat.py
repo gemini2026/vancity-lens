@@ -302,6 +302,70 @@ class TestHandleChat:
         assert response.citations[0].document_title == "Regular Council Meeting Minutes - February 4, 2026"
         assert response.citations[0].document_id == 10301
 
+    @pytest.mark.asyncio
+    async def test_handle_chat_uses_archive_fallback_for_dead_signal_links(self):
+        """Dead signal source URLs should fall back to the archived document URL."""
+        mock_pool = AsyncMock()
+        mock_pool.acquire = MagicMock()
+        conn = AsyncMock()
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+        conn.fetch.return_value = [
+            {
+                "id": 10301,
+                "url_status": "dead",
+                "archive_url": "https://web.archive.org/web/https://vancouver.ca/your-government/council-minutes-2026-02-04.aspx",
+            }
+        ]
+
+        mock_signals = [
+            SignalResponse(
+                id=10179,
+                document_id=10301,
+                signal_type="rezoning_decision",
+                summary="3055 Grandview Highway was approved on February 4, 2026 for 275 units.",
+                headline="Renfrew Station Area: 22-Storey with 275 Units Approved",
+                addresses=["3055 Grandview Highway"],
+                neighborhood="Renfrew-Collingwood",
+                decision="approved",
+                vote_for=8,
+                vote_against=2,
+                sentiment="positive_for_development",
+                severity="medium",
+                confidence=0.91,
+                event_date=date(2026, 2, 4),
+                source_title="Regular Council Meeting Minutes - February 4, 2026",
+                source_url="https://vancouver.ca/your-government/council-minutes-2026-02-04.aspx",
+                source_type="council_minutes",
+                source_date=date(2026, 2, 4),
+            )
+        ]
+
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=[]):
+            with patch("api.intelligence.chat.get_relevant_signals", return_value=mock_signals):
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
+                    )
+                    mock_create.return_value = mock_session
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with _mock_generate_chat():
+                            response = await handle_chat(
+                                mock_pool,
+                                "What rezoning applications were approved recently?",
+                                "test-key",
+                            )
+
+        assert response.citations[0].document_url == "https://web.archive.org/web/https://vancouver.ca/your-government/council-minutes-2026-02-04.aspx"
+        assert response.citations[0].url_status == "dead"
+        assert response.citations[0].archive_url == "https://web.archive.org/web/https://vancouver.ca/your-government/council-minutes-2026-02-04.aspx"
+
 
 class TestGetRelevantSignals:
     """Test relevant signal retrieval."""

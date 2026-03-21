@@ -13,6 +13,7 @@ Search pipeline uses K2 search (with local BM25 fallback).
 import logging
 import re
 import uuid
+from urllib.parse import urlparse
 from datetime import datetime, date, timezone, timedelta
 from typing import Optional, List, Any
 
@@ -187,21 +188,57 @@ def _dedupe_signals(signals: List[SignalResponse]) -> List[SignalResponse]:
     return deduped
 
 
-def _build_signal_citations(signals: List[SignalResponse]) -> List[SourceCitation]:
+def _is_safe_http_url(url: str) -> bool:
+    parsed = urlparse(url.strip())
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
+def _preferred_citation_url(
+    source_url: Optional[str],
+    *,
+    url_status: Optional[str] = None,
+    archive_url: Optional[str] = None,
+) -> str:
+    source = (source_url or "").strip()
+    archive = (archive_url or "").strip()
+
+    if url_status == "dead":
+        if archive and _is_safe_http_url(archive):
+            return archive
+        return source if _is_safe_http_url(source) else ""
+
+    if source and _is_safe_http_url(source):
+        return source
+    if archive and _is_safe_http_url(archive):
+        return archive
+    return ""
+
+
+def _build_signal_citations(
+    signals: List[SignalResponse],
+    document_health: dict[int, dict[str, Any]],
+) -> List[SourceCitation]:
     citations: List[SourceCitation] = []
     for signal in signals:
+        health = document_health.get(signal.document_id, {})
+        url_status = health.get("url_status")
+        archive_url = health.get("archive_url")
         citations.append(
             SourceCitation(
                 document_title=signal.source_title or signal.headline or "Signal",
-                document_url=signal.source_url or "",
+                document_url=_preferred_citation_url(
+                    signal.source_url,
+                    url_status=url_status,
+                    archive_url=archive_url,
+                ),
                 source_type=signal.source_type or "unknown",
                 published_date=signal.source_date or signal.event_date,
                 relevance_score=float(signal.confidence or 0.0),
                 excerpt=signal.summary[:300],
                 document_id=signal.document_id,
                 chunk_id=None,
-                url_status=None,
-                archive_url=None,
+                url_status=url_status,
+                archive_url=archive_url,
             )
         )
     return citations
@@ -397,8 +434,17 @@ User query: {query}"""
         # Step 5: Extract citations from used chunks and structured signals.
         citations: List[SourceCitation] = []
 
-        # Batch-fetch url_status and archive_url for cited documents
-        doc_ids = list({c.get("document_id") for c in chunks if c.get("document_id")})
+        # Batch-fetch url_status and archive_url for cited documents.
+        doc_ids = list(
+            {
+                doc_id
+                for doc_id in [
+                    *(c.get("document_id") for c in chunks),
+                    *(s.document_id for s in signals),
+                ]
+                if doc_id
+            }
+        )
         url_health_map: dict = {}
         if doc_ids:
             try:
@@ -423,7 +469,12 @@ User query: {query}"""
             citations.append(
                 SourceCitation(
                     document_title=chunk.get("document_title", "Unknown"),
-                    document_url=chunk.get("source_url", ""),
+                    document_url=_preferred_citation_url(
+                        chunk.get("source_url"),
+                        url_status=health.get("url_status") or chunk.get("url_status"),
+                        archive_url=health.get("archive_url")
+                        or chunk.get("archive_url"),
+                    ),
                     source_type=chunk.get("source_type", "unknown"),
                     published_date=chunk.get("published_date"),
                     relevance_score=score,
@@ -435,7 +486,7 @@ User query: {query}"""
                 )
             )
 
-        signal_citations = _build_signal_citations(signals)
+        signal_citations = _build_signal_citations(signals, url_health_map)
         if signal_first:
             citations = signal_citations + citations
         else:
