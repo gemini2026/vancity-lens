@@ -11,15 +11,16 @@ Search pipeline uses K2 search (with local BM25 fallback).
 """
 
 import logging
+import re
 import uuid
-from datetime import datetime, date, timezone
-from typing import Optional, List
+from datetime import datetime, date, timezone, timedelta
+from typing import Optional, List, Any
 
 import asyncpg
 
 from .llm_backend import generate_chat
 from .models import ChatResponse, SourceCitation, SignalResponse
-from .prepared_queries import QueryBuilder
+from .prepared_queries import QueryBuilder, build_signal_feed_query
 from .retrieval_backend import retrieve_document_chunks
 from .chat_sessions import (
     create_session,
@@ -41,6 +42,8 @@ CORE INSTRUCTIONS:
 5. Format responses for a sophisticated real estate investor audience - assume knowledge of Vancouver zoning, TOA, and development process
 6. When discussing decisions, include vote counts, dates, and decision status (approved/denied/deferred/pending)
 7. Acknowledge uncertainty when confidence is low
+8. When structured intelligence signals are present, treat them as the primary source of truth for decision status, event dates, vote counts, and addresses
+9. Consolidate duplicate signals that refer to the same event instead of repeating them
 
 RESPONSE FORMAT:
 - Lead with the direct answer
@@ -53,6 +56,174 @@ PROHIBITED:
 - Do not invent or speculate about facts not in the context
 - Do not provide general real estate advice beyond what is documented
 - Do not extrapolate beyond stated policies or decisions"""
+
+
+_DECISION_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
+    ("approved", ("approved", "approve", "approval", "enacted")),
+    ("denied", ("denied", "deny", "rejected", "reject")),
+    ("deferred", ("deferred", "defer")),
+    ("referred", ("referred", "refer")),
+    ("pending", ("pending", "under review", "in review")),
+]
+
+
+def _normalize_query_text(query: str) -> str:
+    return " ".join(query.lower().split())
+
+
+def _extract_decision_filter(normalized_query: str) -> Optional[str]:
+    for decision, terms in _DECISION_PATTERNS:
+        if any(term in normalized_query for term in terms):
+            return decision
+    return None
+
+
+def _infer_lookback_days(normalized_query: str) -> Optional[int]:
+    match = re.search(
+        r"\b(?:last|past)\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)\b",
+        normalized_query,
+    )
+    if match:
+        quantity = int(match.group(1))
+        unit = match.group(2)
+        multipliers = {
+            "day": 1,
+            "days": 1,
+            "week": 7,
+            "weeks": 7,
+            "month": 30,
+            "months": 30,
+            "year": 365,
+            "years": 365,
+        }
+        return quantity * multipliers[unit]
+
+    if any(phrase in normalized_query for phrase in ("last month", "past month")):
+        return 31
+    if any(phrase in normalized_query for phrase in ("last quarter", "past quarter")):
+        return 93
+    if any(phrase in normalized_query for phrase in ("last year", "past year")):
+        return 365
+    if any(term in normalized_query for term in ("recent", "recently", "latest")):
+        return 365
+    return None
+
+
+def _structured_signal_filters(
+    query: str,
+    *,
+    neighborhood: Optional[str] = None,
+    limit: int = 5,
+) -> Optional[dict[str, Any]]:
+    normalized_query = _normalize_query_text(query)
+    if "rezoning" not in normalized_query and "rezone" not in normalized_query:
+        return None
+
+    decision = _extract_decision_filter(normalized_query)
+    if not decision:
+        return None
+
+    filters: dict[str, Any] = {
+        "signal_type": "rezoning_decision",
+        "limit": limit,
+        "offset": 0,
+    }
+    if neighborhood:
+        filters["neighborhood"] = neighborhood
+    filters["decision"] = decision
+
+    lookback_days = _infer_lookback_days(normalized_query)
+    if lookback_days is not None:
+        filters["date_from"] = date.today() - timedelta(days=lookback_days)
+        filters["date_to"] = date.today()
+
+    return filters
+
+
+def _signal_prefers_context(query: str, *, neighborhood: Optional[str] = None) -> bool:
+    return _structured_signal_filters(query, neighborhood=neighborhood, limit=5) is not None
+
+
+def _row_to_signal(row: Any) -> SignalResponse:
+    return SignalResponse(
+        id=row["id"],
+        document_id=row["document_id"],
+        signal_type=row["signal_type"],
+        summary=row["summary"],
+        headline=row["headline"],
+        addresses=row["addresses"] or [],
+        neighborhood=row["neighborhood"],
+        decision=row["decision"],
+        vote_for=row["vote_for"],
+        vote_against=row["vote_against"],
+        sentiment=row["sentiment"],
+        severity=row["severity"],
+        confidence=row["confidence"],
+        event_date=row["event_date"],
+        source_title=row["source_title"],
+        source_url=row["source_url"],
+        source_type=row["source_type"],
+        source_date=row["source_date"],
+    )
+
+
+def _dedupe_signals(signals: List[SignalResponse]) -> List[SignalResponse]:
+    deduped: List[SignalResponse] = []
+    seen: set[tuple[Any, ...]] = set()
+
+    for signal in signals:
+        key = (
+            signal.signal_type,
+            (signal.headline or signal.summary).strip().lower(),
+            tuple(addr.strip().lower() for addr in signal.addresses),
+            signal.event_date,
+            (signal.decision or "").strip().lower(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(signal)
+
+    return deduped
+
+
+def _build_signal_citations(signals: List[SignalResponse]) -> List[SourceCitation]:
+    citations: List[SourceCitation] = []
+    for signal in signals:
+        citations.append(
+            SourceCitation(
+                document_title=signal.source_title or signal.headline or "Signal",
+                document_url=signal.source_url or "",
+                source_type=signal.source_type or "unknown",
+                published_date=signal.source_date or signal.event_date,
+                relevance_score=float(signal.confidence or 0.0),
+                excerpt=signal.summary[:300],
+                document_id=signal.document_id,
+                chunk_id=None,
+                url_status=None,
+                archive_url=None,
+            )
+        )
+    return citations
+
+
+def _dedupe_citations(citations: List[SourceCitation]) -> List[SourceCitation]:
+    deduped: List[SourceCitation] = []
+    seen: set[tuple[Any, ...]] = set()
+
+    for citation in citations:
+        key = (
+            citation.document_id,
+            citation.document_title.strip().lower(),
+            citation.document_url.strip().lower(),
+            citation.excerpt.strip().lower(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(citation)
+
+    return deduped
 
 
 async def handle_chat(
@@ -113,6 +284,10 @@ async def handle_chat(
             # Continue anyway - session may be new
 
     try:
+        signal_first = _signal_prefers_context(
+            query, neighborhood=neighborhood_filter
+        )
+
         # Step 1: Retrieve relevant document chunks
         logger.info(f"Retrieving document chunks for query: {query[:100]}...")
         chunks = await retrieve_document_chunks(
@@ -133,20 +308,9 @@ async def handle_chat(
         # Step 3: Build context string from chunks and signals
         context_parts = []
 
-        if chunks:
-            context_parts.append("## RETRIEVED DOCUMENT CHUNKS:\n")
-            for i, chunk in enumerate(chunks, 1):
-                score = chunk.get("final_score", chunk.get("rrf_score", 0.0))
-                context_parts.append(f"\n### Chunk {i} (Score: {score:.3f})")
-                context_parts.append(
-                    f"Source: {chunk.get('document_title', 'Unknown')}"
-                )
-                context_parts.append(f"URL: {chunk.get('source_url', '')}")
-                if chunk.get("section_header"):
-                    context_parts.append(f"Section: {chunk['section_header']}")
-                context_parts.append(f"\n{chunk['chunk_text']}\n")
-
-        if signals:
+        def append_signal_context() -> None:
+            if not signals:
+                return
             context_parts.append("\n## INTELLIGENCE SIGNALS:\n")
             for i, signal in enumerate(signals, 1):
                 context_parts.append(
@@ -167,7 +331,30 @@ async def handle_chat(
                         votes_str = f" ({signal.vote_for}-{signal.vote_against})"
                     context_parts.append(f"Decision: {signal.decision}{votes_str}")
                 context_parts.append(f"Source: {signal.source_title}")
+                context_parts.append(f"Source URL: {signal.source_url or ''}")
                 context_parts.append(f"\n{signal.summary}\n")
+
+        def append_chunk_context() -> None:
+            if not chunks:
+                return
+            context_parts.append("## RETRIEVED DOCUMENT CHUNKS:\n")
+            for i, chunk in enumerate(chunks, 1):
+                score = chunk.get("final_score", chunk.get("rrf_score", 0.0))
+                context_parts.append(f"\n### Chunk {i} (Score: {score:.3f})")
+                context_parts.append(
+                    f"Source: {chunk.get('document_title', 'Unknown')}"
+                )
+                context_parts.append(f"URL: {chunk.get('source_url', '')}")
+                if chunk.get("section_header"):
+                    context_parts.append(f"Section: {chunk['section_header']}")
+                context_parts.append(f"\n{chunk['chunk_text']}\n")
+
+        if signal_first:
+            append_signal_context()
+            append_chunk_context()
+        else:
+            append_chunk_context()
+            append_signal_context()
 
         context = "\n".join(context_parts)
 
@@ -207,7 +394,7 @@ User query: {query}"""
             )
             logger.info("LLM responded in %.1fs (model=%s)", llm_latency, model_used)
 
-        # Step 5: Extract citations from used chunks with provenance (RAG-005)
+        # Step 5: Extract citations from used chunks and structured signals.
         citations: List[SourceCitation] = []
 
         # Batch-fetch url_status and archive_url for cited documents
@@ -248,8 +435,13 @@ User query: {query}"""
                 )
             )
 
-        # Limit citations to top 5
-        citations = citations[:5]
+        signal_citations = _build_signal_citations(signals)
+        if signal_first:
+            citations = signal_citations + citations
+        else:
+            citations.extend(signal_citations)
+
+        citations = _dedupe_citations(citations)[:5]
 
         # Step 6: Store chat message in database
         try:
@@ -375,79 +567,65 @@ async def get_relevant_signals(
     """
 
     try:
-        # Build parameterized query using QueryBuilder
-        builder = QueryBuilder()
-
-        # Base WHERE condition for full-text search (param 1 is the query)
-        builder.params = [query]
-        builder.conditions = [
-            "to_tsvector('english', isig.summary || ' ' || COALESCE(isig.headline, '')) "
-            "@@ plainto_tsquery('english', $1)"
-        ]
-
-        # Add neighborhood filter if provided
-        if neighborhood:
-            builder.add_filter("isig.neighborhood", "=", neighborhood)
-
-        where_clause, params = builder.build()
-
-        # Build the full query with ordering and limit
-        param_num = len(params) + 1
-        base_query = f"""
-            SELECT
-                isig.id,
-                isig.document_id,
-                isig.signal_type,
-                isig.summary,
-                isig.headline,
-                isig.addresses,
-                isig.neighborhood,
-                isig.decision,
-                isig.vote_for,
-                isig.vote_against,
-                isig.sentiment,
-                isig.severity,
-                isig.confidence,
-                isig.event_date,
-                d.title AS source_title,
-                d.source_url,
-                d.source_type,
-                d.published_date AS source_date
-            FROM intelligence_signals isig
-            JOIN documents d ON isig.document_id = d.id
-            WHERE {where_clause}
-            ORDER BY isig.event_date DESC NULLS LAST, isig.severity DESC
-            LIMIT ${param_num}
-        """
-
-        params.append(limit)
-
         async with db_pool.acquire() as conn:
+            structured_filters = _structured_signal_filters(
+                query, neighborhood=neighborhood, limit=limit
+            )
+            if structured_filters:
+                structured_query, structured_params, _, _ = build_signal_feed_query(
+                    structured_filters
+                )
+                rows = await conn.fetch(structured_query, *structured_params)
+                signals = _dedupe_signals([_row_to_signal(row) for row in rows])
+                if signals:
+                    logger.info(
+                        "Retrieved %d structured signals for query", len(signals)
+                    )
+                    return signals[:limit]
+
+            # Fallback: plain keyword matching for broader exploratory queries.
+            builder = QueryBuilder()
+            builder.params = [query]
+            builder.conditions = [
+                "to_tsvector('english', isig.summary || ' ' || COALESCE(isig.headline, '')) "
+                "@@ plainto_tsquery('english', $1)"
+            ]
+
+            if neighborhood:
+                builder.add_filter("isig.neighborhood", "=", neighborhood)
+
+            where_clause, params = builder.build()
+            param_num = len(params) + 1
+            base_query = f"""
+                SELECT
+                    isig.id,
+                    isig.document_id,
+                    isig.signal_type,
+                    isig.summary,
+                    isig.headline,
+                    isig.addresses,
+                    isig.neighborhood,
+                    isig.decision,
+                    isig.vote_for,
+                    isig.vote_against,
+                    isig.sentiment,
+                    isig.severity,
+                    isig.confidence,
+                    isig.event_date,
+                    d.title AS source_title,
+                    d.source_url,
+                    d.source_type,
+                    d.published_date AS source_date
+                FROM intelligence_signals isig
+                JOIN documents d ON isig.document_id = d.id
+                WHERE {where_clause}
+                ORDER BY isig.event_date DESC NULLS LAST, isig.severity DESC
+                LIMIT ${param_num}
+            """
+            params.append(limit)
             rows = await conn.fetch(base_query, *params)
 
-        signals = []
-        for row in rows:
-            signal = SignalResponse(
-                id=row["id"],
-                document_id=row["document_id"],
-                signal_type=row["signal_type"],
-                summary=row["summary"],
-                headline=row["headline"],
-                addresses=row["addresses"] or [],
-                neighborhood=row["neighborhood"],
-                decision=row["decision"],
-                vote_for=row["vote_for"],
-                vote_against=row["vote_against"],
-                sentiment=row["sentiment"],
-                severity=row["severity"],
-                confidence=row["confidence"],
-                event_date=row["event_date"],
-                source_title=row["source_title"],
-                source_url=row["source_url"],
-                source_type=row["source_type"],
-                source_date=row["source_date"],
-            )
-            signals.append(signal)
+        signals = _dedupe_signals([_row_to_signal(row) for row in rows])
 
         logger.info(f"Retrieved {len(signals)} relevant signals")
         return signals

@@ -152,6 +152,29 @@ def _extract_title_from_text(chunk_text: str) -> str:
     return ""
 
 
+def _coerce_result_metadata(result: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Normalize K2 search metadata across legacy and current SDK shapes.
+
+    Current K2 search responses return `custom_metadata` and `system_metadata`.
+    Older callers expected a single `metadata` dict. Bill47 chat was only reading
+    the legacy shape, which dropped titles and URLs on otherwise healthy results.
+    """
+    custom_meta = result.get("custom_metadata") or {}
+    system_meta = result.get("system_metadata") or {}
+
+    if not custom_meta and not system_meta:
+        legacy = result.get("metadata")
+        if isinstance(legacy, dict):
+            custom_meta = legacy
+
+    if not isinstance(custom_meta, dict):
+        custom_meta = {}
+    if not isinstance(system_meta, dict):
+        system_meta = {}
+
+    return custom_meta, system_meta
+
+
 def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, Any]]:
     """Search K2 and normalize results to the chunk dict shape expected by chat.py."""
 
@@ -227,7 +250,11 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
     results = response.get("results") or []
     normalized: list[dict[str, Any]] = []
     for r in results:
-        meta = r.get("metadata") or {}
+        custom_meta, system_meta = _coerce_result_metadata(r)
+        meta = {**system_meta, **custom_meta}
+        provenance = system_meta.get("provenance")
+        if not isinstance(provenance, dict):
+            provenance = {}
         chunk_text = (r.get("text") or "").strip()
 
         # Best-effort mapping: metadata keys depend on how K2 ingestion was configured.
@@ -235,6 +262,7 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
             meta.get("title")
             or meta.get("document_title")
             or meta.get("source_title")
+            or provenance.get("title")
             or _extract_title_from_text(chunk_text)
             or "Unknown"
         )
@@ -242,6 +270,7 @@ def k2_search_chunks(query: str, *, top_k: int | None = None) -> list[dict[str, 
             meta.get("source_url")
             or meta.get("canonical_url")
             or meta.get("source_uri")
+            or provenance.get("source_uri")
             or ""
         )
         source_type = meta.get("source_type") or meta.get("type") or "unknown"

@@ -8,7 +8,7 @@ from api.intelligence.chat import (
     handle_chat,
     get_relevant_signals,
 )
-from api.intelligence.models import ChatResponse, SourceCitation
+from api.intelligence.models import ChatResponse, SourceCitation, SignalResponse
 
 
 class TestChatSystemPrompt:
@@ -224,6 +224,84 @@ class TestHandleChat:
                             assert response.answer == "Test answer"
                             assert response.session_id is not None
 
+    @pytest.mark.asyncio
+    async def test_handle_chat_prefers_structured_signal_context_and_citations(self):
+        """Structured rezoning decision queries should lead with signal context."""
+        mock_pool = AsyncMock()
+        mock_pool.acquire = MagicMock()
+        conn = AsyncMock()
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+        mock_chunks = [
+            {
+                "chunk_text": "Generic rezoning process guidance",
+                "document_id": None,
+                "document_title": "Zoning District Change Process",
+                "source_url": "https://vancouver.ca/home-property-development/zoning-district-change.aspx",
+                "section_header": None,
+                "chunk_index": 0,
+                "final_score": 0.78,
+            }
+        ]
+        mock_signals = [
+            SignalResponse(
+                id=10179,
+                document_id=10301,
+                signal_type="rezoning_decision",
+                summary="3055 Grandview Highway was approved on February 4, 2026 for 275 units.",
+                headline="Renfrew Station Area: 22-Storey with 275 Units Approved",
+                addresses=["3055 Grandview Highway"],
+                neighborhood="Renfrew-Collingwood",
+                decision="approved",
+                vote_for=8,
+                vote_against=2,
+                sentiment="positive_for_development",
+                severity="medium",
+                confidence=0.91,
+                event_date=date(2026, 2, 4),
+                source_title="Regular Council Meeting Minutes - February 4, 2026",
+                source_url="https://vancouver.ca/your-government/council-minutes-2026-02-04.aspx",
+                source_type="council_minutes",
+                source_date=date(2026, 2, 4),
+            )
+        ]
+        captured: dict[str, str] = {}
+
+        async def fake_generate_chat(**kwargs):
+            captured["user_message"] = kwargs["user_message"]
+            return ("Test answer", "gemini-2.5-flash", 1.1)
+
+        with patch("api.intelligence.chat.retrieve_document_chunks", return_value=mock_chunks):
+            with patch("api.intelligence.chat.get_relevant_signals", return_value=mock_signals):
+                with patch("api.intelligence.chat.create_session") as mock_create:
+                    from api.intelligence.models import ChatSession
+                    from datetime import datetime, timezone
+                    mock_session = ChatSession(
+                        id=1,
+                        session_id="test-session",
+                        user_label="default",
+                        created_at=datetime.now(timezone.utc),
+                        message_count=0
+                    )
+                    mock_create.return_value = mock_session
+                    with patch("api.intelligence.chat.build_context_window", return_value=""):
+                        with patch(
+                            "api.intelligence.chat.generate_chat",
+                            new_callable=AsyncMock,
+                            side_effect=fake_generate_chat,
+                        ):
+                            response = await handle_chat(
+                                mock_pool,
+                                "What rezoning applications were approved recently?",
+                                "test-key",
+                            )
+
+        user_message = captured["user_message"]
+        assert user_message.index("## INTELLIGENCE SIGNALS") < user_message.index("## RETRIEVED DOCUMENT CHUNKS")
+        assert response.citations[0].document_title == "Regular Council Meeting Minutes - February 4, 2026"
+        assert response.citations[0].document_id == 10301
+
 
 class TestGetRelevantSignals:
     """Test relevant signal retrieval."""
@@ -288,6 +366,73 @@ class TestGetRelevantSignals:
         result = await get_relevant_signals(mock_pool, "test")
 
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_get_relevant_signals_prefers_structured_recent_approved_rezonings(self):
+        """Approved recent rezoning queries should use explicit signal filters."""
+        mock_pool = AsyncMock()
+        mock_pool.acquire = MagicMock()
+        conn = AsyncMock()
+        mock_pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        mock_pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+        conn.fetch.return_value = [
+            {
+                "id": 1,
+                "document_id": 10,
+                "signal_type": "rezoning_decision",
+                "summary": "3055 Grandview Highway approved.",
+                "headline": "Renfrew Station Area: 22-Storey with 275 Units Approved",
+                "addresses": ["3055 Grandview Highway"],
+                "neighborhood": "Renfrew-Collingwood",
+                "decision": "approved",
+                "vote_for": 8,
+                "vote_against": 2,
+                "sentiment": "positive_for_development",
+                "severity": "medium",
+                "confidence": 0.91,
+                "event_date": date(2026, 2, 4),
+                "source_title": "Regular Council Meeting Minutes - February 4, 2026",
+                "source_url": "https://vancouver.ca/your-government/council-minutes-2026-02-04.aspx",
+                "source_type": "council_minutes",
+                "source_date": date(2026, 2, 4),
+            },
+            {
+                "id": 2,
+                "document_id": 11,
+                "signal_type": "rezoning_decision",
+                "summary": "3055 Grandview Highway approved.",
+                "headline": "Renfrew Station Area: 22-Storey with 275 Units Approved",
+                "addresses": ["3055 Grandview Highway"],
+                "neighborhood": "Renfrew-Collingwood",
+                "decision": "approved",
+                "vote_for": 8,
+                "vote_against": 2,
+                "sentiment": "positive_for_development",
+                "severity": "medium",
+                "confidence": 0.88,
+                "event_date": date(2026, 2, 4),
+                "source_title": "Regular Council Meeting Minutes - February 4, 2026",
+                "source_url": "https://vancouver.ca/your-government/vancouver-city-council.aspx#doc-10179",
+                "source_type": "council_minutes",
+                "source_date": date(2026, 2, 4),
+            },
+        ]
+
+        result = await get_relevant_signals(
+            mock_pool,
+            "What rezoning applications were approved recently?",
+            limit=5,
+        )
+
+        assert len(result) == 1
+        assert conn.fetch.called
+        query_call = conn.fetch.call_args
+        query_string = query_call[0][0]
+        params = query_call[0][1:]
+        assert "isig.signal_type = $1" in query_string
+        assert "isig.decision = $2" in query_string
+        assert params[0] == "rezoning_decision"
+        assert params[1] == "approved"
 
 
 class TestChatIntegration:

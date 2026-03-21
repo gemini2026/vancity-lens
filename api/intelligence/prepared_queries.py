@@ -274,6 +274,9 @@ def build_signal_feed_query(
     if "signal_type" in filters and filters["signal_type"]:
         builder.add_filter("isig.signal_type", "=", filters["signal_type"])
 
+    if "decision" in filters and filters["decision"]:
+        builder.add_filter("isig.decision", "=", filters["decision"])
+
     if "severity_min" in filters and filters["severity_min"]:
         builder.add_severity_filter(filters["severity_min"])
 
@@ -348,6 +351,9 @@ def build_signal_count_query(
 
     if "signal_type" in filters and filters["signal_type"]:
         builder.add_filter("isig.signal_type", "=", filters["signal_type"])
+
+    if "decision" in filters and filters["decision"]:
+        builder.add_filter("isig.decision", "=", filters["decision"])
 
     if "severity_min" in filters and filters["severity_min"]:
         builder.add_severity_filter(filters["severity_min"])
